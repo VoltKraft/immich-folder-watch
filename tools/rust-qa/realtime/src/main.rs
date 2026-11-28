@@ -1,6 +1,8 @@
 //! Loopback-only RW-02 harness for the actual Rust network adapter.
 #![forbid(unsafe_code)]
 
+#[cfg(target_os = "linux")]
+mod digest_proxy;
 mod plaintext_proxy;
 mod protocol;
 mod session;

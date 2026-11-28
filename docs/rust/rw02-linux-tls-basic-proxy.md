@@ -1,9 +1,9 @@
-# Linux HTTPS through a Basic-authenticated HTTP proxy
+# Linux HTTPS through an authenticated HTTP proxy
 
 The Linux transport handles a named HTTP proxy from the environment when the
 Immich origin uses HTTPS. It first asks for a CONNECT tunnel anonymously.
-If the configured proxy returns 407 and offers Basic, the client may repeat
-the same operation once using that proxy's credentials. The ordinary rustls
+If the configured proxy returns 407 and offers a supported Digest or Basic
+challenge, the client may repeat the same operation once using that proxy's credentials. The ordinary rustls
 connection inside the accepted tunnel validates the Immich origin before
 sending an API key. The HTTPS, redirect and timeout settings are identical
 for both clients. The retry uses the remaining request budget and disables
@@ -151,8 +151,7 @@ verified the response hash before establishing TLS. For each algorithm the
 client then made four authenticated tunnels, read the REST inventory,
 received one event and closed normally. An incorrect password established
 zero tunnels on either relay. The Rust Basic-only binary sent anonymous
-CONNECTs and received 407 in every Digest trial. The application has no
-passing Rust Digest case yet. [Proxy Digest protocol](https://www.rfc-editor.org/rfc/rfc7616#section-3.8).
+CONNECTs and received 407 in every Digest trial. That binary predates the Digest implementation below. [Proxy Digest protocol](https://www.rfc-editor.org/rfc/rfc7616#section-3.8).
 
 Add `--digest` to the Fedora comparison command above, using a fresh
 output path. Replay the captured responses with
@@ -162,3 +161,37 @@ The sixteen original cases are in
 SHA-256 `d3ef4d1f0baf52bce96427095e70f7a35af1280e90f9d80231e511165515fafe`.
 The receipt records route, credential outcome and URI form. Passwords
 and challenge responses stay inside the disposable network namespace.
+
+
+## Authority-bound Digest on Fedora x64
+
+The Linux client selects a supported Digest challenge from the selected HTTP
+proxy's CONNECT response. It binds the digest to the authority actually used
+on the request line. In the sixteen-case signed comparison, the Rust client
+established nine TLS tunnels in each of the four positive cases. Both strict
+and legacy-compatible relays accepted its authority with SHA-256 and MD5.
+The peer observed an inventory, polling, a WebSocket event and a normal close
+inside TLS. All four wrong-password trials stopped before TLS. The signed
+client kept its historical root URI and passed on the two compatible relays.
+
+The release executable's SHA-256 is
+`d32aee73a5e4747655cdc92f34f9c1c47c2007ebeeaf0dcbcc1dfb3af17493b1`.
+The original sixteen-case receipt is
+`artifacts/rust/realtime-assessment/linux-tls-digest-final-01.json`,
+SHA-256 `7e7eb7eab5fd7057e51c0f2695ca89a7b4c66f299ad1a0fd900618535a63ba4a`.
+Replay it with `replay_linux_tls_basic_proxy.py --digest <report.json>`.
+For the ten earlier scenarios with a Digest-capable binary, use
+`--basic-with-digest`. The ordinary Linux suite also verifies the two
+algorithms with both correct and incorrect credentials. The wire evidence
+covers qop `auth`; repeated nonce replay policies and plaintext Digest
+are separate cases.
+
+The Linux transport selects the MIT license for RustCrypto `md-5` 0.11.0 and
+`sha2` 0.11.1. The exact MD5 archive matches crates.io and source revision
+`b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a`. On the two Linux targets
+the MD5 compression function uses safe Rust; this package adds no build
+script or native object. The target inventories retain both original license
+files for both packages. All previously selected target packages and features
+are identical to the previous inventories. The two Windows package sets are
+identical as well. [Reviewed hashes and original notices](../../tools/rust-qa/realtime/inputs.json) ·
+[RustCrypto MD5 sources](https://github.com/RustCrypto/hashes/tree/b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a/md5).

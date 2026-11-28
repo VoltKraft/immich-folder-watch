@@ -1,21 +1,21 @@
 {
-  "lockSha256": "0f0f5fdec52a46bfed2e05dccea9fc8138b5c11556f1a17247ed72d695f5e00b",
+  "lockSha256": "1c24ce548d0699179a8ff605599f68f6b859243c17caae32c242911ac2249f23",
   "graphs": {
     "aarch64-pc-windows-msvc": {
-      "sha256": "d620f1e6d8bd0616e1770e245161f0f8b9a69cffd5c634b5a248e2a57f98a29b",
+      "sha256": "04da2b57aef468bce45f4acd8c3f2b01450ddced4136a6115a5335f8a829bdff",
       "packages": 114
     },
     "aarch64-unknown-linux-gnu": {
-      "sha256": "496358be3fd723f3e4ac21ce55da792433be3f7a7df7c40962e5aeeca9af445d",
-      "packages": 111
+      "sha256": "9535e3fe7e5a251f240183e4f11ec68e130dfeffd354b69cb46fc8f639f2f71e",
+      "packages": 113
     },
     "x86_64-pc-windows-msvc": {
-      "sha256": "baf82ab394509c9ec6becfa0c3717063ef8c88fc3f4bd5e23745a01972b4465f",
+      "sha256": "5fdcf9aa78b0b7a74f5e448271a79b44c344c64777e29fd24d8bfb0ea6d42a60",
       "packages": 111
     },
     "x86_64-unknown-linux-gnu": {
-      "sha256": "d85e3c76c59067404a6adf6293e0fd841a1cffe6cad9200310d7cb88a7687ecc",
-      "packages": 111
+      "sha256": "538c38a7137175f7613ff8e31b474e1d6a07a96ebb0c9aacfac5666330be7e49",
+      "packages": 113
     }
   },
   "packages": [
@@ -503,6 +503,17 @@
       }
     },
     {
+      "name": "md-5",
+      "version": "0.11.0",
+      "archiveSha256": "69b6441f590336821bb897fb28fc622898ccceb1d6cea3fde5ea86b090c4de98",
+      "declared": "MIT OR Apache-2.0",
+      "selected": "MIT",
+      "notices": {
+        "LICENSE-APACHE": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+        "LICENSE-MIT": "831e0f43ad0bf014c1c4fec5767aae470434c1d66d6e671be2d823e729063e25"
+      }
+    },
+    {
       "name": "memchr",
       "version": "2.8.3",
       "archiveSha256": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
@@ -755,6 +766,17 @@
       "name": "sha1",
       "version": "0.11.0",
       "archiveSha256": "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214",
+      "declared": "MIT OR Apache-2.0",
+      "selected": "MIT",
+      "notices": {
+        "LICENSE-APACHE": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+        "LICENSE-MIT": "831e0f43ad0bf014c1c4fec5767aae470434c1d66d6e671be2d823e729063e25"
+      }
+    },
+    {
+      "name": "sha2",
+      "version": "0.11.1",
+      "archiveSha256": "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19",
       "declared": "MIT OR Apache-2.0",
       "selected": "MIT",
       "notices": {

@@ -24,7 +24,7 @@ pub(crate) struct Transport {
     api: Url,
     endpoint: Url,
     client: Client,
-    tls_basic_proxy_client: Option<Client>,
+    tls_proxy: Option<TunnelProxy>,
     plaintext_proxy: Option<Url>,
     proxy_authorization: Option<header::HeaderValue>,
     header: header::HeaderValue,
@@ -218,6 +218,59 @@ fn shipping_path(mut path: &str) -> String {
     out
 }
 
+fn http_client(allow_http: bool, roots: Option<&[Certificate]>) -> reqwest::ClientBuilder {
+    let base = Client::builder()
+        .tls_backend_rustls()
+        .http1_only()
+        .no_proxy()
+        .https_only(!allow_http)
+        .redirect(reqwest::redirect::Policy::none())
+        .retry(reqwest::retry::never())
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT);
+    match roots {
+        Some(roots) => base.tls_certs_only(roots.to_vec()),
+        None => base,
+    }
+}
+
+struct TunnelProxy {
+    basic: Client,
+    #[cfg(target_os = "linux")]
+    credentials: Url,
+    #[cfg(target_os = "linux")]
+    endpoint: Url,
+    #[cfg(target_os = "linux")]
+    roots: Option<Vec<Certificate>>,
+    #[cfg(target_os = "linux")]
+    allow_http: bool,
+}
+
+impl TunnelProxy {
+    fn challenged_client(
+        &self,
+        error: &reqwest::Error,
+        _api: &Url,
+    ) -> Result<Option<Client>, Error> {
+        let Some(headers) = tunnel_challenge(error) else {
+            return Ok(None);
+        };
+        #[cfg(target_os = "linux")]
+        if let Some(credential) =
+            crate::digest_proxy::authorization(headers, &self.credentials, _api)
+        {
+            let proxy = reqwest::Proxy::https(self.endpoint.clone())?.custom_http_auth(credential);
+            return Ok(Some(
+                http_client(self.allow_http, self.roots.as_deref())
+                    .pool_max_idle_per_host(0)
+                    .proxy(proxy)
+                    .build()?,
+            ));
+        }
+        Ok(crate::plaintext_proxy::offers_basic(headers).then(|| self.basic.clone()))
+    }
+}
+
 impl Transport {
     pub fn new(
         mut api: Url,
@@ -253,23 +306,8 @@ impl Transport {
         let endpoint = api.join("/socket.io/").map_err(|_| Error::Origin)?;
         let mut header = header::HeaderValue::from_str(api_key).map_err(|_| Error::Origin)?;
         header.set_sensitive(true);
-        let builder = || {
-            let base = Client::builder()
-                .tls_backend_rustls()
-                .http1_only()
-                .no_proxy()
-                .https_only(!allow_http)
-                .redirect(reqwest::redirect::Policy::none())
-                .retry(reqwest::retry::never())
-                .connect_timeout(CONNECT_TIMEOUT)
-                .timeout(REQUEST_TIMEOUT);
-            match &roots {
-                Some(roots) => base.tls_certs_only(roots.clone()),
-                None => base,
-            }
-        };
-        let mut primary = builder();
-        let mut tls_basic_proxy_client = None;
+        let mut primary = http_client(allow_http, roots.as_deref());
+        let mut tls_proxy = None;
         let mut plaintext_proxy = None;
         let mut credentials = None;
         if let Some(mut proxy) = proxy {
@@ -277,19 +315,28 @@ impl Transport {
                 && proxy.scheme() == "http"
                 && (!proxy.username().is_empty() || proxy.password().is_some())
             {
-                if api.scheme() == "https" {
-                    // Only an actual Basic challenge from this proxy selects this client.
-                    tls_basic_proxy_client = Some(
-                        builder()
-                            .pool_max_idle_per_host(0)
-                            .proxy(reqwest::Proxy::https(proxy.clone())?)
-                            .build()?,
-                    );
-                } else {
-                    credentials = Some(proxy.clone());
-                }
+                let credential_url = proxy.clone();
                 proxy.set_username("").map_err(|_| Error::Origin)?;
                 proxy.set_password(None).map_err(|_| Error::Origin)?;
+                if api.scheme() == "https" {
+                    let basic = http_client(allow_http, roots.as_deref())
+                        .pool_max_idle_per_host(0)
+                        .proxy(reqwest::Proxy::https(credential_url.clone())?)
+                        .build()?;
+                    tls_proxy = Some(TunnelProxy {
+                        basic,
+                        #[cfg(target_os = "linux")]
+                        credentials: credential_url,
+                        #[cfg(target_os = "linux")]
+                        endpoint: proxy.clone(),
+                        #[cfg(target_os = "linux")]
+                        roots: roots.clone(),
+                        #[cfg(target_os = "linux")]
+                        allow_http,
+                    });
+                } else {
+                    credentials = Some(credential_url);
+                }
             }
             if api.scheme() == "http" {
                 primary = primary.proxy(reqwest::Proxy::http(proxy.clone())?);
@@ -317,7 +364,7 @@ impl Transport {
             namespace,
             header,
             client,
-            tls_basic_proxy_client,
+            tls_proxy,
             proxy_authorization,
             plaintext_proxy,
         })
@@ -351,18 +398,21 @@ impl Transport {
     }
 
     async fn send(&self, request: RequestBuilder) -> Result<Response, Error> {
-        if let Some(authenticated) = &self.tls_basic_proxy_client {
+        if let Some(proxy) = &self.tls_proxy {
             let retry = request.try_clone().ok_or(Error::Protocol)?;
             let deadline = tokio::time::Instant::now() + REQUEST_TIMEOUT;
             return match request.send().await {
-                Err(error) if tunnel_challenged_basic(&error) => {
+                Err(error) => {
+                    let Some(authenticated) = proxy.challenged_client(&error, &self.api)? else {
+                        return Err(error.into());
+                    };
                     let remaining = deadline
                         .checked_duration_since(tokio::time::Instant::now())
                         .ok_or(Error::Timeout)?;
-                    let request = RequestBuilder::from_parts(authenticated.clone(), retry.build()?);
+                    let request = RequestBuilder::from_parts(authenticated, retry.build()?);
                     Ok(request.timeout(remaining).send().await?)
                 }
-                result => Ok(result?),
+                Ok(response) => Ok(response),
             };
         }
         let Some(auth) = &self.proxy_authorization else {
@@ -531,21 +581,21 @@ async fn bounded_ok_body(mut response: Response) -> Result<Vec<u8>, Error> {
     input.finish().map_err(|_| Error::Limit)
 }
 
-fn tunnel_challenged_basic(error: &reqwest::Error) -> bool {
+fn tunnel_challenge(error: &reqwest::Error) -> Option<&header::HeaderMap> {
     use hyper_util::client::legacy::connect::proxy::ProxyAuthChallenge;
     use std::error::Error as StdError;
 
     if !error.is_connect() {
-        return false;
+        return None;
     }
     let mut cause = error.source();
     while let Some(error) = cause {
         if let Some(challenge) = error.downcast_ref::<ProxyAuthChallenge>() {
-            return crate::plaintext_proxy::offers_basic(challenge.headers());
+            return Some(challenge.headers());
         }
         cause = error.source();
     }
-    false
+    None
 }
 
 impl From<reqwest::Error> for Error {

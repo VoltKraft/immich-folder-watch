@@ -7,18 +7,23 @@ import secrets
 import threading
 from urllib.parse import quote
 
+from digest_peer import DigestPeer
+
 
 class Authentication:
     def __init__(self, case):
         self.case = case
         self.password = secrets.token_hex(12) + "@:+/"
+        self.digest = None
         self.expected = "Basic " + base64.b64encode(f"fixture:{self.password}".encode()).decode()
         self.attempts = []
         self.rotated = threading.Event()
         self.lock = threading.Lock()
 
-    def proxy_url(self, port):
-        supplied = self.password + "wrong" if self.case == "https-basic-refused" else self.password
+    def proxy_url(self, port, authority):
+        if self.case.startswith("https-digest-"):
+            self.digest = DigestPeer(self.password, authority, self.case.split("-")[2])
+        supplied = self.password + "wrong" if self.case.endswith("-refused") else self.password
         return f"http://fixture:{quote(supplied, safe='')}@127.0.0.1:{port}"
 
     def accept(self, handler, authority):
@@ -26,19 +31,23 @@ class Authentication:
         assert handler.path == authority and headers.get_all("Host") == [authority]
         assert not any(h in headers for h in ("x-api-key", "Authorization", "Cookie"))
         values = headers.get_all("Proxy-Authorization", [])
-        correct = len(values) == 1 and hmac.compare_digest(values[0], self.expected)
-        credential = "correct" if correct else "incorrect" if values else "absent"
+        if self.digest:
+            credential, uri = self.digest.check(values)
+            assert (credential, uri) in {("correct", "authority"), ("incorrect", "authority"), ("absent", None)}
+        else:
+            correct = len(values) == 1 and hmac.compare_digest(values[0], self.expected)
+            credential = "correct" if correct else "incorrect" if values else "absent"
         with self.lock:
             other = self.case == "https-basic-other" or self.rotated.is_set()
-            offered = "other" if other else "basic"
-            allowed = self.case == "https-basic-origin-407" or correct and not other
+            offered = "other" if other else self.digest.algorithm if self.digest else "basic"
+            allowed = self.case == "https-basic-origin-407" or credential == "correct" and not other
             self.attempts.append((offered, credential, 200 if allowed else 407))
         if allowed:
             del headers["Proxy-Authorization"]
             return True
         handler.send_response(407)
-        challenge = 'Digest realm="not Basic, Basic realm", nonce="fixture"' if other else 'Basic realm="private"'
-        handler.send_header("Proxy-Authenticate", challenge)
+        challenge = 'Digest realm="not Basic, Basic realm", nonce="fixture", algorithm=unavailable' if other else 'Basic realm="private"'
+        handler.send_header("Proxy-Authenticate", self.digest.challenge if self.digest else challenge)
         handler.send_header("Connection", "close")
         handler.send_header("Content-Length", "0")
         handler.end_headers()
@@ -52,16 +61,17 @@ class Authentication:
         assert not direct.accepted_connections if not bypass else not outer and not counts
         if not bypass:
             assert sum(counts.values()) == outer["connections"] == outer["connects"]
+        scheme = self.digest.algorithm if self.digest else "basic"
         if self.case == "https-basic-other":
             assert set(counts) == {("other", "absent", 407)}
-        elif self.case == "https-basic-refused":
-            assert set(counts) == {("basic", "absent", 407), ("basic", "incorrect", 407)}
-            assert counts["basic", "absent", 407] == counts["basic", "incorrect", 407]
+        elif self.case.endswith("-refused"):
+            assert set(counts) == {(scheme, "absent", 407), (scheme, "incorrect", 407)}
+            assert counts[scheme, "absent", 407] == counts[scheme, "incorrect", 407]
         elif self.case == "https-basic-origin-407":
             assert set(counts) == {("basic", "absent", 200)} and stats["origin407"] >= 2
         elif not bypass:
-            challenges = counts.pop(("basic", "absent", 407))
-            accepted = counts.pop(("basic", "correct", 200))
+            challenges = counts.pop((scheme, "absent", 407))
+            accepted = counts.pop((scheme, "correct", 200))
             assert challenges == accepted >= 1
             assert outer["clientHellos"] == accepted
             if self.case == "https-basic-rotates":
@@ -69,7 +79,8 @@ class Authentication:
                 assert counts["other", "absent", 407] >= 2
             else:
                 assert not counts
-        success = self.case in ("https-basic-proxy", "https-basic-rotates", "https-basic-bypass")
+        success = self.case in ("https-basic-proxy", "https-basic-rotates", "https-basic-bypass",
+                                "https-digest-sha256", "https-digest-md5")
         if success:
             assert trace["Event"] == stats["sentSubscriptionEvents"] == trace["Connected"] == 1
             assert origin.namespace_posts == ["40/collection,"]

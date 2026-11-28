@@ -34,7 +34,7 @@ def check_session(rows, tunneled):
     assert json.loads(events[0]["body"].split(",", 1)[1])[0] == "on_album_update"
 
 
-def check_cases(cases, fixed):
+def check_cases(cases, fixed, digest_capable=False):
     modes = {"anonymous", "correct", "incorrect", "other-scheme", "bypass"}
     assert len(cases) == 10 and {(c["client"], c["mode"]) for c in cases} == {
         (client, mode) for client in ("signed", "candidate") for mode in modes}
@@ -55,7 +55,7 @@ def check_cases(cases, fixed):
             assert not outer
         elif mode == "anonymous":
             assert attempts.keys() == {("absent", 200)}
-        elif case["client"] == "signed":
+        elif case["client"] == "signed" or digest_capable:
             supplied = {"correct": ("correct", 200), "incorrect": ("incorrect", 407),
                         "other-scheme": ("digest", 407)}[mode]
             assert attempts.keys() == {("absent", 407), supplied}
@@ -73,7 +73,7 @@ def check_cases(cases, fixed):
             assert attempts.keys() == {supplied} and attempts[supplied] >= 2
 
 
-def check_digest_reference(cases):
+def check_digest(cases, digest_capable):
     modes = {f"digest-{scheme}{policy}{password}"
              for scheme in ("sha256", "md5") for policy in ("", "-legacy") for password in ("", "-incorrect")}
     assert Counter((c["client"], c["mode"]) for c in cases) == {
@@ -88,10 +88,14 @@ def check_digest_reference(cases):
         initial = counts.pop(("absent", None, 407))
         assert initial >= 2
         signed = case["client"] == "signed"
-        accepted = signed and "legacy" in mode and "incorrect" not in mode
+        accepted = "incorrect" not in mode and ("legacy" in mode if signed else digest_capable)
         if signed:
             comparison = "incorrect" if "incorrect" in mode else "correct" if accepted else "target-mismatch"
             assert counts == {(comparison, "root", 200 if accepted else 407): initial}
+        elif digest_capable:
+            assert not case["fixtureRejection"]
+            outcome = ("correct", "authority", 200) if accepted else ("incorrect", "authority", 407)
+            assert counts == {outcome: initial}
         else:
             assert not counts
         assert case["inventory"] == case["event"] == accepted
@@ -108,11 +112,13 @@ if __name__ == "__main__":
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--baseline", action="store_true", help="compare the original preemptive client")
     mode.add_argument("--digest-reference", action="store_true", help="check the signed Digest reference and Basic-only candidate")
+    mode.add_argument("--digest", action="store_true", help="require the authority-bound Digest candidate response")
+    mode.add_argument("--basic-with-digest", action="store_true", help="check the ten Basic cases with a Digest-capable candidate")
     args = parser.parse_args()
     report = json.loads(args.receipt.read_text())
-    if args.digest_reference:
-        check_digest_reference(report["cases"])
-        print("Verified the sixteen original TLS Digest reference observations.")
+    if args.digest_reference or args.digest:
+        check_digest(report["cases"], digest_capable=args.digest)
+        print("Verified sixteen original TLS Digest observations.")
     else:
-        check_cases(report["cases"], fixed=not args.baseline)
+        check_cases(report["cases"], fixed=not args.baseline, digest_capable=args.basic_with_digest)
         print("Verified the ten original TLS proxy observations.")

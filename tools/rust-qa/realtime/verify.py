@@ -43,8 +43,9 @@ HTTP_PROXY_CASES = ("http-proxy", "http-proxy-bypass", "http-proxy-connect-redir
                     "http-proxy-upgrade-redirect", "http-proxy-reconnect")
 LINUX_BASIC_CASES = ("http-basic-proxy", "http-basic-refused", "http-basic-connect-refused",
                      "http-basic-other-scheme", "http-basic-bypass")
-LINUX_TLS_BASIC_CASES = ("https-basic-proxy", "https-basic-refused", "https-basic-other", "https-basic-bypass",
-                         "https-basic-rotates", "https-basic-wrong-host", "https-basic-origin-407", "https-basic-redirect")
+LINUX_TLS_AUTH_CASES = ("https-basic-proxy", "https-basic-refused", "https-basic-other", "https-basic-bypass",
+                         "https-basic-rotates", "https-basic-wrong-host", "https-basic-origin-407", "https-basic-redirect",
+                        "https-digest-sha256", "https-digest-md5", "https-digest-sha256-refused", "https-digest-md5-refused")
 WINDOWS_HTTP_CASES = ("http-proxy-cgi", "http-proxy-opposite-scheme")
 WINDOWS_SYSTEM_CASES = ("windows-system-proxy-empty", "windows-system-proxy-invalid")
 
@@ -651,7 +652,7 @@ def run_proxy_scenario(executable, platform_name, name, directory, contexts, red
 
     from tls_basic_cases import Authentication, origin_handler
 
-    authentication = Authentication(name) if name in LINUX_TLS_BASIC_CASES else None
+    authentication = Authentication(name) if name in LINUX_TLS_AUTH_CASES else None
     handler = origin_handler(ProxyOriginHandler, authentication) if authentication else ProxyOriginHandler
     bypass = name in ("https-proxy-bypass", "https-basic-bypass")
     wrong_host = name in ("https-proxy-wrong-host-tls", "https-basic-wrong-host")
@@ -674,7 +675,7 @@ def run_proxy_scenario(executable, platform_name, name, directory, contexts, red
             if bypass:
                 env["NO_PROXY"] = "127.0.0.1"
             if authentication:
-                env["HTTPS_PROXY"] = authentication.proxy_url(proxied.server_port)
+                env["HTTPS_PROXY"] = authentication.proxy_url(proxied.server_port, authority)
             if name == "https-proxy-priority":
                 other = f"http://127.0.0.1:{redirect.server_port}"
                 if platform_name == "windows":
@@ -752,7 +753,7 @@ def run_scenario(executable, name, directory, contexts, redirect):
     if platform_name in ("windows", "linux"):
         if proxy_case in (*HTTP_PROXY_CASES, *WINDOWS_HTTP_CASES) or platform_name == "linux" and proxy_case in LINUX_BASIC_CASES:
             return run_http_proxy_scenario(executable, platform_name, proxy_case, directory, redirect)
-        if proxy_case in HTTPS_PROXY_CASES or platform_name == "linux" and proxy_case in LINUX_TLS_BASIC_CASES:
+        if proxy_case in HTTPS_PROXY_CASES or platform_name == "linux" and proxy_case in LINUX_TLS_AUTH_CASES:
             return run_proxy_scenario(executable, platform_name, proxy_case, directory, contexts, redirect)
     platform_trust = name.startswith("linux-platform-")
     directory_trust = name == "linux-platform-directory-tls"
@@ -979,7 +980,7 @@ def main():
     if platform.system() == "Linux":
         cases += ("linux-platform-tls", "linux-platform-directory-tls", "linux-platform-untrusted-tls",
                   "linux-platform-wrong-host-tls")
-        cases += tuple(f"linux-{name}" for name in (*LINUX_BASIC_CASES, *LINUX_TLS_BASIC_CASES))
+        cases += tuple(f"linux-{name}" for name in (*LINUX_BASIC_CASES, *LINUX_TLS_AUTH_CASES))
     platform_name = platform.system().lower()
     if platform_name in ("windows", "linux"):
         cases += tuple(f"{platform_name}-{case}" for case in (*HTTPS_PROXY_CASES, *HTTP_PROXY_CASES))
