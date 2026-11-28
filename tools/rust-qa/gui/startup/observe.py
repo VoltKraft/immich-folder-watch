@@ -182,6 +182,10 @@ def launch(args):
             "/tmp/runtime", "--setenv", "GSETTINGS_BACKEND", "memory", "--setenv", "LP_NUM_THREADS", "2",
             "--chdir", "/qa", "--", "/usr/bin/python3", "-B", "/gui/startup/observe.py", "--inside"]
         subprocess.run(command, check=True)
+    if args.native_only:
+        results = {name: json.loads((output / name / "result.json").read_bytes()) for name in CASES}
+        write(output / "results.json", {"cases": results, "comparison": "native desktop"})
+        return
     # Use the same synthetic files that the elected GUI and worker actually read.
     sys.path.insert(0, str(GUI.parent / "yaml/startup"))
     import compare as shipping
@@ -213,8 +217,13 @@ if __name__ == "__main__":
         parser.add_argument("--gui", type=Path, required=True)
         parser.add_argument("--worker", type=Path, required=True, help="Original source-bound worker subject directory")
         parser.add_argument("--output", type=Path, required=True)
-        parser.add_argument("--sdk", type=Path, required=True, help="Pinned local .NET SDK root")
-        parser.add_argument("--signed-repo", type=Path, required=True, help="Local original shipping OSTree repository")
+        comparison = parser.add_mutually_exclusive_group(required=True)
+        comparison.add_argument("--sdk", type=Path, help="Pinned local .NET SDK for the signed shipping comparison")
+        comparison.add_argument("--native-only", action="store_true", help="Observe the four native desktop sessions")
+        parser.add_argument("--signed-repo", type=Path, help="Local original shipping OSTree repository")
         parser.add_argument("--compiler-receipt", type=Path, required=True,
                             help="build.json from the ordinary native build or native.json from qualify.py")
-        launch(parser.parse_args())
+        args = parser.parse_args()
+        if bool(args.sdk) != bool(args.signed_repo):
+            parser.error("the signed reference comparison needs both --sdk and --signed-repo")
+        launch(args)

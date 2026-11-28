@@ -1196,6 +1196,17 @@ was empty after cleanup. The result digest was
 The ordinary installed ref still needs the separately verified AT-SPI adapter.
 [Installed language comparison](../../tools/rust-qa/gui/flatpak/README.md).
 
+The original Ubuntu archives at `446fc1f` contained 310 compiler units on x64
+and 309 on ARM64. Both include the current YAML library and the complete
+385-archive inventory. Each native runner passed 40 tests, both Plasma panel
+trials and the installed Flatpak menu check. Each private installation was
+empty after cleanup. The x64 executable had SHA-256
+`b1157deffe8ba8971f34a0f70c753c32d8fe9218d551ba356aba72e0017d6cd4`.
+The ARM64 executable had SHA-256
+`a563ff71fa30facd8e63d1cf38eb84f6c3e8ef56c27c1ad38480c323ea8b5a9f`.
+[Original Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46138706466/artifacts/15260589233) ·
+[Original Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46138706466/artifacts/15260723709).
+
 ## Reproduction
 
 At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed

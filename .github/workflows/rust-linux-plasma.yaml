@@ -82,6 +82,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends apparmor bubblewrap build-essential dbus \
             libglib2.0-bin python3-gi gir1.2-glib-2.0 xvfb x11-utils libx11-6 libxtst6 \
+            at-spi2-core gir1.2-atspi-2.0 \
             libxdamage1 libxres1 libvulkan1 mesa-vulkan-drivers libxkbcommon-x11-0 pkg-config gpg gpgv \
             flatpak ostree dbus-bin xdg-dbus-proxy
           bash tools/rust-qa/hosted-linux-namespace.sh prepare
@@ -130,6 +131,15 @@ jobs:
           /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/launch/graphics.py "$PLATFORM_DEPLOYMENT"
           /usr/bin/python3 -B tools/rust-qa/gui/flatpak/run.py plasma-native --hosted-runtime "$PLATFORM_DEPLOYMENT" --tray-menu
 
+      - name: Read the ordinary editor and tray startup languages on four private desktops
+        if: ${{ !cancelled() && steps.pair.outcome == 'success' }}
+        run: |
+          /usr/bin/python3 -B tools/rust-qa/gui/startup/observe.py --native-only \
+            --gui artifacts/rust/gui-build/release/native-gui-assessment \
+            --compiler-receipt "artifacts/rust/gui-native/$NATIVE_TARGET/build.json" \
+            --worker artifacts/rust/performance/subjects/plasma-native \
+            --output artifacts/rust/gui-run/ordinary-startup
+
       - name: Retain the original executables, compiler receipts and desktop observations
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -140,6 +150,7 @@ jobs:
             artifacts/rust/performance/subjects/plasma-native/ifw-performance-worker
             artifacts/rust/performance/subjects/plasma-native/worker.inputs.json
             artifacts/rust/gui-native/${{ matrix.target }}/
+            artifacts/rust/gui-run/ordinary-startup/
             artifacts/rust/linux-services/tray-gui-handover/
             artifacts/rust/plasma/runs/
             artifacts/rust/flatpak-gui-launch-assessment/

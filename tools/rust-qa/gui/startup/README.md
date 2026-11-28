@@ -71,6 +71,13 @@ The source and compiler receipt `native.json` has SHA-256
 
 ## Fedora desktop readback
 
+For the ordinary GUI, `observe.py` accepts the per-target `build.json` from
+`build-gui-probe.py`. The [native Plasma workflow](../../../../.github/workflows/rust-linux-plasma.yaml)
+uses `--native-only` to observe the elected editor, tray and worker in four
+private X11 sessions on each Ubuntu architecture. Providing `--sdk` and
+`--signed-repo` additionally compares the same four original configurations
+with the signed 3.0.4 assemblies.
+
 Four ordinary launches on four private Fedora X11 desktops opened the editor
 before any StatusNotifierWatcher existed. AT-SPI exposed the two fields, the
 language button and Quit in the expected language. The new watcher then
