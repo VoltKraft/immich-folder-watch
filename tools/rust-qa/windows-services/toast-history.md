@@ -1,9 +1,9 @@
 # Windows notification history trial
 
-Run on the disposable Windows x64 or ARM64 rewrite runner, after the native service build. The recorder uses the existing Rust executable from the same job and checks its source, native compiler, test results, dependencies and PE import table before it uses the desktop.
+Run the x64 trial on the [local VM with the archived sender](#original-sender-on-a-disposable-windows-x64-vm). On the native ARM64 rewrite runner the recorder uses the existing Rust executable from the same job and checks its source, native compiler, test results, dependencies and PE import table before it uses the desktop.
 
 ```powershell
-python -B tools/rust-qa/windows-services/toast_history.py $env:NATIVE_TARGET
+python -B tools/rust-qa/windows-services/toast_console.py --observe-arm64
 ```
 
 A fresh UUID identifies one synthetic app. The recorder creates a new private folder under the current user's Programs known folder. Its single shortcut targets the probe and carries the app's AUMID and a unique stub CLSID. Each subsequent process opens the installed shortcut and verifies its executable, arguments and both properties. Windows documents this mode for unpackaged apps with a protocol-type toast. The trial uses a unique inert protocol URI and requests no activation. Each toast is silent, disables mirroring and expires after five minutes. [Microsoft's shortcut instructions](https://learn.microsoft.com/en-us/windows/win32/shell/enable-desktop-toast-with-appusermodelid) · [Microsoft's unpackaged desktop activation options](https://github.com/MicrosoftDocs/windows-dev-docs/blob/2e559c1c7064af00d993650b1eb2f380a7153c94/hub/apps/design/shell/tiles-and-notifications/toast-desktop-apps.md#alternative-option---no-com--stub-clsid)
@@ -19,6 +19,26 @@ python3 -B tools/rust-qa/windows-services/toast_history.py x86_64-pc-windows-msv
 ```
 
 ## Visible normal WinRT popup
+
+On the hosted ARM64 desktop the command above starts a second, native
+PowerShell observer before the original sender. It checks the ordinary
+Shell popup at the notification corner and the visible CoreWindow
+candidates on the same desktop. The expected title and body must appear
+inside the Shell's normal toast view and have distinct physical hit
+points on the original Shell HWND. The observer
+captures the screen crop containing both labels. Windows notification
+settings stay under the runner's control.
+
+The workflow retains the history and physical observations in separate
+artifacts. To verify a positive physical observation, extract both
+archives and run the command below. Replay checks the original sender's
+Show interval, its run and revision, the observer's native process and
+desktop, and the image digest. An empty history or an unobserved popup
+leaves the corresponding native check open.
+
+```powershell
+python -B tools/rust-qa/windows-services/toast_console.py $historyDirectory $physicalDirectory
+```
 
 The normal sender records the native performance-counter frequency and the interval around its single synchronous `Show`. An independent UI Automation process on the runner's unlocked `WinSta0\Default` desktop starts before the normal sender. It first checks for the absence of the two fresh labels, then searches for the exact normal title and body through ten seconds after the sender returns. The quiet toast has different text and uses `SuppressPopup`. The observer supplies no input and leaves notification settings and the notification center alone.
 

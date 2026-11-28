@@ -7,7 +7,7 @@ on:
       - '.github/workflows/rust-desktop-assessment.yaml'
       - 'rust/**'
       - 'tools/rust-qa/**'
-      # The x64 transition workflow owns the paired observer. Shared code still runs on all four hosts.
+      # Windows x64-only renderer comparisons run on the local VM.
       - '!tools/rust-qa/windows-warm-window/dwm_transitions.py'
       - '!tools/rust-qa/windows-warm-window/test_dwm_transitions.py'
       - '!tools/rust-qa/windows-warm-window/dwm-transitions.md'
@@ -800,7 +800,7 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Windows' && (steps.windows_services.outcome == 'success' || steps.windows_services.outcome == 'failure') && hashFiles(format('artifacts/rust/windows-services/native-{0}/result.json', matrix.target)) != '' }}
         shell: pwsh
         run: |
-          python -B tools/rust-qa/windows-services/toast_history.py $env:NATIVE_TARGET
+          python -B tools/rust-qa/windows-services/toast_console.py --observe-arm64
           exit $LASTEXITCODE
 
       - name: Retain the original Windows notification history records
@@ -811,6 +811,23 @@ jobs:
           path: artifacts/rust/windows-services/toast-history-${{ matrix.target }}/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Retain the original physical ARM64 Shell observation
+        if: ${{ !cancelled() && (steps.toast_history.outcome == 'success' || steps.toast_history.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-toast-physical-${{ matrix.target }}-${{ github.sha }}
+          path: artifacts/rust/windows-services/toast-physical-${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify the screen crop against the native ARM64 notification sender
+        if: ${{ !cancelled() && steps.toast_history.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $area = "artifacts/rust/windows-services"
+          python -B tools/rust-qa/windows-services/toast_console.py "$area/toast-history-$env:NATIVE_TARGET" "$area/toast-physical-$env:NATIVE_TARGET"
+          exit $LASTEXITCODE
 
       - name: Compare the rendered Windows label with the system contrast palette and restore it
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
