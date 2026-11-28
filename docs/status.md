@@ -19,8 +19,15 @@ At `048b0d7`, Orca spoke the four focused controls of the ordinary installed
 Flatpak in German and English on both Ubuntu x64 and ARM64. Both targets
 used their existing application accessibility proxy. The separate unpackaged
 x64 language trial found the test watcher's bus name before its object was
-available. [Original Ubuntu run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46141403406) ·
+available. At `68a8123` each native job passed its four language starts
+and its installed Orca comparison. [Original Ubuntu run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46141403406) ·
+[Repeat with the watcher correction](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46142640444) ·
 [Compiler and installed controls](../tools/rust-qa/gui/flatpak/README.md#installed-reader-from-the-ordinary-compiler-directory).
+
+Both Ubuntu targets repeated the four starts, installed Orca and all
+40 native GUI tests at `fd14d4c`. Each original ZIP preserved the ELF
+and its matching compiler, registry and unit-test evidence under the
+public filenames. [Ubuntu build and archive readback](rust/rw02-gui-dependencies.md#offline-compiler-inputs-for-the-ordinary-linux-gui).
 
 The ordinary Fedora x64 ELF passed all 40 native GUI tests and spoke all
 eight focused labels in the installed ref. On X11 it followed four

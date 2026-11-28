@@ -236,6 +236,17 @@ byte-identical after both writers exited. The original check is under
 `artifacts/rust/gui-run/atomic-publication-c352d35/verified.json`, SHA-256
 `ee17187836783e792a82f524f2ac9438c8913d558a25869ba0490fd3d3971884`.
 
+At `fd14d4c` each native Ubuntu ZIP contained all five public evidence
+files. Their bytes matched both the `gui-current` view and the named
+generation in the original archive. Each unit log recorded 40 passes.
+On x64 the compiler recorded 310 units and on ARM64 it recorded 309.
+Both installed Orca tests and both four-case startup checks passed.
+The original ZIP SHA-256 values were
+`f1a3d0563c3eec225dca6496e1a5d3440b5556abb5438405ae6f1e5627dffa58`
+on x64 and `67519370d8bbbde7c4c0100c3afaf5038a8180666cdd9f0ae114a3e26ebb273b`
+on ARM64. [Ubuntu x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46143350252/artifacts/15263410638) ·
+[Ubuntu ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46143350252/artifacts/15262294061).
+
 The Fedora x64 offline build at `1862b75` recorded 289 compiler units across 235
 packages in graph `6c99492b82997e4e20b66e559a9de9bbea8c22d910bf00fe26484413f00df700`.
 Clippy and all 40 native tests passed. The release executable had SHA-256

@@ -1228,8 +1228,9 @@ are retained under `artifacts/rust/ordinary-accesskit-graphs-01/fedora-cold/`.
 The normal offline entry point at `68a8123` passed formatting, Clippy
 and all 40 native tests, and produced the same ELF.
 The headless renderer then exercised six frames in both software modes
-against the GPU captures. None of the twelve comparisons exceeded the
-reviewed two-level channel tolerance. The comparison SHA-256 was
+against the GPU captures. All eighteen BGRA images matched the earlier
+reference run byte for byte, and none of the twelve comparisons exceeded
+the reviewed two-level channel tolerance. The comparison SHA-256 was
 `85448223bf9f8b154531c01a567ef6614192191bfa1a1c42cc4ee35eecbe6477`.
 
 Orca read all four focused controls in each saved language through the
