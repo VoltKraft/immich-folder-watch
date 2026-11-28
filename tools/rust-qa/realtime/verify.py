@@ -43,7 +43,8 @@ HTTP_PROXY_CASES = ("http-proxy", "http-proxy-bypass", "http-proxy-connect-redir
                     "http-proxy-upgrade-redirect", "http-proxy-reconnect")
 LINUX_HTTP_AUTH_CASES = ("http-basic-proxy", "http-basic-refused", "http-basic-connect-refused",
                         "http-basic-other-scheme", "http-basic-bypass", "http-digest-sha256", "http-digest-md5",
-                        "http-digest-sha256-refused", "http-digest-md5-refused", "http-digest-sha256-auth-int")
+                        "http-digest-sha256-refused", "http-digest-md5-refused", "http-digest-sha256-auth-int",
+                        "http-digest-sha256-utf8-realm")
 LINUX_TLS_AUTH_CASES = ("https-basic-proxy", "https-basic-refused", "https-basic-other", "https-basic-bypass",
                          "https-basic-rotates", "https-basic-wrong-host", "https-basic-origin-407", "https-basic-redirect",
                         "https-digest-sha256", "https-digest-md5", "https-digest-sha256-refused", "https-digest-md5-refused")
@@ -573,7 +574,8 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
             if name.startswith("http-digest-"):
                 from digest_peer import DigestPeer
                 digest_peer = DigestPeer(secret, authority, name.split("-")[2], check_counts=True,
-                                         qop="auth-int" if name.endswith("-auth-int") else "auth")
+                                         qop="auth-int" if name.endswith("-auth-int") else "auth",
+                                         realm="München" if name.endswith("-utf8-realm") else "synthetic proxy")
             handler = authenticated_proxy_handler(handler, authority, name, expected, digest_peer)
         with peer(scenario, api, handler=handler) as proxied:
             proxied.proxy_targets = {}
@@ -615,7 +617,8 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
                 accepted = sum(status == "allow" for _, _, status in proxied.auth_attempts)
                 counts = sorted(digest_peer.counts)
                 assert counts == list(range(1, accepted + 1))
-                digest_evidence = {"acceptedNonceCounts": counts, "digestAlgorithm": digest_peer.algorithm, "qop": digest_peer.qop}
+                digest_evidence = {"acceptedNonceCounts": counts, "digestAlgorithm": digest_peer.algorithm,
+                                   "qop": digest_peer.qop, "realm": digest_peer.realm}
             if name in LINUX_HTTP_AUTH_CASES:
                 refused = check_http_auth_attempts(name, proxied.auth_attempts, trace, stats)
                 if refused:

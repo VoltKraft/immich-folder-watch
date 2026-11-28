@@ -47,7 +47,8 @@ def inside(client, mode):
     if mode.startswith("digest-"):
         from digest_peer import DigestPeer
         digest_peer = DigestPeer(secret, AUTHORITY, mode.split("-")[1], legacy_root="-legacy" in mode,
-                                 check_counts=client == "candidate")
+                                 check_counts=client == "candidate",
+                                 realm="München" if "-utf8" in mode else "synthetic proxy")
 
     class Relay(ThreadingHTTPServer):
         lang = "signed" if client == "signed" else "rust"
@@ -99,7 +100,9 @@ def inside(client, mode):
                 if not allowed:
                     self.send_response(407)
                     challenge = 'Digest realm="protected, Basic realm", nonce="fixture", algorithm=unavailable' if mode == "other-scheme" else 'Basic realm="fixture"'
-                    self.send_header("Proxy-Authenticate", digest_peer.challenge if digest_peer else challenge)
+                    if digest_peer:
+                        challenge = digest_peer.challenge.encode("utf-8").decode("latin-1")
+                    self.send_header("Proxy-Authenticate", challenge)
                     self.send_header("Content-Length", "0")
                     self.send_header("Connection", "close")
                     self.end_headers()
@@ -162,12 +165,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tls", action="store_true", help="run the HTTPS origin comparison")
     parser.add_argument("--digest", action="store_true", help="compare Digest with a verifying proxy for the selected origin scheme")
+    parser.add_argument("--utf8-realm", action="store_true", help="offer a localized UTF-8 protection realm in the HTTP comparison")
     parser.add_argument("--archive", type=Path, required=True, help="paired native proxy-fedora-05 archive")
     parser.add_argument("--sdk", type=Path, required=True, help="shared .NET SDK containing the dotnet host")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, help="additional native release binary")
     parser.add_argument("--candidate-sha256", help="expected digest of the additional binary")
     args = parser.parse_args()
+    if args.utf8_realm and (not args.digest or args.tls):
+        parser.error("--utf8-realm requires the plaintext Digest comparison")
     if bool(args.candidate) != bool(args.candidate_sha256):
         parser.error("supply both the candidate and its expected digest")
     archive = args.archive.resolve(strict=True)
@@ -205,7 +211,8 @@ def main():
     if args.tls or args.digest:
         modes = ("anonymous", "correct", "incorrect", "other-scheme", "bypass")
         if args.digest:
-            modes = [f"digest-{algorithm}{policy}{password}"
+            realm_mode = "-utf8" if args.utf8_realm else ""
+            modes = [f"digest-{algorithm}{realm_mode}{policy}{password}"
                      for algorithm in ("sha256", "md5") for policy in ("", "-legacy")
                      for password in ("", "-incorrect")]
         cases = [(client, mode) for client in (("signed", "candidate") if args.candidate else ("signed",)) for mode in modes]

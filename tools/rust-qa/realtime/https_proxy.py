@@ -172,7 +172,8 @@ def authenticated_proxy_handler(origin, authority, name, expected, digest):
                 if credentials == "correct":
                     assert form == ("authority" if operation == "connect" else "absolute")
                 allowed = credentials == "correct"
-                challenge = digest.challenge
+                # HTTPServer encodes its header string as Latin-1. Preserve the actual UTF-8 octets.
+                challenge = digest.challenge.encode("utf-8").decode("latin-1")
             else:
                 valid = len(supplied) == 1 and hmac.compare_digest(supplied[0], expected)
                 credentials = "correct" if valid else "incorrect" if supplied else "absent"

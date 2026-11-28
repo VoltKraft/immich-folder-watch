@@ -75,8 +75,9 @@ def replay(cases, candidate=False):
         verify_session(rows)
 
 
-def replay_digest(cases, baseline):
-    modes = {f"digest-{algorithm}{policy}{suffix}" for algorithm in ("sha256", "md5")
+def replay_digest(cases, baseline, localized=False):
+    realm_mode = "-utf8" if localized else ""
+    modes = {f"digest-{algorithm}{realm_mode}{policy}{suffix}" for algorithm in ("sha256", "md5")
              for policy in ("", "-legacy") for suffix in ("", "-incorrect")}
     assert Counter((c["client"], c["mode"]) for c in cases) == {
         (client, mode): 1 for client in ("signed", "candidate") for mode in modes}
@@ -87,10 +88,11 @@ def replay_digest(cases, baseline):
         assert not case["fixtureProtocolRejected"] and not any(row["kind"] == "handlerError" for row in rows)
         proxy = [row for row in rows if row["kind"] == "proxy"]
         assert proxy and all(row["apiKey"] == (row["operation"] != "connect") for row in proxy)
-        passed = not mode.endswith("incorrect") and ("legacy" in mode if signed else not baseline)
+        anonymous_only = localized and signed or baseline and not signed
+        passed = not anonymous_only and not mode.endswith("incorrect") and ("legacy" in mode if signed else True)
         assert case["eventObserved"] == case["inventorySucceeded"] == passed
         operations = {"inventory", "pollingGET", "pollingPOST", "connect"} if passed else {"inventory", "pollingGET"}
-        if baseline and not signed:
+        if anonymous_only:
             assert {r["operation"] for r in proxy} == operations
             assert all(r["credentials"] == "absent" and r["digestUri"] is None and r["status"] == "407" for r in proxy)
         else:
@@ -117,10 +119,13 @@ if __name__ == "__main__":
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--digest-reference", action="store_true")
     mode.add_argument("--digest", action="store_true")
+    parser.add_argument("--utf8-realm", action="store_true", help="check the separate localized realm observations")
     args = parser.parse_args()
     report = json.loads(args.receipt.read_text())
     if args.digest_reference or args.digest:
-        replay_digest(report["cases"], baseline=args.digest_reference)
+        replay_digest(report["cases"], baseline=args.digest_reference, localized=args.utf8_realm)
     else:
+        if args.utf8_realm:
+            parser.error("--utf8-realm requires a Digest replay mode")
         replay(report["cases"], "candidateBinarySha256" in report)
     print(f"Validated {len(report['cases'])} archived Linux proxy observations.")
