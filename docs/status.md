@@ -95,7 +95,12 @@ replaced the installed launch paths after WPF had stopped. Forced failure
 restored the original executable. Success removed its shortcut and executable,
 and reinstall restored both. The returning WPF opened and quit in RDP
 session 2. The YAML, SQLite database and its two sidecars stayed byte-identical.
-RI-AC05 still requires a competing ordinary launch during the transaction.
+At `1c5bc66` the private MSI also refused the upgrade when WPF was already
+open in RDP. The original window and tray survived until the user selected
+Quit. This passed again in the 3072 MiB guest, including rollback, retry
+and return to the installed WPF. RI-AC05 still requires exclusion across
+the remaining launch window.
+[Running WPF and the 3 GiB repeat](../tools/rust-qa/instance/cross-session/transaction/running-wpf.md#windows-server-2025-x64-results) ·
 [MSI rollback and return to WPF](../tools/rust-qa/instance/cross-session/installed-writer.md#server-2025-x64-result-at-2ba4006) ·
 [Installed MSI preflight and guest archive](../tools/rust-qa/instance/cross-session/installed-writer.md).
 

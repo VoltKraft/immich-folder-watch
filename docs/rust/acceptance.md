@@ -76,7 +76,11 @@ its editor was open. With WPF already stopped, a private major upgrade
 removed the ordinary installed launch paths. Its failure path restored
 the original executable through Windows Installer rollback. After reinstall,
 the original WPF started and quit normally in RDP using the unchanged
-profile. A competing launch during the transaction remains unverified.
+profile. On two fresh x64 guests, the private successor refused to start
+its transaction while WPF was already open in RDP. The original window
+and tray survived until a normal Quit. A later launch during the transaction
+remains unverified.
+[Installed WPF during the MSI refusal](../../tools/rust-qa/instance/cross-session/transaction/running-wpf.md#windows-server-2025-x64-results) ·
 [Native MSI transaction and limits](../../tools/rust-qa/instance/cross-session/installed-writer.md#server-2025-x64-result-at-2ba4006) ·
 [Installed MSI preflight](rw02-cross-session.md#identifying-a-still-installed-wpf-before-the-next-launch) ·
 [WPF-first handover](../../tools/rust-qa/instance/cross-session/wpf-handover.md#local-server-2025-handover-at-bfd99b2) ·

@@ -657,6 +657,12 @@ Reinstall restored the original 3.0.4 launch and ordinary tray Quit.
 Exclusion during a concurrent launch and after candidate writes remains open.
 [Standard-user trial and retained profile](../../tools/rust-qa/instance/cross-session/installed-writer.md#server-2025-x64-result-at-2ba4006).
 
+When the standard user's WPF instance was already running, the private
+successor at `1c5bc66` returned 1603 before the install transaction began.
+Two x64 guests recorded the same original editor and tray receiver through
+the refusal. The user then quit WPF and the transaction and rollback
+trials completed. [Original observations and replay](../../tools/rust-qa/instance/cross-session/transaction/running-wpf.md#windows-server-2025-x64-results).
+
 On the local Server 2025 x64 guest the Rust preflight at `3913061`
 identified the original machine MSI from a standard user's RDP session
 before WPF had ever launched. The profile was still absent after the
