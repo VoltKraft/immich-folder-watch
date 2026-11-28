@@ -1193,7 +1193,7 @@ saved-language labels and both first menus under the opposite desktop
 language. Both processes exited with status 0 and the private installation
 was empty after cleanup. The result digest was
 `a16058d9e6f0056ba1b007a3cbd2feb2ec724388e95e0dda03163e91b4a968cb`.
-The ordinary installed ref still needs the separately verified AT-SPI adapter.
+That revision of the ordinary installed ref used the stock AT-SPI adapter.
 [Installed language comparison](../../tools/rust-qa/gui/flatpak/README.md).
 
 The original Ubuntu archives at `446fc1f` contained 310 compiler units on x64
@@ -1213,6 +1213,35 @@ the same eight labels. The original adapter produced Tab echoes. With the
 two reviewed AccessKit source changes, Orca spoke each focused control
 and the external client identified the original application proxy.
 [Ordinary and corrected installed editors](../../tools/rust-qa/gui/flatpak/README.md#orca-with-the-ordinary-gui-and-current-settings-reader).
+
+### Ordinary Linux compiler and Orca in the installed Flatpak
+
+The normal Linux build uses the reviewed `accesskit_unix` 0.24.1 source
+from `aff2477`. The Fedora x64 ELF had SHA-256
+`8701338776267200c277de2dc7a7f73969716509e0dcc6f9524770531524aeaa`.
+All 310 Cargo units matched its native graph. The rustc dependency file
+for the newly compiled AccessKit library named both corrected modules.
+Its library SHA-256 was
+`f56d6a1a9eda28431ca254b58338992afa7676663aeb8cff763e0c9f3221699e`.
+The dependency file, library, release receipt, compiler messages and ELF
+are retained under `artifacts/rust/ordinary-accesskit-graphs-01/fedora-cold/`.
+The normal offline entry point at `68a8123` passed formatting, Clippy
+and all 40 native tests, and produced the same ELF.
+The headless renderer then exercised six frames in both software modes
+against the GPU captures. None of the twelve comparisons exceeded the
+reviewed two-level channel tolerance. The comparison SHA-256 was
+`85448223bf9f8b154531c01a567ef6614192191bfa1a1c42cc4ee35eecbe6477`.
+
+Orca read all four focused controls in each saved language through the
+installed Flatpak's existing proxy. The Fedora capture retained 396,134
+bytes of English audio and 400,568 bytes of German audio. The stock
+control with the same 40 first-party inputs produced only key echoes.
+Outside Flatpak, the same Fedora executable added and removed its AT-SPI
+root twice as accessibility was toggled. On Mutter, Orca read the roles
+and kept the password masked. Native Ubuntu x64 and ARM64 also passed the
+installed comparison at `048b0d7`.
+[Installed readback](../../tools/rust-qa/gui/flatpak/README.md#installed-reader-from-the-ordinary-compiler-directory) ·
+[X11 and Mutter](../../tools/rust-qa/gui/flatpak-accessibility/README.md#desktop-status-changes-outside-flatpak).
 
 ## Reproduction
 

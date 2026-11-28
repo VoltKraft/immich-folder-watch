@@ -47,9 +47,13 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 For the desktop accessibility requirement, the Fedora x64 private Flatpak
 at `9cbbf41` exposed four focused controls to the external reader in each
 saved language. Orca spoke all eight labels. The ordinary GUI integrated
-the saved startup language at `c361c69`. The Flatpak accessibility adapter
-still uses its separate qualified build.
-[Installed screen reader evidence](../../tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs).
+the saved startup language at `c361c69`. At `048b0d7` the normal Ubuntu
+x64 and ARM64 builds each spoke the four focused controls in German and
+English through the installed application's existing proxy. Both test
+refs also started and exited with the accessibility bus absent.
+[Installed reader and compiler controls](../../tools/rust-qa/gui/flatpak/README.md#installed-reader-from-the-ordinary-compiler-directory) ·
+[Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46141403406/artifacts/15262595804) ·
+[Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46141403406/artifacts/15262181425).
 
 For RI-AC03, all four native targets at `9d4d550` preserved the complete
 original SQLite family for two refused version-99 profiles in the WAL

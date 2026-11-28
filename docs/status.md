@@ -15,6 +15,27 @@ display, and the user currently has no separate ARM64 test system.
 [Local x64 display trial](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial) ·
 [ARM64 console](rust/rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
 
+At `048b0d7`, Orca spoke the four focused controls of the ordinary installed
+Flatpak in German and English on both Ubuntu x64 and ARM64. Both targets
+used their existing application accessibility proxy. The separate unpackaged
+x64 language trial found the test watcher's bus name before its object was
+available. [Original Ubuntu run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46141403406) ·
+[Compiler and installed controls](../tools/rust-qa/gui/flatpak/README.md#installed-reader-from-the-ordinary-compiler-directory).
+
+The ordinary Fedora x64 ELF passed all 40 native GUI tests and spoke all
+eight focused labels in the installed ref. On X11 it followed four
+accessibility settings on the same window. On Mutter, Orca announced the
+password field and masked its input. A concurrent build had truncated
+the compiler stream during the first local attempt. The repeat used
+separate staged evidence, a per-directory build lock and a freshly
+compiled AccessKit library. [Fedora compiler and desktop evidence](rust/rw02-native-gui.md#ordinary-linux-compiler-and-orca-in-the-installed-flatpak).
+
+The combined Fedora x64 profile at `f47753b` linked 403 units across
+338 packages, passed Clippy, its renderer smoke test and all five
+held-file uploads. Two independent readbacks reproduced its native ZIP,
+SPDX inventory and notice archive byte for byte.
+[Combined result and original licenses](rust/rw02-combined-profile.md#linux-accessibility-adapter-in-the-combined-profile).
+
 On Windows 11 ARM64 at `e610d61`, three Tab presses moved native focus from
 the filename through the protected password and language button to Quit.
 Space closed the original GUI and its inventory worker and restored the
