@@ -74,6 +74,10 @@ Windows ARM64 and both Linux architectures keep their native Actions jobs.
 Previously started mixed-platform runs may finish.
 [Execution and evidence](../tools/rust-qa/windows-local/README.md).
 
+On November 28 the user reported that a separate Windows ARM64 test system
+is currently unavailable. The native mixed-DPI and connected-RDP criteria
+remain open on that architecture. [Required display observations](rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop).
+
 The following acceptance criteria are fixed for this run. Their evidence is
 conjunctive: a missing required platform/test/artifact remains open.
 
