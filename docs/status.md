@@ -75,6 +75,13 @@ REST and the WebSocket CONNECT matched the signed 3.0.4 client's Basic proxy
 challenge. The direct-route control sent no proxy credentials to the origin.
 [Native suites and paired observations](rust/rw02-linux-basic-proxy.md#first-party-linux-transport).
 
+The Fedora x64 transport suite passed all 62 wire scenarios and 17 unit
+tests with the reviewed CONNECT change. An HTTPS tunnel now starts
+anonymously. The client sends Basic credentials on one retry when the
+selected proxy offers that scheme. Ten paired runs compared the Rust
+client with signed 3.0.4. Digest authentication remains open.
+[TLS proxy cases and original receipts](rust/rw02-linux-tls-basic-proxy.md).
+
 At `1910195`, Ubuntu x64 and ARM64 each passed all 54 wire scenarios and
 17 unit tests. Windows ARM64 passed its 49 wire scenarios and 18 unit
 tests. All three original archives matched their Actions digests. On the

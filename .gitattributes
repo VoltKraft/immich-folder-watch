@@ -35,6 +35,7 @@ tools/rust-qa/gui/src/tray-icon.argb -text
 tools/rust-qa/instance/** text eol=lf
 tools/rust-qa/font-coverage/** text eol=lf
 tools/rust-qa/realtime/** text eol=lf
+tools/rust-qa/realtime/hyper-util-connect.patch text eol=lf whitespace=-blank-at-eol
 tools/rust-qa/windows-services/** text eol=lf
 tools/rust-qa/windows-reader/** text eol=lf
 tools/rust-qa/windows-performance/** text eol=lf
