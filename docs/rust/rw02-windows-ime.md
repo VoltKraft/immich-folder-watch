@@ -73,6 +73,43 @@ python -B tools/rust-qa/windows-ime/guest.py --archive D:\gui.zip --archive-sha2
 .\tools\rust-qa\windows-ime\guest-capability.ps1 -Action Restore
 ```
 
+### Standard-user console result at 065ae57
+
+The offline 4 GiB Server 2025 overlay ran the observer from `065ae57`
+against the original `1660aeb` GUI ZIP. The read-only test DVD used the
+GUI compiler sources from `1660aeb` and the observer sources from
+`065ae57`. The original executable SHA-256 was
+`9a09120d0cb7a5fd07024aeff5ddf987dcfb6801fab8a0d4b43e7b79aea5d22d`.
+Both phases ran in the non-elevated `ifw-test` account on the unlocked
+`WinSta0\Default` console in session 1.
+
+The first inventory found no loaded Japanese input locale. Windows
+installed the 10.0.26100.1 AMD64 Basic Typing package from the DVD.
+The same standard user's Japanese layout exposed the focused filename on
+the first lookup. The observer followed PID 5052 and HWND `0x2009a`
+through preedit before Enter, commit after Enter and the normal UI
+Automation readback of U+3042 (あ). The GUI used the Microsoft Basic
+Render Driver with DX12, drained after 37 passes and exited zero.
+Both private profiles were removed. The original German keyboard layout
+67568647 and `de-DE` language list returned. Windows reported
+`NotPresent` after removing the capability and requested no restart for
+either servicing action. The guest then shut down normally.
+
+The guest's 10,392-byte archive matched its serial SHA-256
+`f918935a1c61052e6319ca14c26c69d3767e424ec5ec290456760582d861164b`.
+All 20 member CRCs, both observer manifests and all 22 reported source
+digests passed host readback. The composition receipt SHA-256 was
+`d10ea200615331460f3b94220e212f31042da542bfe1038c8ae1fc672337346e`.
+The original archive and readback are retained in
+`artifacts/rust/windows-ime/server2025-local-065ae57/`.
+The five synthetic servicing cases also passed on Fedora with PowerShell
+7.7.0. They covered an absent or preinstalled package, an interrupted
+install, an inactive input desktop and an unavailable offline source.
+The language-list controls observed restoration after a failing observer
+and preservation of an already configured Japanese keyboard.
+[Servicing controls](../../tools/rust-qa/windows-ime/test_guest.ps1) ·
+[Language-list controls](../../tools/rust-qa/windows-ime/test_language_list.ps1).
+
 ## Hosted language provisioning
 
 The hosted wrapper first runs the actual field test with the installed
