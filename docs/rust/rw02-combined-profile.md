@@ -199,6 +199,35 @@ secondary archive. The cold-cache receipt is
 SHA-256 `1875ca302a8da9059383a6ab22308806345015ecebd08f6eb05fa38ce7cc5679`.
 [Notice source preparation](../../tools/rust-qa/native-notice-input.py).
 
+### Native Linux x64 results at c0523e1
+
+The Fedora x64 compiler linked the reconstructed `hyper-util` from its
+read-only mount with `client,client-legacy,client-proxy,default,http1,tokio`.
+Cargo recorded 337 packages and 402 compiler units. Clippy, the headless
+GUI and storage checks, and the five held-file upload cases passed.
+The offline Wayland relink changed the observed blur-manager version
+from 1 to 2. The ordinary executable had SHA-256
+`5edb138330e95f9408642223d9be80c36c55db2082bbd551d9cf95ef4e63eb2f`.
+The relinked executable had SHA-256
+`0271ed1b43ba143a82cda600a3511c88a6075308de9b0f3d3aae799a41bba1cb`.
+
+The first compiler process at `51b08d4` stopped before linking. The
+completed run used a detached checkout of `c0523e1` and a private copy
+of the prior Cargo cache. All 80 witnessed source files matched between
+the two revisions. The finished run records its hashes in
+`artifacts/rust/combined-profile/runs/hyper-connect-native-c0523e1/result.json`,
+SHA-256 `e8af75006fef78c4bbeba034ad60b1d872789726d229dc848d181191c0d0b76a`.
+
+The local input ZIP generated a 1,799-member notice archive. Its SPDX
+document contains 446 packages and 1,063 relationships and passed the
+pinned SPDX 2.3.1 schema. Independent readback matched the original MIT
+license, both changed source hashes and the compiled package. The ZIPs,
+SPDX document and their hashes are under
+`artifacts/rust/combined-profile/verification/hyper-connect-c0523e1/`.
+The verification receipt has SHA-256
+`19f26d9502f3b3a154f0693ff7dce9d6edef3095a08913cdf38f54c066581b24`.
+[Source-bound SPDX checks](rw02-combined-sbom.md) · [Notice checks](rw02-combined-notices.md).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
