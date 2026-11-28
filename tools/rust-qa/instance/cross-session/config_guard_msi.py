@@ -43,14 +43,16 @@ def identify_window(pid):
     return matches
 
 
-def guest_wpf(work, own, sid, accounts):
-    launch_wpf(work, own['sessionId'], sid, accounts, ('wpf-first',))
+def guest_wpf(work, own, sid, accounts, with_admission):
+    if with_admission:
+        launch_wpf(work, own['sessionId'], sid, accounts, ('wpf-first',))
     for name in ('protected', 'released'):
         area = work / name
         wait(area, 'launch.json', timeout=100)
         with subprocess.Popen([APP], cwd=APP.parent) as proc:
             try:
                 identity = ordinary(accounts, proc.pid, sid, APP, own['sessionId'])
+                windows = []
                 deadline = time.monotonic() + 30
                 while proc.poll() is None and time.monotonic() < deadline:
                     windows = identify_window(proc.pid)
@@ -78,6 +80,23 @@ def start(area, accounts, sid, other):
     token = record['identity']
     require(token == ordinary(accounts, token['pid'], sid, APP, other['sessionId'], token['created100ns']), 'Changed WPF process')
     return record
+
+
+def sharing_violation(path, access):
+    """Ask Win32 for the sharing error directly; Python's CRT returns only EACCES."""
+    import ctypes as c
+    from ctypes import wintypes as w
+    kernel = c.WinDLL('kernel32', use_last_error=True)
+    kernel.CreateFileW.argtypes = [w.LPCWSTR, w.DWORD, w.DWORD, w.LPVOID, w.DWORD, w.DWORD, w.HANDLE]
+    kernel.CreateFileW.restype = w.HANDLE
+    kernel.CloseHandle.argtypes = [w.HANDLE]
+    handle = kernel.CreateFileW(str(path), access, 7, None, 3, 0x80, None)
+    if handle != w.HANDLE(-1).value:
+        kernel.CloseHandle(handle)
+        raise RuntimeError('Unexpected access to the config while the Rust share was held')
+    error = c.get_last_error()
+    require(error == 32, f'Expected a Windows sharing violation, received Win32 {error}')
+    return error
 
 
 def guard_trial(work, own, other, sid, accounts):
@@ -110,14 +129,8 @@ def guard_trial(work, own, other, sid, accounts):
             record['guardProcess'] = ordinary(accounts, rust.proc.pid, sid, exe, own['sessionId'])
             rust.expect(f"CONFIG_HELD volume={before['volume']} id={before['fileId']}")
             record['heldNs'] = time.monotonic_ns()
-            for mode in ('rb', 'r+b'):
-                try:
-                    with cfg.open(mode): pass
-                except OSError as exc:
-                    require(exc.winerror == 32, 'Expected a Windows sharing violation')
-                    record[mode + 'Win32'] = exc.winerror
-                else:
-                    raise RuntimeError('A configuration handle opened while the Rust share was held')
+            record['readWin32'] = sharing_violation(cfg, 0x80000000)
+            record['readWriteWin32'] = sharing_violation(cfg, 0xc0000000)
             record['protectedWpf'] = start(area, accounts, sid, other)
             record['windowObservedNs'] = time.monotonic_ns()
             require(not server.received.wait(12) and not server.posts and not (profile / 'sync-state.db').exists(),
@@ -153,7 +166,8 @@ def guard_trial(work, own, other, sid, accounts):
 
 
 def main():
-    role, arg = sys.argv[1:]
+    role, arg, *options = sys.argv[1:]
+    require(options in ([], ['--config-only']), 'Unknown local observer option')
     work = Path(arg).resolve(strict=True)
     require(work.parent == Path(os.environ['LOCALAPPDATA']) / 'IFW-MsiSessions' and work.name.startswith('trial-'), 'Expected dedicated VM directory')
     accounts = Accounts()
@@ -165,11 +179,12 @@ def main():
     write(work / (role+'-session.json'), {'identity': own, 'desktop': desktop})
     try:
         if role == 'peer':
-            guest_wpf(work, own, sid, accounts)
+            guest_wpf(work, own, sid, accounts, not options)
         else:
             other = wait(work, 'peer-session.json')['identity']
             require(other['sidSha256'] == own['sidSha256'] and other['sessionId'] != own['sessionId'], 'Expected the same account in two active sessions')
-            measure(work, 'wpf-first', own, other, accounts, sid)
+            if not options:
+                measure(work, 'wpf-first', own, other, accounts, sid)
             guard_trial(work, own, other, sid, accounts)
     except BaseException as exc:
         write(work / (role+'-error.json'), {'error': repr(exc)})
