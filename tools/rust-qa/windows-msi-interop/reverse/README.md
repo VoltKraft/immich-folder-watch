@@ -121,3 +121,32 @@ The WPF-primary source retains
 Both variants check the hosted environment before using the installed
 endpoint name. The build checks all other compiled GUI files against the
 ordinary retained build from the same revision.
+
+### Native ARM64 activation at c0dd89c
+
+The three jobs installed the 3.0.4 ARM64 MSI on separate hosts. All three
+reached the native window interaction. The following results were replayed
+from the original archives using the reader and installer log parser from
+the same commit. [Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103605884).
+
+| Primary and input desktop | Result | Original Actions ZIP SHA-256 |
+| --- | --- | --- |
+| Rust on Default | The installed secondary reopened Rust HWND 262778. The same worker completed both kernel-observed file queries. Normal Quit and job cleanup passed. | [`a0e8a62d423e6097dc4611f50490e2daabd5447ff4abd34941d654efdcf6c56d`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103605884/artifacts/15246892466) |
+| WPF on private input | Rust reopened WPF HWND 262366 and exited zero. The shipping helper selected Quit. WPF logged shutdown and the start of flushing, then exited zero. The supervisor restored Default in session 2 and closed both desktop handles. | [`977088d6ca499c5c46a0a752abe55dcbc140e5119f7ffa441c807e30bb4f3079`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103605884/artifacts/15247141473) |
+| WPF on Default | Rust reopened WPF HWND 131422 and exited zero. The partial readback passed. The observer could not reach the Quit menu, and the full readback failed. | [`ea6bd9bc7f7ee5f5d2960291fb555b7e67e646e25a2986d8769454408a5f02da`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103605884/artifacts/15247321285) |
+
+On Default all 16 sampled client points returned the same foreign
+foreground window (HWND 66052, PID 8368). The helper stopped before moving
+the cursor or opening a popup. The three earlier passive samples identified
+the WPF window but could not identify the foreground owner. The observer
+terminated its own WPF process and drained its job. An ordinary Quit and
+orderly worker shutdown on Default remain unobserved. On the private desktop
+the shipping worker log ends its flush evidence at the start of flushing.
+
+The six original transaction logs confirmed installation and removal on
+all three hosts. Each final checkpoint had no registered product, installation
+directory, pending application operations or running application process.
+Each supervisor removed its synthetic profile and scratch directory.
+The original archives and detached readback are in
+`artifacts/rust/hosted-msi-interop/46103605884/`. Its `verified.json` has
+SHA-256 `2c151feeb38e8bd1ba56983ca982e06ff42c17fcd4869f84531b7bddf97b1cfe`.
