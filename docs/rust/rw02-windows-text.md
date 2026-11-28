@@ -146,6 +146,49 @@ graph and compiler receipts. It compares the original sources and font and
 dependency inputs to the current canonical receipt before using the archived
 executable. This trial exercises one console desktop at its current DPI.
 
+### ARM64 filename selection on the private console
+
+On November 28, 2026, the observer at `d8386a0` exercised the original
+canonical ARM64 executable from `b0fb23c`. Its SHA-256 was
+`7f0d96d2f4dafb7e9c13615735b65501adfe8a22955e86a816b0cd45f4aa0139`.
+The current and original native compiler receipts agreed on all 30 application
+inputs, including Rust sources, manifests and the tray icon. Their dependency
+graph, reconstructed trees, fonts and notices also matched.
+The original compiler ZIP matched its Actions digest
+`ca7f1e67e246548a663f39939969f380184d3bbb67e94bb22140285ae35c6f1f`.
+[Original compiler artifact](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46120848150/artifacts/15253874143).
+
+The private desktop ran in unlocked WTS session 2, using console protocol 0.
+WM_CLOSE released HWND 721370 while primary PID 6092 stayed alive. A normal
+second launch (PID 1088) granted foreground permission to PID 6092. The
+primary received the request from that PID and Windows accepted its foreground
+request for HWND 786906. The observer read the focused *Dateiname* field on
+the new window before sending the next key.
+
+| Observation | Selected text and UTF-16 start | UIA document text and value |
+| --- | --- | --- |
+| Before WM_CLOSE | `üße` at 2 | `Grüße – Sommer.jpg` |
+| After the second launch | `üße` at 2 | `Grüße – Sommer.jpg` |
+| Shift+Left | `rüße` at 1 | `Grüße – Sommer.jpg` |
+| x | Collapsed caret at 2 | `Gx – Sommer.jpg` |
+
+The focused UIA element and the foreground HWND matched the normal field
+and primary window at all four stages. Both processes exited with code zero.
+The primary drained after 72 passes. The supervisor closed the worker job
+and both desktop handles, then verified input on the restored, unlocked
+`WinSta0\Default` in the same session. The field and session JSON SHA-256
+values were `b803b013f6718a2fef5371433e4dd689d307636d89dd25bd9311695f64cfd24c`
+and `503d3e0dc00641a5d48f856bcdd93fed180b29d122f2ea26e186e8a8d089b0cf`.
+The Actions ZIP digest was `b9d49a0964282c0cd5dab29a0158c2c08514304345a9ddc668f26045297a0f27`.
+The two independent source-frame edits on Default failed in the same job.
+Mixed-DPI movement and RDP rendering remain open on ARM64.
+[Original observation archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46124443026/artifacts/15255786164).
+
+The first attempt stopped in Windows PowerShell 5.1 parameter binding before
+launching the editor. Its supervisor also restored Default. The confirmed
+run resolved the observer directory in the script body and supplied its
+path to the native worker. [First attempt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46122814831).
+
 ## Ordinary filename on the reopened retained HWND
 
 The disposable Windows desktop job also runs the same eight glyph crops and three editing sequences on the retained executable. Its separate process starts with the original filename, hides through WM_CLOSE and reopens through the existing supervisor. The native observer verifies the loaded executable path and hash, the process creation time and the original HWND. The GUI must retain generation one in DX12 CPU Mailbox/Wait mode. A create/destroy hook and root hide/show events cover the field observation.
