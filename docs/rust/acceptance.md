@@ -69,9 +69,11 @@ text without refocusing the field. [Windows editor and native input](rw02-window
 Ubuntu x64 and ARM64 passed all eleven paired resource limits during the
 native three-trial inventory with the GUI and worker from `9487dbe`.
 On Windows ARM64 a normal WinRT send succeeded in application mode and
-the Shell retained the notification. Its visible banner remains unverified.
+the Shell retained the notification. The repeat at `bc41f49` covered the
+visible foreground window 87 times. Neither screen nor accessibility
+observations confirmed the banner.
 [Ubuntu resource measurements](rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
-[ARM64 sender and desktop observations](../../tools/rust-qa/windows-services/toast-history.md#ordinary-notification-in-app-state-after-quiet-time).
+[ARM64 sender and desktop observations](../../tools/rust-qa/windows-services/toast-history.md#foreground-and-desktop-root-coverage-on-windows-arm64).
 
 The local standard user's x64 RDP and console sessions verified a
 WPF-to-Rust handover after one committed upload. The original WPF process

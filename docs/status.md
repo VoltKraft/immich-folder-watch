@@ -38,10 +38,12 @@ Shift+Left extended the left edge and typing `x` produced
 
 Both Ubuntu worker-budget trials at `d118426` passed all eleven limits
 using the native pairs from `9487dbe`. The ordinary Windows ARM64 sender
-posted successfully in Shell application mode. The visible banner and
-the sender's banner preference remain unverified.
+posted successfully in Shell application mode. A repeat observed the
+foreground window in all 87 screen sweeps. A second observer completed
+92 passes without finding the notification title and body. Windows retained
+both messages and restored Do not disturb. Banner visibility remains open.
 [Ubuntu budgets](rust/rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
-[ARM64 original archive](../tools/rust-qa/windows-services/toast-history.md#ordinary-notification-in-app-state-after-quiet-time).
+[ARM64 original send and screen observations](../tools/rust-qa/windows-services/toast-history.md#foreground-and-desktop-root-coverage-on-windows-arm64).
 
 Two offline builds on native Ubuntu ARM64 at `378b36a` produced identical
 executables and identical modified Wayland relinks. Both passed all five
