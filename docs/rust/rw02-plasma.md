@@ -219,6 +219,7 @@ on the original bus. The panel exposed no accessible child rows for this
 popup. The German and English popup images were byte-identical across the
 two sessions.
 
+All 31 GUI source inputs in the compiler receipt match `c1171b9`.
 Both sessions used the same Ubuntu-linked executable
 `8c8bfba1496d0b74424e6c316de6f8d58a488e6ebec6e89643384de88aecfb12`
 and inventory worker `1df5522e13556332eb87523337eb4178f28765e4caa67d5945c3a4b38d94f5b0`.

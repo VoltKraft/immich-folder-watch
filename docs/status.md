@@ -30,7 +30,10 @@ available. The GUI stayed hidden through both late replies and drained on
 desktop Quit. On two isolated Plasma desktops the x64 GUI registered
 again after a KDED module reload. Physical Open, Restart and Quit worked.
 The English editor button updated the visible menu. The three-command
-trial on native Linux ARM64 is pending.
+trial on native Linux ARM64 is pending. All 31 GUI compiler inputs in
+these Plasma runs match `c1171b9`. The native Linux GUI suite passed
+39 tests. Clippy passed on native Linux x64 and for both Windows targets,
+including the separate Windows worker allocation adjustment.
 [Five watcher owners](rust/rw02-linux-services.md#watcher-handover-in-the-original-background-gui) ·
 [Original panel captures and worker results](rust/rw02-plasma.md#native-linux-x64-menu-and-watcher-reload).
 

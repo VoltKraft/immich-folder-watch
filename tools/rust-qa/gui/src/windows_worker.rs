@@ -206,14 +206,14 @@ impl Restarts {
 }
 
 pub(super) enum Owner {
-    Direct(Benchmark),
+    Direct(Box<Benchmark>),
     Tray(Restarts, JoinHandle<io::Result<()>>),
 }
 
 impl Owner {
     pub(super) fn new(mut worker: Benchmark, with_tray: bool) -> io::Result<Self> {
         if !with_tray {
-            return Ok(Self::Direct(worker));
+            return Ok(Self::Direct(Box::new(worker)));
         }
         let (wake, commands) = mpsc::sync_channel(1);
         let closing = Arc::new(AtomicBool::new(false));
