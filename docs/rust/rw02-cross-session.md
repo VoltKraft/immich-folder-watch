@@ -536,3 +536,44 @@ of its path needs. Releasing that handle introduces a transition that this
 test did not measure. Keep the installer and worker-drain gate above for
 real profiles. [Shipping config reader](../../src/ImmichFolderWatch.Core/Configuration/AppConfigLoader.cs)
 · [Shipping Apply path](../../src/ImmichFolderWatch.App.Shared/Services/ConfigApplyService.cs).
+
+### Save and Apply on the installed WPF window while the config is held
+
+On November 28, 2026, a local Windows Server 2025 x64 guest ran the
+original 3.0.4 MSI application and the archived Rust config holder. Both
+used ordinary tokens for the same account. The holder (PID 6284) ran in
+console session 2. The installed WPF process (PID 3576, HWND 459362)
+ran in RDP session 3. The observer at `92b26c2` followed its original
+window, process creation time and Save and Apply button through both actions.
+[Archived native holder](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46096614452/artifacts/15242684323)
+· [WPF window observer](../../tools/rust-qa/instance/cross-session/apply_window.ps1)
+· [Worker and local HTTPS peer](../../tools/rust-qa/instance/cross-session/apply_msi.py).
+
+| Phase | Configuration, UI and worker observations |
+| --- | --- |
+| WPF started with the file held | WPF reported that it could not load `config.yaml` and opened defaults. The URL and key fields were empty. The observer entered a synthetic HTTPS endpoint, key and watch folder into that window. |
+| Save and Apply with the file held | The peer saw an empty multipart permission check. WPF then reported that another process was using `config.yaml`. Win32 returned sharing violation 32 before and after an additional 12.002-second observation. During that interval the profile contained no sync database and the peer saw no image upload. Immediately after release, the original file still had the same volume, file ID, 416 bytes and SHA-256. |
+| Save and Apply after the holder exited | The same button on the same HWND applied the draft successfully. The saved config grew to 1,519 bytes on the original file ID. A database appeared and the peer received the worker's initial Socket.IO polling requests. The observer then created the 69-byte PNG. Windows attributed its HTTPS connection to WPF PID 3576. The peer accepted the exact image with HTTP 201 and acknowledged album membership. The original SQLite database and WAL contained one matching row for `signed-worker.png`. |
+
+The independently replayed evidence includes the two button invocations,
+original config bytes, captured multipart bodies, Windows TCP owner row and
+SQLite files. The guest ZIP SHA-256 is
+`0ca760ea458162853fb8417bd07ac29f61d3f8693fe0438f7d31a15784238a61`.
+The observer checkout SHA-256 is
+`e798d92e70aea3c514f78a0cdb3cdf1046e2b61194be516838bae96a83622915`.
+Run the replay from the repository root using the variables defined above.
+
+```bash
+apply=$base/20261128/msi-apply
+python3 "$qa/replay_apply_msi.py" "$apply/apply-06.zip" "$second/endpoint.zip" \
+  "$apply/checkout-06.zip" c0ebe49184496b7b18e6146e4cf0fcaedae24d6a68ea39fbad5654ea6a38cfaf
+```
+
+The replay JSON SHA-256 is
+`14ed534c4bbb8d95fd001a4324a30172640f0bea4dc533fce77ccab1c1c9c64a`.
+The guest removed its temporary loopback CA and test logon hook before
+shutdown. The host confirmed that QEMU exited and the loopback RDP port
+closed, then discarded the overlay. QMP reported 4 GiB of base memory
+and zero hotplugged bytes. Admission of a previously running configured
+worker, startup with an absent file and atomic config replacement remain
+separate cases.
