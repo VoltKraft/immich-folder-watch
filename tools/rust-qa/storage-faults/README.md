@@ -167,9 +167,15 @@ pages beyond its measured initial size; this is not filesystem `ENOSPC`.
 
 The original `storage/src/main.rs` compiles unchanged as a separate seed binary.
 The fault binary also compiles an exact byte-for-byte copy of that source with
-only two appended test-visibility wrappers for its existing snapshot/WAL helpers.
-`build.rs` generates and the runner archives this copy. Original source is not
-edited; no production API is exposed. The new fault transactions and kill
+only two appended test-visibility wrappers for its snapshot helper and ordinary
+existing-profile opener. The worker closes the seed and backup connections
+before that opener checks the restored schema in private scratch and opens the
+writable database. It establishes the WAL baseline before the fault transaction.
+`build.rs` tracks the seed entry point and both sibling modules,
+`preflight.rs` and `wal_preflight_cases.rs`. It copies both modules unchanged
+beside the generated fault entry point. The runner compares each compiled copy
+with the archived first-party sources and retains the three files under
+`generated-source/` for each build profile. The new fault transactions and kill
 barriers are test code. Cargo.lock is generated, and all external identities and
 features must equal the existing 31-package reviewed closure before compilation.
 

@@ -38,6 +38,28 @@ def evidence_inventory(output: Path) -> dict:
             and path.relative_to(output).parts[0] != "build" and path.name != "evidence-hashes.json"}
 
 
+def archive_reviewed_storage(build: Path, output: Path) -> None:
+    originals = output / "first-party-sources/tools/rust-qa/storage/src"
+    main = (originals / "main.rs").read_bytes()
+    modules = {name: (originals / name).read_bytes() for name in
+               ("preflight.rs", "wal_preflight_cases.rs")}
+    shims = sorted(build.glob("**/out/reviewed-storage.rs"))
+    if not shims:
+        raise ValueError("no compiled review shim found")
+    for shim in shims:
+        destination = output / "generated-source" / shim.relative_to(build)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        reviewed = shim.read_bytes()
+        if not reviewed.startswith(main):
+            raise ValueError("compiled review shim differs from archived original source")
+        destination.write_bytes(reviewed)
+        for name, original in modules.items():
+            compiled = shim.with_name(name).read_bytes()
+            if compiled != original:
+                raise ValueError(f"compiled module differs from archived original: {name}")
+            destination.with_name(name).write_bytes(compiled)
+
+
 def isolated(value: Path) -> Path:
     path = value.resolve()
     if not path.is_relative_to(ARTIFACTS.resolve()) or path == ARTIFACTS.resolve():
@@ -378,14 +400,7 @@ def main() -> int:
         binary = build / "rust" / args.target / "release" / ("ifw-storage-faults" + suffix)
         seed_binary = binary.with_name("ifw-reviewed-storage" + suffix)
         result["binaries"] = {binary.name: sha256(binary), seed_binary.name: sha256(seed_binary)}
-        generated = list((build / "rust").glob("**/out/reviewed-storage.rs"))
-        original = (STORAGE / "src/main.rs").read_bytes()
-        if not generated or any(not p.read_bytes().startswith(original) for p in generated):
-            raise ValueError("compiled review shim does not contain unchanged original source")
-        for path in generated:
-            destination = output / "generated-source" / path.relative_to(build / "rust")
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(path, destination)
+        archive_reviewed_storage(build / "rust", output)
         seed = output / "seed"
         command("reviewed-seed", [str(seed_binary), str(fixtures), str(seed)])
         dotnet = str(Path(args.dotnet).resolve()) if Path(args.dotnet).is_file() else args.dotnet

@@ -3,18 +3,23 @@
 use std::{env, fs, path::PathBuf};
 
 fn main() {
-    let source =
-        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../storage/src/main.rs");
-    println!("cargo:rerun-if-changed={}", source.display());
+    let sources = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../storage/src");
     let output = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    for name in ["preflight.rs", "wal_preflight_cases.rs"] {
+        let source = sources.join(name);
+        println!("cargo:rerun-if-changed={}", source.display());
+        fs::copy(source, output.join(name)).unwrap();
+    }
+    let source = sources.join("main.rs");
+    println!("cargo:rerun-if-changed={}", source.display());
     let mut bytes = fs::read(&source).unwrap();
     bytes.extend_from_slice(
         br#"
 pub(super) fn fault_snapshot(database: &Connection) -> Result<Value> {
     snapshot(database)
 }
-pub(super) fn fault_initialize_wal(database: &Connection) -> Result<()> {
-    initialize_wal(database)
+pub(super) fn fault_open_existing(database: &Path, scratch: &Path) -> Result<Connection> {
+    preflight::open_existing(database, scratch)
 }
 "#,
     );

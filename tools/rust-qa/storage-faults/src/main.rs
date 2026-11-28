@@ -246,7 +246,7 @@ fn worker(
     let database_path = database_directory.join("state.db");
     backup(&seed_database, &database_path)?;
     drop(seed_database);
-    let mut database = Connection::open(&database_path)?;
+    let mut database = reviewed::fault_open_existing(&database_path, &output.join("preflight"))?;
     check(
         database.query_row::<String, _, _>("SELECT sqlite_source_id()", [], |row| row.get(0))?
             == SOURCE_ID,
@@ -261,7 +261,6 @@ fn worker(
             && !compile_options.contains(&"ENABLE_LOAD_EXTENSION".to_owned()),
         "extension loading gate failed",
     )?;
-    reviewed::fault_initialize_wal(&database)?;
     database
         .execute_batch("PRAGMA synchronous=FULL; PRAGMA cache_size=8; PRAGMA cache_spill=ON;")?;
     check(

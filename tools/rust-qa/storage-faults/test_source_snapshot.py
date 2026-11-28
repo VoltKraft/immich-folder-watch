@@ -101,6 +101,31 @@ class SourceSnapshotTests(unittest.TestCase):
         second_files = {p.relative_to(second): p.read_bytes() for p in second.rglob("*") if p.is_file()}
         self.assertEqual(first_files, second_files)
 
+    def test_compiled_storage_modules_match_the_archived_seed(self) -> None:
+        names = ("main.rs", "preflight.rs", "wal_preflight_cases.rs")
+        sources = [runner.STORAGE / "src" / name for name in names]
+        output = self.base / "reviewed"
+        output.mkdir()
+        runner.export_source_snapshot(runner.ROOT, output, sources)
+        build = self.base / "build"
+        compiled = build / "release/build/storage-faults/out"
+        compiled.mkdir(parents=True)
+        shim = compiled / "reviewed-storage.rs"
+        shim.write_bytes(sources[0].read_bytes() + b"\n// synthetic wrapper\n")
+        for source in sources[1:]:
+            shutil.copyfile(source, compiled / source.name)
+        runner.archive_reviewed_storage(build, output)
+        for source in compiled.iterdir():
+            archived = output / "generated-source" / source.relative_to(build)
+            self.assertEqual(archived.read_bytes(), source.read_bytes())
+        module = compiled / "preflight.rs"
+        module.write_bytes(b"changed compiled module")
+        with self.assertRaisesRegex(ValueError, "differs from archived original: preflight.rs"):
+            runner.archive_reviewed_storage(build, output)
+        module.unlink()
+        with self.assertRaises(FileNotFoundError):
+            runner.archive_reviewed_storage(build, output)
+
     def test_uninventoried_files_are_not_discovered(self) -> None:
         output = self.export("selected", ["src/main.rs"])
         hashes = json.loads((output / "first-party-source-hashes.json").read_text())
