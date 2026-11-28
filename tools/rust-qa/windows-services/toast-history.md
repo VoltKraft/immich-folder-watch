@@ -248,3 +248,32 @@ $target = 'aarch64-pc-windows-msvc'
 python -B tools/rust-qa/windows-services/toast_eligibility.py --verify "toast-history-$target" "toast-physical-$target"
 python -B tools/rust-qa/windows-services/toast_console.py --require-visible "toast-history-$target" "toast-physical-$target"
 ```
+
+### Shell states over 65 minutes at 85936d4
+
+On November 28, 2026, the fresh Windows 11 ARM64 console returned
+`S_OK` in all 131 queries over 3,900.003 seconds. The first 99 samples
+reported `QUNS_QUIET_TIME` (6). At 2,970.338 seconds, the state changed
+to `QUNS_APP` (7) and stayed there for the remaining 32 samples.
+Microsoft describes state 7 as a running Windows Store app. The API
+returns a state code, with no application identity. The test recorded
+the same unlocked `WinSta0\Default` console in session 2 at both ends of
+the wait. [Microsoft Shell state values](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ne-shellapi-query_user_notification_state)
+
+The eligibility check failed at its deadline. Without an observed
+`QUNS_ACCEPTS_NOTIFICATIONS` (5), the workflow skipped the ordinary
+WinRT send and its physical banner capture. Visible presentation on an
+eligible ARM64 console remains open. The permitted-settings comparison
+observed Notifications On and temporarily turned Do not disturb Off.
+Restoration observed Off before returning it to On. A separately opened
+Settings window then confirmed both switches On.
+
+The [native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46107366401/job/140863008512)
+ran at `85936d49b4acecf2a5e17a5c78a0561c2e3f07ba`. The
+[original 182,294-byte ZIP](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46107366401/artifacts/15249954131)
+had SHA-256 `d7c59ab411ad3d60b7e3c591a936e4927610cf5e6e8978db7de838efc4e65a99`.
+Offline replay verified all 54 source hashes, the original compiled sender
+(`89c66b130dbfc5abed5e90dd14111a3c2efe553c327f8ade62c9f1c60ef75619`),
+the raw Shell query sequence and the Settings restoration receipts. The
+archive and replay are under
+`artifacts/rust/hosted-toast-history/arm64-eligible-85936d4/`.
