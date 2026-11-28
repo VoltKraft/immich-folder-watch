@@ -8,11 +8,28 @@ from unittest.mock import patch
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parent), str(HERE)]
 import worker
+import observe
 from fixture import read
 from standard import TEMPORARY
 
 
 class TemporaryAccountTests(unittest.TestCase):
+    def test_only_the_owned_temporary_account_uses_the_provisioners_assignment_observation(self):
+        for mode in (TEMPORARY, "hosted-S4U", "hosted-S4U-ambient"):
+            result = {"mode": mode}
+            with (self.subTest(mode=mode), patch.object(observe, "prepare", return_value=({}, None, None, None)),
+                  patch.object(observe, "batch_rights", side_effect=PermissionError("group policy")) as policy,
+                  patch.object(observe.shutil, "which", return_value=None)):
+                if mode == TEMPORARY:
+                    with self.assertRaisesRegex(RuntimeError, "PowerShell"):
+                        observe.scheduled(None, None, result, None)
+                    policy.assert_not_called()
+                    self.assertEqual(result["batchRightsSource"], "temporary SID in host.json")
+                else:
+                    with self.assertRaisesRegex(PermissionError, "group policy"):
+                        observe.scheduled(None, None, result, None)
+                    policy.assert_called_once()
+
     def run_fixture(self, folder, qualifies, os_probe):
         config = {"mode": TEMPORARY}
         identity = {"sessionId": 0, "elevated": not qualifies}

@@ -46,9 +46,8 @@ def replay(folder):
             "Unexpected run or test identity")
     require(case["build"] == compiler | {"nativeArchiveSha256":DIGEST}, "Native subject differs from original")
     require(case["passed"] and case["oracleSidMatched"] and case["lockSequenceObserved"] and case["profileGuardRemoved"]
-            and case["participantsExited"] == 7 and case["batchRightsBefore"] == case["batchRightsAfter"]
-            and case["batchRightsBefore"]["directAllow"] and not case["batchRightsBefore"]["directDeny"]
-            and not case["batchRightsBefore"]["groupDeny"], "The native case is incomplete")
+            and case["participantsExited"] == 7 and case["batchRightsSource"] == "temporary SID in host.json",
+            "The native case is incomplete")
     require(case["originalBootstrapExit"] == case["schedulerExit"] == case["cleanupExit"] == 0
             and read(folder / "cleanup.json")["cleanupVerified"], "Task or participant exit failed")
     scheduler = read(folder / "scheduler.json")
