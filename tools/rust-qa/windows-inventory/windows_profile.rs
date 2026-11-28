@@ -1,5 +1,4 @@
 // Compiled with the source-bound inventory, YAML model and budgets of the Linux comparison.
-mod windows_qa_host;
 static WINDOWS_ENDPOINT: std::sync::OnceLock<SocketAddr> = std::sync::OnceLock::new();
 
 struct WindowsInput {
@@ -17,7 +16,29 @@ fn windows_input() -> Result<WindowsInput, Box<dyn Error>> {
     {
         return Err("A disposable native Windows inventory run is required".into());
     }
-    let (runner, _) = windows_qa_host::fixture_temp().ok_or("Unexpected native inventory host")?;
+    let local = value("IFW_QA_LOCAL_WINDOWS").as_deref() == Ok("1");
+    let temp_key = if local {
+        // The supervisor authenticated the native computer and user before starting this worker.
+        // Preserve the worker's safe-code boundary and independently bind its directory and token below.
+        if !cfg!(target_arch = "x86_64")
+            || std::env::var_os("GITHUB_ACTIONS").is_some()
+            || std::env::var_os("RUNNER_ENVIRONMENT").is_some()
+            || !value("COMPUTERNAME")?.eq_ignore_ascii_case("IFW-QA25")
+            || !value("USERNAME")?.eq_ignore_ascii_case("ifw-test")
+        {
+            return Err("Unexpected local inventory host".into());
+        }
+        "IFW_QA_LOCAL_TEMP"
+    } else {
+        if value("GITHUB_ACTIONS").as_deref() != Ok("true")
+            || value("RUNNER_ENVIRONMENT").as_deref() != Ok("github-hosted")
+            || value("RUNNER_OS").as_deref() != Ok("Windows")
+        {
+            return Err("Unexpected native inventory host".into());
+        }
+        "RUNNER_TEMP"
+    };
+    let runner = PathBuf::from(value(temp_key)?);
     let top = PathBuf::from(value("IFW_QA_INVENTORY_ROOT")?);
     let name = top.file_name().ok_or("Missing private inventory root")?;
     let token = value("IFW_QA_INVENTORY_TOKEN")?;

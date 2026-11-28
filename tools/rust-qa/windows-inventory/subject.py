@@ -59,7 +59,6 @@ def stage_workspace(project):
     common = replace_once(common, "    let root = configuration()?;", "    let root = configuration()?;\n    inventory_release()?;")
     (worker / "src/main.rs").write_text(common + '\ninclude!("windows_profile.rs");\n', encoding="utf-8", newline="\n")
     shutil.copyfile(HERE / "windows_profile.rs", worker / "src/windows_profile.rs")
-    shutil.copyfile(QA / "gui/src/windows_qa_host.rs", worker / "src/windows_qa_host.rs")
     (project / "rust").mkdir()
     shutil.copyfile(ROOT / "rust/Cargo.toml", project / "rust/Cargo.toml")
     shutil.copytree(ROOT / "rust/crates/safe-fs", project / "rust/crates/safe-fs")
@@ -139,7 +138,7 @@ def build_subject(area, output, gui, target, pe_machine, *, compile_only=False):
             trace = stage / "file-observer.exe"
     if any(pe_machine(p) != machine for p in (rust, executable, trace) if p is not None):
         raise ValueError("The staged native inventory subject or observer has an unexpected architecture")
-    files = [QA / "gui/src/windows_qa_host.rs", *sorted(HERE.glob("*.rs")), *sorted(HERE.glob("*.py")), HERE / "file-observer.cpp",
+    files = [*sorted(HERE.glob("*.rs")), *sorted(HERE.glob("*.py")), HERE / "file-observer.cpp",
              HERE.parent / "windows-performance/etw-owned.h", review_path, WORKER_PROFILE,
              ORIGINAL / "src/main.rs", ORIGINAL / "Cargo.toml", ORIGINAL / "Cargo.lock", ROOT / "rust/Cargo.toml",
              ROOT / "rust/crates/safe-fs/Cargo.toml", *sorted((ROOT / "rust/crates/safe-fs/src").glob("*.rs"))]
