@@ -2,8 +2,8 @@
   "lockSha256": "bdda6dc843f34b90bbe9efd99c84e994fd293a5d6ad88c52f6c70ceb8ea97679",
   "targetReportSha256": {
     "aarch64-pc-windows-msvc": "1e74eb803d67b0f21e7e9545bc1705ef0673ceb789f60284036d7b854734ab89",
-    "aarch64-unknown-linux-gnu": "7125d9c1a9e2531973e7596f4df6072c660064c715c37003e234b0b1d51cc96d",
+    "aarch64-unknown-linux-gnu": "be722aed4eecfc22343f1077c9d6b3dace12bbec6546af1ad3d585d7a0571df8",
     "x86_64-pc-windows-msvc": "79a0ed7a1e0ca41324862e43a95fa17182140a36a18af5726f90b9249e7d5763",
-    "x86_64-unknown-linux-gnu": "9e254bf981615bc4f473a9e7c0aa131226274fc3be1fee5a74075b38ebbba286"
+    "x86_64-unknown-linux-gnu": "3ca865b604db0e10bb61454b755d298d832fd15eae9a5e129b64bb820b9e2f94"
   }
 }

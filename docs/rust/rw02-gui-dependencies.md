@@ -192,14 +192,23 @@ drivers and the application's orderly shutdown.
 The normal Linux [build entry point](../../tools/rust-qa/build-gui-probe.py)
 prepares the pinned Cargo archives. Its [isolated compiler](../../tools/rust-qa/gui/build.py)
 reconstructs the 385 registry packages in the GUI and settings-reader lock.
-The inventory SHA-256 of their original archives and unpacked compiler
-sources is `1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3`.
+The inventory SHA-256 with the reviewed Flatpak AT-SPI adapter is
+`6a169a3b2c15a259d24ee23f10fc4625876808ae121e2edd15469ab1e96d0478`.
+The stock 385-package control uses
+`1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3`.
+Both use the same published crates and Cargo.lock. The Linux x64 and
+ARM64 dependency reports differ from their stock controls in one entry.
+For `accesskit_unix` 0.24.1 they additionally record the effective compiler
+tree and both file changes. The two Windows reports remain byte-identical
+to their stock controls. [Original archive, patch and notices](../../tools/rust-qa/gui/flatpak-accessibility/README.md#cargo-directory-source-for-the-normal-compiler).
 The earlier GUI at `1862b75` used 372 registry packages with inventory
 `0a4cc8dc3db5daee67b22898a0b4b3ca09a15fd157691e3d19eb72c134f885fe`.
 The cache is under `artifacts/rust/gui-registry/<digest>/`. A new compiler
 invocation authenticates the archives, file lists and individual source
 bytes before mounting the directory at `/vendor`. Clippy, release builds
 and native tests use this read-only mount in an offline namespace.
+Each compiler inventory has a separate Cargo target directory so replaying
+the stock control cannot supply cached crate objects to the corrected GUI.
 The separately reconstructed text crates and installed fonts keep their
 existing inputs. [Directory reconstruction](../../tools/rust-qa/gui/startup/vendor.py).
 

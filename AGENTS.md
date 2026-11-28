@@ -198,6 +198,8 @@ to reconcile project decisions, defaults, and recorded state.
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
   when changing the candidate desktop profile.
+  Build the ordinary Linux GUI with its [reviewed AccessKit directory source](tools/rust-qa/gui/flatpak-accessibility/README.md#cargo-directory-source-for-the-normal-compiler)
+  and keep its Cargo target cache separate from the stock control.
   Run the [Windows x64 YAML exchange in the local guest](tools/rust-qa/windows-local/yaml.md).
   Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md),
   the [100- and 300-folder profiles](docs/rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders),

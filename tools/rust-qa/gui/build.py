@@ -44,6 +44,12 @@ def main(args):
     if build == OUTPUT or not build.is_relative_to(OUTPUT.resolve()):
         raise ValueError("Use a build directory below artifacts/rust")
     build.mkdir(exist_ok=True, parents=True)
+    registry_receipt = directory.parents[2] / "registry-sources.json"
+    registry_digest = sha(registry_receipt)
+    # Cargo identifies registry crates by their published version. Separate
+    # target directories keep compiled originals out of a corrected build.
+    target_dir = build / "targets" / registry_digest
+    target_dir.mkdir(parents=True, exist_ok=True)
     sources = linux_project_sources(ROOT)
     with tempfile.TemporaryDirectory(dir=build) as home:
         vendor.configure_cargo_home(Path(home), directory)
@@ -70,7 +76,7 @@ def main(args):
         command += ["--ro-bind", str(HERE.parent / "yaml"), "/project/tools/rust-qa/yaml"]
     command += ["--ro-bind", str(directory), "/vendor", "--ro-bind", str(toolchain), "/toolchain",
                 "--ro-bind", str(ROOT / "rust"), "/project/rust", "--ro-bind", str(HERE), "/project/tools/rust-qa/gui",
-                "--ro-bind", str(fonts), "/fonts", "--bind", str(build), "/build",
+                "--ro-bind", str(fonts), "/fonts", "--bind", str(target_dir), "/build",
                 "--setenv", "IFW_QA_FONT_DIR", "/fonts", "--setenv", "HOME", "/test-home",
                 "--setenv", "PATH", "/toolchain/bin:/usr/bin", "--setenv", "CARGO_HOME", "/cargo",
                 "--setenv", "CARGO_TARGET_DIR", "/build", "--chdir", "/project/tools/rust-qa/gui"]
@@ -91,7 +97,10 @@ def main(args):
                             *cargo, "test", *selection, "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
         return
     drivers = [Path(__file__).resolve(), HERE / "compiler_inputs.py", HERE / "startup/vendor.py",
-               HERE / "source_profile.py", HERE.parent / "combined-profile/sources.py", HERE.parent / "yaml/prepare.py",
+               HERE / "startup/audit_profile.py", HERE / "source_profile.py",
+               HERE / "flatpak-accessibility/accesskit_source.py", HERE / "flatpak-accessibility/source-review.json",
+               HERE / "flatpak-accessibility/application-bus.patch",
+               HERE.parent / "combined-profile/sources.py", HERE.parent / "yaml/prepare.py",
                HERE.parent / "audit-graph.py", HERE.parent / "storage/evidence.py"]
     original_sources = source_digests(sources)
     original_drivers = source_digests(drivers)
@@ -103,16 +112,17 @@ def main(args):
     units = verify_gui_units(log, expected)
     if source_digests(sources) != original_sources or source_digests(drivers) != original_drivers:
         raise ValueError("The native GUI sources or compiler drivers changed during compilation")
-    binary = build / "release/native-gui-assessment"
+    binary = target_dir / "release/native-gui-assessment"
     record = {"rustc": version.strip(), "target": target, "command": "cargo build --release --frozen",
               "binary_sha256": sha(binary), "fonts": {p.name: sha(p) for p in sorted(fonts.glob("*.ttf"))},
               "font_notice": sha(fonts / "OFL-1.1.txt"),
               "sources": original_sources}
     record["graphSha256"] = graph_sha
-    registry_receipt = build / "gui-registry-sources.json"
-    shutil.copyfile(directory.parents[2] / "registry-sources.json", registry_receipt)
-    record["registryReceiptSha256"] = sha(registry_receipt)
-    if record["registryReceiptSha256"] != vendor.GUI_LOCK_RECEIPTS[original_sources["tools/rust-qa/gui/Cargo.lock"]]:
+    saved_receipt = build / "gui-registry-sources.json"
+    shutil.copyfile(registry_receipt, saved_receipt)
+    record["registryReceiptSha256"] = sha(saved_receipt)
+    expected_receipt = vendor.GUI_LOCK_RECEIPTS[original_sources["tools/rust-qa/gui/Cargo.lock"]]
+    if registry_digest != record["registryReceiptSha256"] or registry_digest != expected_receipt:
         raise ValueError("The GUI directory-source receipt changed during compilation")
     record["compilerStreamSha256"] = sha(log)
     record["compilerUnits"] = units
@@ -122,8 +132,16 @@ def main(args):
     record["textNotices"] = profile["noticeFiles"]
     record["sourceProfileSha256"] = source_profile.sha(source_profile.REVIEW)
     record["sourceReconstructionSha256"] = sha(Path(source_profile.__file__))
-    binary.with_suffix(".inputs.json").write_text(json.dumps(record, indent=2) + "\n")
-    print(f"{target} {record['binary_sha256']} {binary}")
+    release = build / "release"
+    release.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=release) as staging:
+        staged = Path(staging) / binary.name
+        shutil.copy2(binary, staged)
+        inputs = staged.with_suffix(".inputs.json")
+        inputs.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        staged.replace(release / binary.name)
+        inputs.replace(release / inputs.name)
+    print(f"{target} {record['binary_sha256']} {release / binary.name}")
 
 
 if __name__ == "__main__":

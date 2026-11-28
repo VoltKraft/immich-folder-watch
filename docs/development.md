@@ -354,7 +354,9 @@ python3 tools/rust-qa/gui/native.py --backend wayland --wayland-ime --monitor-ch
 
 The ordinary Linux GUI build reconstructs its Cargo directory source from
 the locked crate archives. Its private build environment mounts that
-directory read-only. The target's `gui-native` output contains the
+directory read-only. The Linux build applies the reviewed two-file change
+to the pinned Unix AccessKit adapter and selects a Cargo target directory
+by the resulting source inventory digest. The target's `gui-native` output contains the
 complete release compiler messages, source inventory and native graph.
 [Compiler input checks](rust/rw02-gui-dependencies.md#offline-compiler-inputs-for-the-ordinary-linux-gui).
 

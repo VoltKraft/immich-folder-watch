@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from gui import source_profile
-from gui.startup.vendor import RECEIPT_SHA256
+from gui.startup import vendor as registry
 from sources import yaml_prepare
 
 QA = Path(__file__).resolve().parents[2]
@@ -71,8 +71,9 @@ class StartupAudit:
         if self.vendor.parts[-3:] != ("registry", "src", "reviewed"):
             raise ValueError("Use the reviewed startup registry directory")
         inventory = self.vendor.parents[2] / "registry-sources.json"
-        if source_profile.sha(inventory) != RECEIPT_SHA256:
-            raise ValueError("Wrong original 385-package source inventory")
+        receipt = registry.CORRECTED_RECEIPT_SHA256 if canonical else registry.RECEIPT_SHA256
+        if source_profile.sha(inventory) != receipt:
+            raise ValueError("The compiler source inventory differs from the selected GUI profile")
         self.registry = json.loads(inventory.read_bytes())
         self.source_roots = {}
         for name, (path, manifest_sha, source_sha) in allowed.items():
@@ -113,24 +114,28 @@ class StartupAudit:
             raise ValueError(f"Unexpected directory source for {key}")
         if not expected["transformations"]:
             return None
-        if key != "base64-0.23.1":
-            raise ValueError(f"Unreviewed transformed package {key}")
         archive = self.vendor.parents[1] / "cache/reviewed" / (key + ".crate")
-        files, changes = yaml_prepare.source_files(archive, key, checksum)
+        if key == "base64-0.23.1":
+            files, changes = yaml_prepare.source_files(archive, key, checksum)
+        elif key == "accesskit_unix-0.24.1":
+            from sources import accesskit_source
+            files, changes = accesskit_source.registry_files(archive, checksum)
+        else:
+            raise ValueError(f"Unreviewed transformed package {key}")
         hashes = {name: yaml_prepare.digest(data) for name, data in files.items()}
         tree = yaml_prepare.digest(yaml_prepare.canonical(hashes))
         if (tree != expected["compilerTreeSha256"] or changes != expected["transformations"]
                 or len(hashes) != expected["files"]):
-            raise ValueError("The reconstructed base64 source differs from the reviewed filter")
+            raise ValueError(f"The reconstructed {key} source differs from its review")
         actual = {}
         for item in root.rglob("*"):
             if item.is_symlink():
-                raise ValueError("Unexpected linked base64 compiler input")
+                raise ValueError(f"Unexpected linked compiler input for {key}")
             if item != root / ".cargo-checksum.json" and not item.is_dir():
                 if not item.is_file():
-                    raise ValueError("Unexpected base64 compiler input")
+                    raise ValueError(f"Unexpected compiler input for {key}")
                 actual[item.relative_to(root).as_posix()] = source_profile.sha(item)
         if (actual != hashes or json.loads((root / ".cargo-checksum.json").read_bytes())
                 != {"files": hashes, "package": checksum}):
-            raise ValueError("The supplied base64 files differ from the reviewed compiler source")
+            raise ValueError(f"The supplied {key} files differ from the reviewed compiler source")
         return {"compilerTreeSha256": tree, "files": len(hashes), "transformations": changes}

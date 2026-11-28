@@ -125,7 +125,7 @@ def run(cache, build, *, startup_vendor=None, combined_receipt=None, original_co
         if original_control:
             profile = "original-control"
             gui, _ = qualify.stage(snapshot)
-        directory = vendor.compiler_directory(AREA / "assessment-cache/registry", gui)
+        directory = vendor.compiler_directory(AREA / "assessment-cache/registry", gui, stock=original_control)
         receipt = directory.parents[2] / "registry-sources.json"
     project = gui.parents[2]
     inputs = project_inputs(project)
@@ -133,8 +133,13 @@ def run(cache, build, *, startup_vendor=None, combined_receipt=None, original_co
     patch = stage(source, gui, original_control=original_control)
     registry_receipt = trial / "registry-sources.json"
     shutil.copyfile(receipt, registry_receipt)
-    if sha(registry_receipt) != vendor.GUI_LOCK_RECEIPTS[inputs["tools/rust-qa/gui/Cargo.lock"]]:
+    digest = sha(registry_receipt)
+    expected = (vendor.RECEIPT_SHA256 if startup_vendor is not None else
+                vendor.GUI_LOCK_RECEIPTS[inputs["tools/rust-qa/gui/Cargo.lock"]])
+    if digest != expected:
         raise ValueError("The compiler source receipt differs from the reviewed GUI lock")
+    target_dir = build / "targets" / digest
+    target_dir.mkdir(parents=True, exist_ok=True)
     args = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
             "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin",
             "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
@@ -152,7 +157,7 @@ def run(cache, build, *, startup_vendor=None, combined_receipt=None, original_co
         sources.append((path, "/review/" + path.name))
     for path, mount in sources:
         args.extend(["--ro-bind", str(path), mount])
-    args.extend(["--bind", str(build.resolve()), "/build", "--bind", str(pixels), "/pixels",
+    args.extend(["--bind", str(target_dir), "/build", "--bind", str(pixels), "/pixels",
                  "--chdir", "/project/tools/rust-qa/gui", "--", "/toolchain/bin/cargo",
                  "test", "--release", "--frozen", "--jobs", "1", *qualify.source_config("/reviewed"), "--bin", "native-gui-assessment",
                  "cpu_view_observation::actual_view_mesh_and_texture_requests", "--", "--exact", "--nocapture"])

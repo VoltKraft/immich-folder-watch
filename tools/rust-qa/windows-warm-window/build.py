@@ -62,7 +62,7 @@ def stage(project, *, canonical=None):
         for name in ("Cargo.toml", "Cargo.lock"):
             shutil.copyfile(yaml / name, copied / name)
         registry = ROOT / "artifacts/rust/assessment-cache/registry"
-        reviewed_directory = vendor.compiler_directory(registry, canonical)
+        reviewed_directory = vendor.compiler_directory(registry, canonical, stock=True)
         config = project / ".cargo"
         config.mkdir()
         vendor.configure_cargo_home(config, reviewed_directory)
