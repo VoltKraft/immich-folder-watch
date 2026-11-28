@@ -69,7 +69,6 @@ def inside(client, mode):
         def route_request(self):
             values = self.headers.get_all("Proxy-Authorization", [])
             api = self.headers.get_all("x-api-key", [])
-            valid = len(values) == 1 and hmac.compare_digest(values[0], expected)
             assert self.headers.get_all("Host") == [AUTHORITY]
             if self.tunneled:
                 assert self.command == "GET" and self.path.startswith("/socket.io/?")
@@ -91,6 +90,7 @@ def inside(client, mode):
                     allowed = credential == "correct"
                     info = {"digestUri": form}
                 else:
+                    valid = len(values) == 1 and hmac.compare_digest(values[0].encode("latin-1"), expected.encode("ascii"))
                     credential = "correct" if valid else "incorrect" if values else "absent"
                     allowed = (mode == "anonymous" or mode == "connect-only" and label != "connect"
                                or mode != "other-scheme" and valid)
