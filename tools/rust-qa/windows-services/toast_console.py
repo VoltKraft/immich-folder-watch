@@ -24,11 +24,20 @@ def check_venue(native, captured):
     raise ValueError("The native sender and physical observer must belong to the same supported desktop trial")
 
 
+def corroborates_labels(banner, popup):
+    if banner.get("status") != "visible":
+        return False
+    match = banner["presentation"]["match"]
+    return (all(match["host"][k] == popup[k] for k in ("pid", "hwnd", "session"))
+            and all(match[key]["runtimeId"] == label["runtimeId"]
+                    for key, label in zip(("title", "body"), popup["labels"])))
+
+
 def verify(directory, frames):
     native = json.loads((directory / "result.json").read_bytes())
     if native["status"] != "passed":
         raise ValueError("Expected a complete native sender and independent notification history")
-    toast_history.replay(directory, native)
+    history = toast_history.replay(directory, native)
     captured = json.loads((frames / "physical.json").read_text(encoding="utf-8-sig"))
     if captured["status"] != "observed":
         raise ValueError(f"Physical observation {captured['status']}: {captured.get('reason') or captured.get('error')}")
@@ -88,7 +97,9 @@ def verify(directory, frames):
         if (label["text"] != text or not label["runtimeId"] or label["physicalHwnd"] != popup["hwnd"]
                 or not left <= x0 <= x < x1 <= left + width or not top <= y0 <= y < y1 <= top + height):
             raise ValueError("A captured label or physical hit was outside the matching Shell popup")
-    return dict(status="passed", token=token, senderPid=proc["pid"], senderSha256=native["binarySha256"],
+    provider_match = any(corroborates_labels(banner, popup) for banner in history["normalBanners"])
+    return dict(status="capture-verified", presentation="visible" if provider_match else "review-screen-crop",
+                token=token, senderPid=proc["pid"], senderSha256=native["binarySha256"],
                 shellPid=popup["pid"], hwnd=popup["hwnd"], imageSha256=sha(image),
                 afterShowMs=round((captured["beginQpc"] - end) * 1000 / frequency, 3))
 

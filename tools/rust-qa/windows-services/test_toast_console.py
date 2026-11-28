@@ -3,7 +3,7 @@
 import unittest
 
 from activation import TARGET
-from toast_console import check_venue
+from toast_console import check_venue, corroborates_labels
 
 
 class PhysicalVenueTests(unittest.TestCase):
@@ -23,3 +23,13 @@ class PhysicalVenueTests(unittest.TestCase):
         for key in screen:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 check_venue(sender, {**screen, key: "different"})
+
+    def test_capture_needs_visual_review_when_point_provider_did_not_identify_both_labels(self):
+        host = dict(hwnd=2, pid=3, session=1)
+        title, body = {"runtimeId": "title"}, {"runtimeId": "body"}
+        crop = {**host, "labels": [title, body]}
+        match = dict(host=host, title=title, body=body)
+        self.assertTrue(corroborates_labels(dict(status="visible", presentation={"match": match}), crop))
+        self.assertFalse(corroborates_labels(dict(status="unavailable"), crop))
+        changed = {**match, "body": {"runtimeId": "covering-element"}}
+        self.assertFalse(corroborates_labels(dict(status="visible", presentation={"match": changed}), crop))

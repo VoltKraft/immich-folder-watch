@@ -146,8 +146,24 @@ public static class IfwToastPoint {
             image=$owner.Path; session=$session; createdUtc=$owner.StartTime.ToUniversalTime().ToString('o');
             normalView=$normalView; labels=$labels; capture=@($left,$top,$width,$height); imageSha256=(Get-FileHash "$OutputDirectory\popup.png").Hash.ToLowerInvariant()}
     }
+    # A retained notifier can retry its Setting query before reaching the one
+    # ordinary Show. Start the screen interval from that sender's own return.
     $start.Restart()
-    while ($start.Elapsed.TotalSeconds -lt 80 -and !(Test-Path "$NativeDirectory\result.json")) {
+    $showEnd = $null
+    while ($null -eq $showEnd -and $start.Elapsed.TotalMinutes -lt 5 -and !(Test-Path "$NativeDirectory\result.json")) {
+        foreach ($sender in (Get-ChildItem -LiteralPath $NativeDirectory -Filter '???-post-normal.txt' -File)) {
+            $sendLog = Get-Content -Raw -LiteralPath $sender.FullName -ErrorAction SilentlyContinue
+            if ($sendLog -match "(?m)^aumid=IFW\.RustQA\.Toast\.$token\r?$" -and
+                $sendLog -match '(?m)^suppressPopup=false\r?$' -and $sendLog -match '(?m)^showHresult=0\r?$' -and
+                $sendLog -match '(?m)^showReturned=true\r?$' -and $sendLog -match '(?m)^showEndQpc=([1-9][0-9]*)\r?$') {
+                $showEnd = [long]$Matches[1]
+                break
+            }
+        }
+        if ($null -eq $showEnd) { Start-Sleep -Milliseconds 50 }
+    }
+    if ($null -eq $showEnd) { $report.reason = 'No completed ordinary Show in the native sender logs'; return }
+    while ([Diagnostics.Stopwatch]::GetTimestamp() -le $showEnd + 10L * $report.frequency -and !(Test-Path "$NativeDirectory\result.json")) {
         $report.beginQpc = [Diagnostics.Stopwatch]::GetTimestamp()
         $root = [IfwToastPoint]::Root(($area.Right-260),($area.Bottom-97))
         $candidates = @($root)

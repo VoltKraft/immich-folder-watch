@@ -36,6 +36,12 @@ Show interval, its run and revision, the observer's native process and
 desktop, and the image digest. An empty history or an unobserved popup
 leaves the corresponding native check open.
 
+Replay reports `presentation=visible` when the independent timed UI
+Automation point queries also found both labels on that same Shell window.
+With `review-screen-crop`, inspect the archived PNG for both strings and the
+sender's token before recording a presentation result. Another surface
+inside the same native window can cover accessible text.
+
 ```powershell
 python -B tools/rust-qa/windows-services/toast_console.py $historyDirectory $physicalDirectory
 ```
