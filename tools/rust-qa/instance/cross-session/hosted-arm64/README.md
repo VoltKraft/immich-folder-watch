@@ -1,0 +1,11 @@
+# Windows ARM64 standard-user writer trial
+
+The dedicated Windows 11 ARM64 job exercises a new local standard account on the disposable runner. One authenticated Secondary Logon process runs from the runner's original nonzero session. The same user registers a single, on-demand S4U task in session 0. Both participants read their own Windows logon type and authentication ID, WTS session ID, process session ID and primary token. This measures local cross-session file exclusion. Interactive console/RDP and installed MSI handover have separate evidence. [Workflow](../../../../../.github/workflows/rust-windows-arm64-writer.yaml) · [Original guard protocol](../../../../../docs/rust/rw02-cross-session.md) · [Microsoft logon API](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithlogonw) · [Task Scheduler security contexts](https://learn.microsoft.com/en-us/windows/win32/taskschd/security-contexts-for-running-tasks)
+
+The controller verifies the original native compiler archive from run `46062734833`, revision `1c9a7ee6388450a0bcbf9afa947ea4138a6441df`, against Actions SHA-256 `90df61bc32fa397958a5d91ad7a586e0dcbcba6c2544b668f295a9f4caf5680c` and the current source tree. Its ARM64 Rust writer and managed identity oracle run with synthetic files. Five distinct native writers must produce the eight ordered hold, refusal, release and reacquisition events on the same file ID. [Compiler archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46062734833/artifacts/15229492640)
+
+The fixture generates its password in a job-local SecureString and passes it to Windows through the process credentials API. The unprivileged task runs under its own SID with S4U. A temporary, SID-specific batch-logon assignment permits that logon. Cleanup verifies the original empty assignment, task removal, account and profile removal, staging directory removal and restoration of Secondary Logon. The hosted archive contains the verified compiler ZIP, source hashes and the scoped process and cleanup receipts. Run the replay from the measured checkout after extracting the archive.
+
+```sh
+python3 -IB tools/rust-qa/instance/cross-session/hosted-arm64/replay.py /path/to/extracted-observation
+```

@@ -15,7 +15,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import console_levels
 from fixture import Accounts, HERE, HOSTED, LOCAL_WRITER, bind, checked, guard_id, instance, read, release, subject_env, validate_area, wait, write
-from standard import AMBIENT, EXISTING, STANDARD, fixed_writer, qualifies, required_authority
+from standard import AMBIENT, EXISTING, STANDARD, TEMPORARY, fixed_writer, qualifies, required_authority
 
 
 PHASES = {"original": (("original-hold", True), ("original-refuse", False), ("original-last", True)),
@@ -213,6 +213,14 @@ def run(area, result, role="scheduled"):
     write(area / (role + "-bootstrap.json"), identity)
     if config["mode"] == AMBIENT:
         result["mode"] = "unchanged-bootstrap-authority"
+        result["passed"] = participant(area, role)
+    elif config["mode"] == TEMPORARY:
+        if not qualifies(identity):
+            raise RuntimeError("The new local account must already have ordinary user authority")
+        sys.path.insert(0, str(HERE / "hosted-arm64"))
+        from logon import current_logon
+        result["osLogon"] = current_logon(identity, role)
+        result["mode"] = "inherited-standard-user"
         result["passed"] = participant(area, role)
     elif config["mode"] not in (STANDARD, EXISTING):
         raise RuntimeError("Unknown fixed participant mode")

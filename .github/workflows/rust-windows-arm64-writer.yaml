@@ -1,0 +1,60 @@
+name: Rust Windows ARM64 standard-user writer
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-arm64-writer.yaml'
+      - 'tools/rust-qa/instance/cross-session/hosted-arm64/*.py'
+      - 'tools/rust-qa/instance/cross-session/hosted-arm64/*.ps1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  observe:
+    if: github.repository == 'VoltKraft/immich-folder-watch' && github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 10.0.401
+          architecture: arm64
+
+      - name: Verify the original tested ARM64 writer and identity oracle
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -I -B tools/rust-qa/instance/cross-session/hosted-arm64/inputs.py download
+
+      - name: Exercise the new ordinary user's two local logons
+        shell: pwsh
+        run: ./tools/rust-qa/instance/cross-session/hosted-arm64/run.ps1
+
+      - name: Replay the original lock events, tokens and cleanup
+        shell: pwsh
+        run: python -I -B tools/rust-qa/instance/cross-session/hosted-arm64/replay.py artifacts/rust/arm64-standard-writer
+
+      - name: Retain the native archive and redacted test observations
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-standard-writer-arm64-${{ github.sha }}
+          path: |
+            artifacts/rust/arm64-standard-writer/writer.zip
+            artifacts/rust/arm64-standard-writer/observer-sources.json
+            artifacts/rust/arm64-standard-writer/host.json
+            artifacts/rust/arm64-standard-writer/case.json
+            artifacts/rust/arm64-standard-writer/worker-done.json
+            artifacts/rust/arm64-standard-writer/original-bootstrap-done.json
+            artifacts/rust/arm64-standard-writer/scheduler.json
+            artifacts/rust/arm64-standard-writer/cleanup.json
+          if-no-files-found: error
+          retention-days: 14

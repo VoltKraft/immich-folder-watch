@@ -16,7 +16,7 @@ if ($taskName -cnotmatch '^IfwQaCross_[a-f0-9]{32}$' -or
     throw 'Expected a new marked profile directly under the disposable runner temp directory.'
 }
 $config = [IO.File]::ReadAllText((Join-Path $areaPath 'controller.json')) | ConvertFrom-Json
-if ($config.mode -cnotin @('hosted-S4U-ambient','hosted-S4U')) { throw 'Expected a fixed hosted guard trial.' }
+if ($config.mode -cnotin @('hosted-S4U-ambient','hosted-S4U','hosted-temporary-standard')) { throw 'Expected a fixed hosted guard trial.' }
 $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $sha = [Security.Cryptography.SHA256]::Create()
 try {

@@ -112,6 +112,7 @@ def qualifies(receipt):
 
 AMBIENT = "hosted-S4U-ambient"
 STANDARD = "hosted-S4U"
+TEMPORARY = "hosted-temporary-standard"
 EXISTING = "existing-standard-sessions"
 
 
@@ -131,7 +132,7 @@ def unchanged_authority(actual, parent):
 def required_authority(mode, actual, parent):
     if mode == AMBIENT:
         return unchanged_authority(actual, parent)
-    if mode in (STANDARD, EXISTING):
+    if mode in (STANDARD, TEMPORARY, EXISTING):
         return qualifies(actual)
     raise ValueError("Unknown native writer measurement mode")
 
