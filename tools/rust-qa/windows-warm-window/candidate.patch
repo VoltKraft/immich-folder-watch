@@ -8,7 +8,7 @@
 +mod loop_wake;
  mod native_window;
  
- use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
+ use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, TrayAvailability, WindowIntent};
 @@ -32,12 +34,16 @@
      Close,
      Quit,

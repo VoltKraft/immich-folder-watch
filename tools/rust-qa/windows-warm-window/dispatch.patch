@@ -7,7 +7,7 @@
 +#[cfg(target_os = "windows")]
 +mod ui_trace;
 
- use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
+ use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, TrayAvailability, WindowIntent};
  use eframe::egui;
 @@ -58,6 +60,10 @@
      fn send(&self, command: Command) -> Result<(), TrySendError<Command>> {
