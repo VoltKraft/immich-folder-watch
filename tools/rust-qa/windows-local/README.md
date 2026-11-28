@@ -30,6 +30,37 @@ compiler messages, checks each digest and records each process exit and
 output. The network fixture uses private loopback endpoints. A compiler
 receipt and a guest result identify different events.
 
+### Workspace, Realtime and Combined on the same Server 2025 guest
+
+On November 28, 2026, the native x64 guest ran the following compiler
+archives offline in console session 1 as its dedicated standard user.
+
+| Original compiler input | Local result |
+| --- | --- |
+| [Workspace at `a2e54f5`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103806236/artifacts/15246667821) | Nine harnesses, 35 tests passed, zero failed or ignored. |
+| [Realtime at `a2e54f5`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103806236/artifacts/15246019059) | 18 unit tests, 49 wire cases and 16 Windows system proxy cases passed. The fixture and its supervisor both confirmed restoration. |
+| [Combined at `6c4a364`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103222392/artifacts/15246850971) | The native smoke test and all five held-file upload retries passed after the original paths were replaced. |
+
+For Realtime, restore the checkout with `core.autocrlf=true` and its
+checked-in attributes to reproduce all 35 compiler source digests. Run
+the command above with `--system-proxy` in the disposable account. Put the
+offline OpenSSL CLI on `PATH` for the loopback peers' temporary certificates.
+With embedded Python, add the checkout's `tools/rust-qa/realtime` directory
+to a private copy of its `python*._pth` file so child interpreters can load
+the fixture's sibling modules. The first run lacked OpenSSL on `PATH`.
+The repeat used OpenSSL 3.5.9 and exited zero for all four driver steps.
+
+The guest generated the Combined SPDX inventory from 250 compiled packages
+in 281 compiler units. Independent host generation produced the same bytes
+and validated 258 SPDX packages and 615 relationships against the pinned
+schema. Its SHA-256 was
+`2b2c737909bed78f8cb40195ac52a8e05fa7c56e103e83247ed7496d3df26591`.
+The 47 original result files, the 667,721-byte ZIP, and the independent
+replay are under
+`artifacts/rust/local-windows-server-2025-x64/20261128/local-suite-a2e54f5/attempt-2/`.
+The ZIP matched the guest's serial SHA-256
+`eedd46bbedb9a333e3723008a7ed27fdfd2d0b37c46d635e2fbaf8b157531e05`.
+
 ## Ordinary GUI and native GUI test executables
 
 The [x64 GUI compiler](../../../.github/workflows/rust-windows-x64-gui-build.yaml)
