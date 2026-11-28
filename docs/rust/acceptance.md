@@ -48,6 +48,7 @@ On Fedora x64 the installed portal client at `c7c614f` opened both selected
 directory grants and retained the literal percent escape in the second
 folder name. After its revocation, a new process read the control grant
 and observed `ENOENT` for the revoked URI on both X11 and Wayland.
+Native Ubuntu ARM64 reproduced both installed trials with the same sources.
 The editor at `b71b573` also retained keyboard focus and its directional
 Unicode selection after an ordinary reopen on both backends.
 [Selected grants and revocation](rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·

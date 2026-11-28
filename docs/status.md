@@ -12,6 +12,7 @@ The Fedora x64 portal client now decodes a selected directory URI into
 the original Unix filename bytes. At `c7c614f` two installed Flatpak trials
 opened `Grüße #2 %2F` and lost access after revocation while the control
 grant remained readable. Both native host chooser trials also passed.
+Both installed trials passed again on Ubuntu ARM64 at the same revision.
 The editor at `b71b573` retained its focused field, backwards selection
 and first keystroke after reopening on Mutter and X11.
 [Folder results](rust/rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·

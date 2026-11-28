@@ -91,6 +91,18 @@ Git revision. Results are under `artifacts/rust/portal-dialog/`.
 | Host X11 | `x11-chooser-only-felfrzjz` | `8178d7f7f4535e791a7c774926f78b78a6e915f1b1e2cfa8401a6d8be6655d70` |
 | Host Wayland | `wayland-chooser-only-vcdm_skm` | `5169f0f0c49ed6f6b25ed591d0dfa7542eda6765b1184c8bf36a2b31604b770f` |
 
+The native Ubuntu ARM64 run at the same revision reproduced both installed
+trials. On X11, the escaped grant `55e7c8cc` was revoked while `642762a6`
+remained readable. On Wayland, the corresponding IDs were `360bb55c` and
+`5cedd3d2`. Both fresh processes confirmed the FUSE mount and received
+`ENOENT` for the revoked folder. Independent readback checked the original
+parenting observations, both filenames and all 27 recorded source inputs
+per desktop. The ARM64 ELF had SHA-256
+`547fbf4e10dad38ec7609de55dfd407694b9a492cdd2ac2381b23c6c3231788d`.
+The original ZIP had SHA-256
+`1f716448e1aa5133528cb49381c0e62e8b081a3dd0d4baa38b063c1c4ecff15a`.
+[Original Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46118180278/artifacts/15252637426).
+
 ## Notifications and autostart
 
 On Fedora x64 the private notification observer now publishes each complete
