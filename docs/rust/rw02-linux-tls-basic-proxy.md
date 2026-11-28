@@ -232,3 +232,34 @@ reports are in `artifacts/rust/realtime-assessment/` as
 `a9b57ffbe2ac7cdd6a92a37a219af13cc9fa761630155845ec3cbd255891ffe5`)
 and `linux-tls-digest-count-final-01.json` (SHA-256
 `e6d6a45d5aa61557d50d1e29efe3051ccbd1066c0619c61af1b9c039fc7fdf79`).
+
+### Native nonce counts on Ubuntu x64 and ARM64 at a2e54f5
+
+On both Ubuntu architectures, the relay accepted nonce counts 1 through 13
+in order for MD5 and for SHA-256. Each accepted CONNECT followed an
+unauthenticated 407 challenge. All thirteen tunnels completed TLS and carried
+authenticated origin requests. The peer observed the subscription event,
+namespace disconnect and normal WebSocket close. With an incorrect password,
+each relay rejected ten credentialed retries, accepted zero counts and observed
+zero TLS handshakes. The parallel-count and rotated-nonce unit test also passed
+on both architectures. [Native transport run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103806187).
+
+| Native host | Unit tests | Wire scenarios | Original Actions ZIP SHA-256 |
+| --- | ---: | ---: | --- |
+| Ubuntu x64 | 20 | 66 | `1ff8ae45dc4b8767d3214733f39049246481c1146085000c31d4a984d2057686` |
+| Ubuntu ARM64 | 20 | 66 | `09239e8835d8e40de2a2a609d49de3d647cbf8741b61036407338161f2485231` |
+| Windows 11 ARM64 | 18 | 49 | `dc279452b4d733247090035c0ae5dc73ee607d88ba51a1a34dbf7eefe18c362f` |
+
+The Windows ARM64 control recorded 13 authenticated HTTPS requests through
+two TLS tunnels. The HTTP bypass case connected directly and received its
+event. The archived executable's PE machine field identifies ARM64. Its
+target graph excludes the Linux-only MD5 dependency.
+
+The detached replay matched the three original ZIPs to the Actions digests,
+verified every indexed output and compared 35 source files per archive with
+commit `a2e54f5`, accounting for Windows checkout line endings.
+The archives, Actions metadata and replay are in
+`artifacts/rust/realtime-assessment/hosted-a2e54f5/`. Running
+`python3 -B artifacts/rust/realtime-assessment/hosted-a2e54f5/replay.py`
+reproduces `verified.json`, SHA-256
+`b14d6458fb9165695994621bf6658e8e1c8fbbfbbd768cb69b4440071ce5c169`.
