@@ -15,6 +15,11 @@ public static class ApplyWindowNative {
     [StructLayout(LayoutKind.Sequential)] public struct Point { public int x, y; }
     [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(Point point);
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+    [DllImport("user32.dll")] public static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, UIntPtr key, IntPtr data);
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
 }
 '@
@@ -72,27 +77,56 @@ function SelectPage($key) {
     $item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
 }
 function SetField($key,$value) {
-    if ($key -eq 'UI_FolderPath') {
-        $r = BoundRoot
-        $rect = $r.Current.BoundingRectangle
-        $item = $null
-        for ($y = [int]$rect.Top + 8; $y -lt $rect.Bottom -and !$item; $y += 12) {
-            for ($x = [int]$rect.Left + 8; $x -lt $rect.Right -and !$item; $x += 48) {
-                $point = [ApplyWindowNative+Point]::new()
-                $point.x=$x; $point.y=$y
-                $native = [ApplyWindowNative]::WindowFromPoint($point)
-                if ([ApplyWindowNative]::GetAncestor($native,2).ToInt64() -ne $Hwnd) { continue }
-                $hit = [Windows.Automation.AutomationElement]::FromPoint([Windows.Point]::new($x,$y))
-                if ($hit -and $hit.Current.ProcessId -eq $ProcessId -and $hit.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and
-                    !$hit.Current.IsOffscreen -and $hit.Current.IsEnabled -and $strings[$key] -ccontains $hit.Current.Name) {
-                    $item=$hit
-                    $record.folderPoint=@($x,$y)
-                }
-            }
-        }
-        if (!$item) { $item = FindControl ([Windows.Automation.ControlType]::Edit) $strings[$key] }
-    } else { $item = FindControl ([Windows.Automation.ControlType]::Edit) $strings[$key] }
+    $item = FindControl ([Windows.Automation.ControlType]::Edit) $strings[$key]
     $item.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($value)
+}
+function SaveWindowImage([string]$name) {
+    $r = BoundRoot
+    $rect=$r.Current.BoundingRectangle
+    $image=[Drawing.Bitmap]::new([int]$rect.Width,[int]$rect.Height)
+    $graphics=[Drawing.Graphics]::FromImage($image)
+    $dc=$graphics.GetHdc()
+    try { $ok=[ApplyWindowNative]::PrintWindow([IntPtr]$Hwnd,$dc,2) } finally { $graphics.ReleaseHdc($dc); $graphics.Dispose() }
+    try {
+        if (!$ok) { throw 'The original WPF window did not supply a capture' }
+        $image.Save((Join-Path $area $name),[Drawing.Imaging.ImageFormat]::Png)
+    } finally { $image.Dispose() }
+}
+function EnterFolder($tab,$value) {
+    # The shipping tab renders its first editor below General, outside the UIA tab content tree.
+    $root=BoundRoot
+    $r=$tab.Current.BoundingRectangle
+    if (!$tab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected -or $r.IsEmpty) {
+        throw 'The source editor General tab is not selected'
+    }
+    $point=[ApplyWindowNative+Point]::new()
+    $point.x=[int]($r.Left+$r.Width*.75)
+    $point.y=[int]($r.Bottom+$r.Height*1.7)
+    if (!$root.Current.BoundingRectangle.Contains($point.x,$point.y) -or
+        [ApplyWindowNative]::GetAncestor([ApplyWindowNative]::WindowFromPoint($point),2).ToInt64() -ne $Hwnd) {
+        throw 'The observed folder field is outside the original native WPF window'
+    }
+    SaveWindowImage 'folder-before.png'
+    $original=[ApplyWindowNative+Point]::new()
+    if (![ApplyWindowNative]::GetCursorPos([ref]$original)) {throw 'Could not read the original pointer'}
+    try {
+        if (![ApplyWindowNative]::SetCursorPos($point.x,$point.y)) {throw 'The pointer did not reach the observed folder field'}
+        if ([ApplyWindowNative]::GetAncestor([ApplyWindowNative]::WindowFromPoint($point),2).ToInt64() -ne $Hwnd) {throw 'Changed native WPF hit'}
+        [ApplyWindowNative]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+        [ApplyWindowNative]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
+        Start-Sleep -Milliseconds 160
+        $focus=[Windows.Automation.AutomationElement]::FocusedElement
+        if (!$focus -or $focus.Current.ProcessId -ne $ProcessId -or [ApplyWindowNative]::GetForegroundWindow().ToInt64() -ne $Hwnd) {
+            throw 'The original WPF process did not own foreground and keyboard focus'
+        }
+        $record.folderFocus=@{name=$focus.Current.Name;type=$focus.Current.ControlType.ProgrammaticName;point=@($point.x,$point.y);hwnd=$Hwnd}
+        # Send WM_CHAR directly to this held, focused HWND. This cannot route text into another application.
+        foreach ($c in $value.ToCharArray()) {
+            if ([ApplyWindowNative]::GetForegroundWindow().ToInt64() -ne $Hwnd) {throw 'The original WPF window lost focus'}
+            [void][ApplyWindowNative]::SendMessage([IntPtr]$Hwnd,0x0102,[UIntPtr][UInt32][int]$c,[IntPtr]1)
+        }
+        SaveWindowImage 'folder-entered.png'
+    } finally { [void][ApplyWindowNative]::SetCursorPos($original.x,$original.y) }
 }
 $record = [ordered]@{phase=$Phase;pid=$ProcessId;hwnd=$Hwnd;created=$Created;issued=$false;outcome=$null}
 try {
@@ -108,7 +142,7 @@ try {
         $entries[0].GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
         $tab = FindControl ([Windows.Automation.ControlType]::TabItem) $strings['UI_General']
         $tab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
-        SetField 'UI_FolderPath' $draft.media
+        EnterFolder $tab $draft.media
     }
     $button = FindControl ([Windows.Automation.ControlType]::Button) $strings['App_SaveAndApply']
     $record.buttonName=$button.Current.Name
@@ -134,14 +168,7 @@ try {
     $record.controls=@($r.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition) | Select-Object -First 180 | ForEach-Object {
         "$($_.Current.ControlType.ProgrammaticName) $($_.Current.AutomationId) $($_.Current.Name)"
     })
-    $rect=$r.Current.BoundingRectangle
-    $image=[Drawing.Bitmap]::new([int]$rect.Width,[int]$rect.Height)
-    $graphics=[Drawing.Graphics]::FromImage($image)
-    $dc=$graphics.GetHdc()
-    try {
-        if ([ApplyWindowNative]::PrintWindow([IntPtr]$Hwnd,$dc,2)) { $record.captured=$true }
-    } finally { $graphics.ReleaseHdc($dc); $graphics.Dispose() }
-    try { if($record.captured){$image.Save((Join-Path $area "$Phase-window.png"),[Drawing.Imaging.ImageFormat]::Png)} } finally {$image.Dispose()}
+    SaveWindowImage "$Phase-window.png"
     throw
 } finally {
     [IO.File]::WriteAllText((Join-Path $area "$Phase-window.json"),($record|ConvertTo-Json -Depth 4),[Text.UTF8Encoding]::new($false))
