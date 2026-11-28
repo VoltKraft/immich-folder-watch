@@ -7,10 +7,24 @@ the x64 inputs. Native Windows ARM64 and both Linux suites run in Actions.
 Retain the full source revision, original input ZIP, its Actions SHA-256,
 guest result and logs together. Use a fresh output directory for each trial.
 
-Run one local Windows guest at a time. Allocate 3 GiB (`-m 3072M`)
+Run one local Windows guest at a time. Allocate at most 3 GiB (`-m 3072M`)
 to the desktop and every disposable overlay, including the workspace,
-MSI, tray and proxy trials. When copying a launcher from an older trial,
-set the new copy's memory limit before starting it.
+MSI, tray and proxy trials. The local starters share the [host launch
+helper](guest_slot.py). It checks the RAM argument and reserves the same
+slot for the lifetime of QEMU, including daemonized guests.
+When adapting an old launcher, set its RAM limit and route its QEMU call
+through the installed helper. On a new QA host, copy `guest_slot.py` to
+the existing private VM directory before using the launcher.
+
+```python
+import runpy
+from pathlib import Path
+
+vm_dir = Path.home() / ".local/share/ifw-qa/server2025-x64"
+run_guest = runpy.run_path(str(vm_dir / "guest_slot.py"))["run"]
+run_guest(args, cwd=work, check=True)
+```
+
 Stage new DVDs, result disks and writable guest overlays on the local SSD.
 On this test host `/tmp` is a RAM-backed filesystem.
 

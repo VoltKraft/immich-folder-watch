@@ -217,9 +217,14 @@ The guest also showed the expected WinRT notification title and body on the
 original Shell window. The console observer retained the screenshot and the
 original Do Not Disturb setting was restored. [Local Windows evidence](rust/rw02-windows-services.md).
 
-Local Windows trials share one guest slot. The local Server 2025 guest
-now uses 3072 MiB, down from 3584 MiB. The desktop, workspace, MSI,
-tray, setup and proxy launchers all use this limit. Three host kernel
+The local Server 2025 guest now uses 3072 MiB, down from 3584 MiB.
+All twelve desktop, workspace, MSI, tray, setup and proxy launchers
+now use the same [host launch helper](../tools/rust-qa/windows-local/README.md).
+At `62219be` two successive 8 MiB QEMU processes each held the slot
+after daemonizing, refused a second start and released it on exit. Host
+readback verified the installed helper, the RAM arguments in all twelve
+launchers and the base launcher's refusal while the slot was occupied.
+Three host kernel
 OOM events ended QEMU processes before the reduction. A fresh
 SSD-backed guest reported 3,221,225,472 bytes of base RAM and zero
 hot-plugged memory through QMP.
