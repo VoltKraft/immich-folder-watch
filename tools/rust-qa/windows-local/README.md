@@ -7,6 +7,9 @@ the x64 inputs. Native Windows ARM64 and both Linux suites run in Actions.
 Retain the full source revision, original input ZIP, its Actions SHA-256,
 guest result and logs together. Use a fresh output directory for each trial.
 
+For SQLite and the legacy C# store, use the [native storage readback](storage.md)
+with the original compiler ZIP and a private Windows x64 .NET 10.0.12 runtime.
+
 Run one local Windows guest at a time. Allocate at most 3 GiB (`-m 3072M`)
 to the desktop and every disposable overlay, including the workspace,
 MSI, tray and proxy trials. The local starters share the [host launch
