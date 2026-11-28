@@ -332,6 +332,46 @@ that reads file metadata. Writer handover with a configured synchronization
 engine remains open. [Installed observer](../../tools/RustCompatibilityOracle/installed/interop/gui_refusal.py)
 · [Shipping startup](../../src/ImmichFolderWatch.App.Linux/App.axaml.cs).
 
+### Restart and Quit from the installed Rust tray with live inventory
+
+On Fedora x64, the installed Rust GUI (PID 212) retained its window and
+first inventory worker through two ordinary secondary launches. The signed
+3.0.4 secondary exited and the Rust secondary reopened XID 4194306. On
+the private desktop bus, the observer then selected `Neustart` (menu ID 2)
+and `Beenden` (ID 3) from that GUI's exported tray menu. Both clicks and
+replies identified owner `:1.23` behind the original Flatpak proxy, PID
+208. Their request serials were 157 and 163.
+
+| Worker | Observer PID | Flatpak PID | Native observation |
+| --- | ---: | ---: | --- |
+| Original | 223 | 12 | Discovered both synthetic files during the ordinary launches. Restart produced a successful exit and the original pidfd became readable. |
+| Replacement | 370 | 63 | The first sweep reported two files and two changes. The next reported two files and zero changes. Quit produced a successful exit on the second pidfd. |
+
+Both workers were direct children of GUI PID 212. Both used the same
+executable SHA-256, PID and mount namespaces, and device/inode pairs for
+the original `/qa/files` and `/qa/worker-profile/config` read-only
+mounts. The worker SHA-256 was
+`1df5522e13556332eb87523337eb4178f28765e4caa67d5945c3a4b38d94f5b0`.
+After Quit, the legacy socket disappeared, the signed 3.0.4 GUI reopened
+as PID 387 with the same profile, and its own Quit left the private user
+installation empty. The profile marker and synthetic configuration hashes
+matched their original values.
+
+Add `--tray-worker-restart` to the existing installed `--gui-build` and
+`--inventory-subject` invocation. For the local run those inputs were
+`artifacts/rust/interop-menu-noble-02` and
+`artifacts/rust/performance/subjects/plasma-menu-noble-02`. The complete
+`same-id-wb5pomgt/result.json` had SHA-256
+`ae08a43ffaedecef66aca7e72e7536e3e28b568fa6170d68a7951cdfe80bda14`.
+The observer archive matched `b1bfc59`; the three source archives retained
+24 observer, 31 GUI and 16 worker/reference inputs. The 29-file evidence
+manifest includes the four original D-Bus frames. Replay the archived
+directory with the native GIO bindings.
+
+```sh
+python3 -B tools/RustCompatibilityOracle/installed/interop/tray_readback.py artifacts/rust/shipping-flatpak-interop/same-id-wb5pomgt
+```
+
 ### Rust startup during a signed worker upload
 
 At `f5e84bc` on Fedora x64, a configured, signed 3.0.4 Flatpak uploaded
