@@ -1,0 +1,95 @@
+param(
+    [ValidateSet('held','released')][string]$Phase,
+    [int]$ProcessId,
+    [Int64]$Created,
+    [Int64]$Hwnd,
+    [string]$Work
+)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
+$workPath = [IO.Path]::GetFullPath($Work)
+$fixtureParent = Join-Path $env:LOCALAPPDATA 'IFW-MsiSessions'
+if ((Split-Path $workPath -Parent) -ne $fixtureParent -or (Split-Path $workPath -Leaf) -notlike 'trial-*' -or
+    $env:COMPUTERNAME -ne 'IFW-QA25' -or $env:USERNAME -ne 'ifw-test') { throw 'Expected a disposable apply fixture' }
+$area = Join-Path $workPath 'apply'
+$draft = Get-Content (Join-Path $area 'launch.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$uri = [uri]$draft.url
+if ($uri.Scheme -ne 'https' -or $uri.Host -cne '127.0.0.1' -or $uri.AbsolutePath -cne '/api' -or
+    $uri.UserInfo -or $uri.Query -or $uri.Fragment -or $draft.key -cne 'synthetic-installed-upload' -or
+    $draft.media -ine (Join-Path $area 'media')) { throw 'Invalid synthetic form values' }
+$app = 'C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.exe'
+if ((Get-FileHash $app).Hash -ine 'b8354424bd6c6eba133bb7939ce0de42afbe234bcbb77853b30c25dd645f8675') { throw 'Unexpected installed image' }
+$strings = @{}
+$repo = Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')
+foreach ($file in @('Strings.resx','Strings.de.resx')) {
+    $path = Join-Path $repo "src\ImmichFolderWatch.App.Shared\Resources\$file"
+    $xml = New-Object Xml.XmlDocument
+    $xml.Load($path)
+    foreach ($node in $xml.DocumentElement.data) {
+        $strings[$node.name] = @($strings[$node.name] | Where-Object { $_ }) + @([string]$node.value)
+    }
+}
+function BoundRoot {
+    $proc = Get-Process -Id $ProcessId -ErrorAction Stop
+    if ($proc.Path -ine $app -or $proc.StartTime.ToFileTimeUtc() -ne $Created -or
+        $proc.SessionId -ne [Diagnostics.Process]::GetCurrentProcess().SessionId) { throw 'WPF process identity changed' }
+    $r = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Hwnd)
+    if (!$r -or $r.Current.NativeWindowHandle -ne $Hwnd -or $r.Current.ProcessId -ne $ProcessId -or
+        $r.Current.Name -cne 'Immich Folder Watch' -or $r.Current.IsOffscreen) { throw 'WPF root identity changed' }
+    return $r
+}
+function Elements($type) {
+    $r = BoundRoot
+    $condition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty,$type)
+    return $r.FindAll([Windows.Automation.TreeScope]::Descendants,$condition)
+}
+function FindControl($type,$labels) {
+    $until = [DateTime]::UtcNow.AddSeconds(8)
+    do {
+        $matches = @(Elements $type | Where-Object {
+            $_.Current.ProcessId -eq $ProcessId -and !$_.Current.IsOffscreen -and $_.Current.IsEnabled -and $labels -ccontains $_.Current.Name
+        })
+        if ($matches.Count -gt 1) { throw "Ambiguous WPF control $labels" }
+        if ($matches.Count -eq 1) {return $matches[0]}
+        Start-Sleep -Milliseconds 120
+    } while ([DateTime]::UtcNow -lt $until)
+    throw "Missing WPF control $labels"
+}
+function SelectPage($key) {
+    $item = FindControl ([Windows.Automation.ControlType]::ListItem) $strings[$key]
+    $item.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern).Select()
+}
+function SetField($key,$value) {
+    $item = FindControl ([Windows.Automation.ControlType]::Edit) $strings[$key]
+    $item.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($value)
+}
+$record = [ordered]@{phase=$Phase;pid=$ProcessId;hwnd=$Hwnd;created=$Created;issued=$false;outcome=$null}
+try {
+    if ($Phase -eq 'held') {
+        SelectPage 'UI_Connection'
+        SetField 'UI_ServerApiUrl' $draft.url
+        SetField 'UI_ApiKey' $draft.key
+        SelectPage 'UI_Folders'
+        SetField 'UI_FolderPath' $draft.media
+    }
+    $button = FindControl ([Windows.Automation.ControlType]::Button) $strings['App_SaveAndApply']
+    $record.buttonName=$button.Current.Name
+    $record.buttonRuntimeId=@($button.GetRuntimeId())
+    $record.startQpc=[Diagnostics.Stopwatch]::GetTimestamp()
+    $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $record.issued=$true
+    $end = [DateTime]::UtcNow.AddSeconds(35)
+    do {
+        $texts = @(Elements ([Windows.Automation.ControlType]::Text) | Where-Object { $_.Current.ProcessId -eq $ProcessId -and !$_.Current.IsOffscreen } | ForEach-Object { $_.Current.Name })
+        $prefixes = @($strings['Op_SaveFailedFormat'] | ForEach-Object { $_.Split('{')[0] })
+        foreach ($value in $texts) {
+            if ($Phase -eq 'held' -and ($prefixes | Where-Object { $value.StartsWith($_) }) -and $value -match 'config\.yaml') { $record.outcome='save-failed';$record.message=$value;break }
+            if ($Phase -eq 'released' -and ($strings['Op_SavedApplied'] | Where-Object { $value.StartsWith($_) })) { $record.outcome='saved-applied';$record.message=$value;break }
+        }
+        if (!$record.outcome) { Start-Sleep -Milliseconds 140 }
+    } while (!$record.outcome -and [DateTime]::UtcNow -lt $end)
+    if (!$record.outcome) { $record.visibleText=$texts;throw 'No matching shipping Apply outcome on the original WPF window' }
+    $record.observedQpc=[Diagnostics.Stopwatch]::GetTimestamp()
+} catch { $record.error=$_.Exception.Message;throw } finally {
+    [IO.File]::WriteAllText((Join-Path $area "$Phase-window.json"),($record|ConvertTo-Json -Depth 4),[Text.UTF8Encoding]::new($false))
+}
