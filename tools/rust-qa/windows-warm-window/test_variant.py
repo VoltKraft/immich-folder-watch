@@ -131,6 +131,12 @@ class WarmTests(unittest.TestCase):
                 self.assertEqual(builder.sha(builder.GUI / name), builder.sha(gui / name))
             self.assertEqual(builder.sha(gui / "src/loop_wake.rs"), builder.sha(builder.HERE / "loop_wake.rs"))
             self.assertEqual(builder.sha(gui / "src/windows_present.rs"), builder.sha(builder.HERE / "windows_present.rs"))
+            retained = (gui / "src/main.rs").read_text(encoding="utf-8")
+            self.assertIn("struct Wake {\n    context: egui::Context,", retained)
+            self.assertIn("Some(Wake {\n            context: creation.egui_ctx.clone(),", retained)
+            canonical = (builder.GUI / "src/main.rs").read_text(encoding="utf-8")
+            drop = canonical.split("impl Drop for Window {", 1)[1].split("impl eframe::App", 1)[0]
+            self.assertIn("impl Drop for Window {" + drop, retained)
             for name, digest in builder.ORIGINALS.items():
                 self.assertEqual(builder.sha(builder.GUI / "src" / name), digest)
                 self.assertNotEqual(builder.sha(gui / "src" / name), digest)

@@ -26,11 +26,10 @@
      #[cfg(target_os = "linux")]
      graphics_attention: Arc<std::sync::atomic::AtomicBool>,
      #[cfg(target_os = "linux")]
-@@ -45,20 +51,36 @@
+@@ -45,20 +51,35 @@
  }
  
  struct Wake {
-+    #[cfg(target_os = "linux")]
      context: egui::Context,
 -    x11: Option<Arc<winit::window::Window>>,
 +    retained: Option<Arc<winit::window::Window>>,
@@ -89,7 +88,7 @@
          if let Some(render) = &creation.wgpu_render_state {
              let info = render.adapter.get_info();
              println!(
-@@ -158,15 +185,14 @@
+@@ -158,15 +184,13 @@
                  info.backend, info.device_type, info.name
              );
          }
@@ -104,7 +103,6 @@
 +            .winit_window()
 +            .is_some_and(|w| w.is_visible().is_some());
          *control.window.lock().expect("window wake mutex poisoned") = Some(Wake {
-+            #[cfg(target_os = "linux")]
              context: creation.egui_ctx.clone(),
 -            x11: creation.winit_window().filter(|_| can_hide).cloned(),
 +            retained: creation.winit_window().filter(|_| can_hide).cloned(),

@@ -21,7 +21,7 @@ from pixels import compare
 
 
 GUI = QA / "gui"
-SUBJECT_SHA = "d7b9ec1d21eeec67b5f2abe3f41ba8ea84677ff2ee8d7378d7661a04c37a50dc"
+SUBJECT_SHA = "650a20201c02196d9b483d880bd3abe9f80f974830bcebd0dd0c2fc51b8b5fc0"
 LOCK_SHA = "55959e8ab77241da561ad189b53f75b3cba769a917ef47c8aa6b0acf9e304ae9"
 AREA = ROOT / "artifacts/rust"
 SCOPE = AREA / "egui-cpu-assessment"
@@ -88,7 +88,7 @@ def run(cache, build):
         args.extend(["--ro-bind", str(path), mount])
     args.extend(["--bind", str(build.resolve()), "/build", "--bind", str(pixels), "/pixels",
                  "--chdir", "/project/tools/rust-qa/gui", "--", "/toolchain/bin/cargo",
-                 "test", "--release", "--frozen", "--jobs", "6", "--bin", "native-gui-assessment",
+                 "test", "--release", "--frozen", "--jobs", "2", "--bin", "native-gui-assessment",
                  "cpu_view_observation::actual_view_mesh_and_texture_requests", "--", "--exact", "--nocapture"])
     log = trial / "render.log"
     print(trial, flush=True)

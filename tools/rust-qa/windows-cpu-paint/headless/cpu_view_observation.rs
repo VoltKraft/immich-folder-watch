@@ -24,6 +24,9 @@ fn actual_view_mesh_and_texture_requests() {
             appearance: Default::default(),
         };
         let model = Rc::new(RefCell::new(Model {
+            restarts: None,
+            tray_language: None,
+            tray_status: Default::default(),
             lifecycle: DesktopLifecycle::new(false),
             commands,
             filename: "Grüße – Sommer.jpg".into(),
@@ -32,6 +35,7 @@ fn actual_view_mesh_and_texture_requests() {
             passes: 0,
             graphics: graphics::Graphics::new(),
             last_focus: None,
+            selections: [None; 2],
             restore_focus: false,
         }));
         let mut window = Window::new(&creation, model.clone(), control);

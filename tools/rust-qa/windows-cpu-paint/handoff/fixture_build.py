@@ -22,15 +22,26 @@ def read(path):
 
 
 def example_main(original):
+    # Retain byte-for-byte replay for captures made with the original pipe reader.
+    current_open = b"                Ok(b'O') => Command::Open,"
+    previous_open = b"                Ok(()) if next[0] == b'O' => Command::Open,"
+    if original.count(current_open) + original.count(previous_open) != 1:
+        raise ValueError("The private example requires one Open command in its input loop")
+    if current_open in original:
+        open_case = current_open
+        advance = (b"                Ok(byte @ (b'1' | b'2')) if !observe_ime => {\n"
+                   b"                    handoff_scene::advance(byte - b'0');\n")
+    else:
+        open_case = previous_open
+        advance = (b"                Ok(()) if matches!(next[0], b'1' | b'2') => {\n"
+                   b"                    handoff_scene::advance(next[0] - b'0');\n")
+    original, painted = re.subn(rb"^( +)let language = ui\.add\(button\);$",
+                                rb"\g<0>\n\1handoff_scene::paint(ui);", original, flags=re.MULTILINE)
+    if painted != 1:
+        raise ValueError("The private example requires one language button for its scene")
     insertions = (
         (b"mod fonts;", b"mod fonts;\nmod handoff_scene;"),
-        (b"            let language = ui.add(button);", b"            let language = ui.add(button);\n"
-         b"            handoff_scene::paint(ui);"),
-        (b"                Ok(()) if next[0] == b'O' => Command::Open,",
-         b"                Ok(()) if matches!(next[0], b'1' | b'2') => {\n"
-         b"                    handoff_scene::advance(next[0] - b'0');\n"
-         b"                    continue;\n                }\n"
-         b"                Ok(()) if next[0] == b'O' => Command::Open,"),
+        (open_case, advance + b"                    continue;\n                }\n" + open_case),
     )
     for old, new in insertions:
         if original.count(old) != 1:

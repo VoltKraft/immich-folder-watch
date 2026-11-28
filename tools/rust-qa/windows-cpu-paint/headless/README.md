@@ -32,3 +32,32 @@ All 18 BGRA files matched the originals byte for byte. Both CPU painters
 passed the channel comparison against the six GPU reference frames. The
 new comparison report has SHA-256
 `085850f4926ac89be7de7fd12eb7d8026834fb9e1ade17e4ab6ffc8ad5937794`.
+
+## Reconstructing the editor selection change
+
+The canonical `main.rs` at `b71b573` has SHA-256
+`650a20201c02196d9b483d880bd3abe9f80f974830bcebd0dd0c2fc51b8b5fc0`.
+On window destruction the GUI reads both editor selections from its egui
+context. The Windows retained patch keeps that context in the supervisor's
+`Wake` struct until the window is dropped. The four patches and the original eframe
+and winit archives produced the retained `main.rs` with SHA-256
+`a7cc36d0b6f4663b601595a8e8b2b07518555f7579ad974912febf0ecfbc17de`.
+The CPU paint variant kept those same application bytes. The separate
+frame-ready variant inserted its session observer, producing
+`e98a2b8585e57d2cfaa63aaa4624efe32145457a8cc516aedfea8b98f7e43a68`.
+The texture-handoff example uses the existing byte reader for its two
+scene commands and leaves the filename IME commands available during
+IME observation. Its source reader also reconstructed the example's
+`main.rs` in three earlier native handoff archives byte for byte.
+[Retained builder](../../windows-warm-window/build.py) ·
+[Frame-ready inputs](../../windows-frame-cost/frame-ready-pins.json) ·
+[Texture-handoff example](../handoff/fixture_build.py).
+
+On Linux x64 the headless test rendered all six frames of the updated
+editor using at most two Cargo jobs. All 18 original BGRA files matched
+the preceding run byte for byte. The largest CPU-to-GPU channel difference
+was two. The new report is
+`artifacts/rust/egui-cpu-assessment/headless-pl1afvg9/pixel-comparison.json`,
+SHA-256 `707c9cb3d67558cb8cad03ea7263de1e57d1ab59351012f46febd58dcb42b424`.
+The [ARM64 display workflow](../../../../.github/workflows/rust-windows-arm64-display.yaml)
+owns native compilation and source-frame observation on that target.

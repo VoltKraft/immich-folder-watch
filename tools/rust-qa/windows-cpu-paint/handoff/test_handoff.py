@@ -105,3 +105,14 @@ class Handoff(unittest.TestCase):
         for invalid in (source+source,source.replace(b"mod fonts;",b"")):
             with self.assertRaises(ValueError):
                 example_main(invalid)
+
+    def test_current_gui_keeps_ime_input_and_adds_the_scene_to_the_editor_scope(self):
+        source = (Path(__file__).resolve().parents[2] / "gui/src/main.rs").read_bytes()
+        prepared = example_main(source)
+        self.assertIn(b"let language = ui.add(button);\n                    handoff_scene::paint(ui);", prepared)
+        self.assertIn(b"Ok(byte @ (b'1' | b'2')) if !observe_ime => {", prepared)
+        self.assertIn(b"Ok(byte @ b'1'..=b'7') if observe_ime => Command::ReadFilenameIme", prepared)
+        previous = b"                Ok(()) if next[0] == b'O' => Command::Open,"
+        for invalid in (source + previous, source.replace(b"Ok(b'O') => Command::Open,", b"")):
+            with self.assertRaises(ValueError):
+                example_main(invalid)
