@@ -1263,6 +1263,43 @@ original logs and `result.json` under
 Each Shell result reports its own provider, callback, window and worker
 observations, including any ordinary-launch fallback.
 
+#### Both Explorer starts on Windows Server 2025
+
+The local Server 2025 x64 console ran the retained GUI and inventory worker
+from `87491b0` as the standard user in session 1. The original Actions ZIP
+has SHA-256 `156bbb1a6af1a41ca4edc9c002ba7f79ad89bc142953f4b4579de5eae60b7aeb`.
+Observer `aa403da` opened Explorer's hidden-icons flyout through its taskbar
+button. At pixel (1283, 815), UI Automation returned the flyout root.
+Explorer exposed one enabled child button bearing the GUI's exact
+token-specific name. Its bounds matched the icon rectangle, and its runtime
+ID differed from the root's. In each trial, the sampled pixel changed to
+the requested complementary color before the observer invoked that child.
+[Original compiler archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46102133752/artifacts/15246502882).
+
+| Start and Shell action | GUI PID | Visible root HWND | Worker PID | Sampled RGB sequence | Invoke to callback |
+| --- | ---: | ---: | ---: | --- | ---: |
+| Visible start, close, then reopen through Explorer | 4544 | 262520 | 3152 | `20e033` → `df1fcc` | 2.7646 ms |
+| Background start, then first show through Explorer | 5100 | 327704 | 656 | `4cc963` → `b3369c` | 4.5330 ms |
+
+Both registered receivers delivered one `NIN_SELECT` for icon 23 before
+the Explorer invocation returned. The first GUI thread recorded the original
+HWND as hidden during the callback. Its next root SHOW reopened that HWND.
+The background process created its first editor root after the callback.
+Both windows acquired keyboard focus and foreground ownership. Each worker
+kept its original PID and creation time. Ordinary Quit removed each icon,
+and both process jobs drained. Explorer's flyout returned to its original
+closed state for 774 ms and 759 ms respectively, with the pointer restored.
+The separate private-desktop control recorded a failed icon registration
+and a successful ordinary second launch of the same retained window.
+
+The private results are under
+`artifacts/rust/local-windows-server-2025-x64/20261128/tray-87491b0/attempt-3/`.
+The guest ZIP has SHA-256
+`2fc908ef58c61a39a8e192d50fc2ef8c4f33000a32c42956aa610faa406d37b3`.
+The independent host replay checked the 42 compiler-manifest entries, ten
+observer sources and ten guest files, then reconstructed both activations
+from the provider records, GUI logs and native window and job samples.
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named
