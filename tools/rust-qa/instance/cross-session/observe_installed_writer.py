@@ -31,7 +31,8 @@ def digest(data):
 def stage(archive, checksum, work):
     require(instance.sha(archive) == checksum, 'Original Actions archive digest differs')
     with ZipFile(archive) as z:
-        require(sorted(z.namelist()) == ['build.json', 'msi-session-endpoint.exe'], 'Unexpected compiler archive')
+        require(sorted(z.namelist()) in (['build.json', 'msi-session-endpoint.exe'],
+                ['build.json', 'msi-session-endpoint.exe', 'msi-session-endpoint.pdb']), 'Unexpected compiler archive')
         receipt = json.loads(z.read('build.json'))
         binary = z.read('msi-session-endpoint.exe')
         require(receipt['target'] == 'x86_64-pc-windows-msvc' and digest(binary) == receipt['executableSha256']
