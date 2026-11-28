@@ -80,3 +80,12 @@ IBus and Orca check, including protected-field masking and a backward selection
 across an ordinary second launch. Its native result is
 `artifacts/rust/gui-run/x11-qih95zgk/results.json`, SHA-256
 `96e05d8844a8c9ef7e0fa9eb269241166182686fe9648fd6be1bc8365f9ccd63`.
+
+The [desktop status observer](desktop_status.py) toggled `IsEnabled` on a
+separate, private session bus. The same mapped X11 window and GUI PID 23
+survived all four samples. Starting with status off yielded zero roots,
+turning it on exposed root `:1.3`, disabling it removed that root, and
+enabling it again registered `:1.4`. Quit removed the final root and exited
+zero. Run the observer with the candidate executable as its sole argument.
+The original result is `artifacts/rust/flatpak-accessibility/desktop-status-1k9hds8a/status.json`,
+SHA-256 `7ae11d5f9eea3a987e89d2d4ddbb2e8def517f136d8da717fb8ec633dfd624c3`.
