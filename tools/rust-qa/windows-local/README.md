@@ -116,6 +116,21 @@ The original guest ZIP under
 `artifacts/rust/local-windows-server-2025-x64/20261128/gui-02d4460/`
 has SHA-256 `e56cf7779fd1222c841b18c7d3d5c606dd1be680f05b0849fac6b24ec9ee23cf`.
 
+On the local Server 2025 x64 guest at `cdb69d4`, all 29 tests in five
+native executables passed. The previously failing case completed its
+worker drain. The new test also observed the owner thread exiting while
+a command sender survived. QEMU reported 4 GiB of base memory. The host
+reader verified each original test log and the serial transfer. The
+first successful execution exposed an empty-output handling issue in the
+host export script. The complete archived repeat also exited zero.
+[Original compiler artifact](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46113325781/artifacts/15250224209).
+
+The compiler archive has SHA-256
+`0735d389e814ebf1fed674a24cd0a97ad06b5a0bacfa723d65eab8efab132fd5`.
+The original guest ZIP in
+`artifacts/rust/local-windows-server-2025-x64/20261128/gui-cdb69d4/`
+has SHA-256 `190ccc11c3de3dacd4cf94aab9d202a1837645beeac2d021d2e348960b15c6f8`.
+
 ## Combined native profile
 
 The [x64 profile compiler](../../../.github/workflows/rust-windows-x64-combined-build.yaml)

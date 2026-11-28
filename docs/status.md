@@ -43,7 +43,9 @@ The Quit-during-restart case received Winsock error 10035 on its private
 test socket. The observer now sets blocking mode on the accepted socket
 before reading the child's PID. The tray owner also joins its worker
 thread on early return. The two ownership tests passed on Fedora and
-both Windows targets passed Clippy. A native x64 repeat is pending.
+both Windows targets passed Clippy. On the same 4 GiB VM all 29 cases at
+`cdb69d4` passed, including close during a restart and dropping the owner
+with a sender still alive. All five original test logs verified.
 [Native result and compiler inputs](../tools/rust-qa/windows-local/README.md#gui-worker-quit-during-restart-at-02d4460).
 
 On a native Windows ARM64 console the notification state changed from
@@ -51,6 +53,22 @@ quiet time to `QUNS_APP` after 49 minutes and 30 seconds. None of the
 131 samples in 65 minutes reported `QUNS_ACCEPTS_NOTIFICATIONS`. The
 strict test stopped before sending and restored Do not disturb.
 [Original ARM64 traces](../tools/rust-qa/windows-services/toast-history.md).
+
+The installed 3.0.4 WPF worker on the local x64 guest completed one
+upload before its ordinary tray Quit in RDP. Its process (9076) exited
+with code 0 before Rust acquired the endpoint and writer guard in the
+console. The config and single SQLite upload row survived. Replay at
+`b1e8fb2` verified the original guest ZIP and a separate source supplement.
+The opposite start order still allows a legacy writer to run.
+[Orderly handover](rust/rw02-cross-session.md#ordinary-wpf-shutdown-before-rust-writer-admission) ·
+[Rust-first result](rust/rw02-cross-session.md#installed-304-worker-in-another-session).
+
+A third private x64 Plasma session verified that the replacement worker
+first found two new files and then two unchanged files. The new native
+Linux workflow runs the panel and the five-owner D-Bus trial on each
+architecture independently of the full desktop assessment queue.
+[Panel observations](rust/rw02-plasma.md#native-linux-x64-menu-and-watcher-reload) ·
+[Ubuntu x64 and ARM64 jobs](../.github/workflows/rust-linux-plasma.yaml).
 
 On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
 GUI from a background start and reopened its original window after close.

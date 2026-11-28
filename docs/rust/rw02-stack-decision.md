@@ -121,6 +121,10 @@ and RDP sessions excluded each other in both orders. With installed WPF
 already uploading, Rust identified its pipe server and refused admission.
 When Rust started first, WPF uploaded the synthetic PNG, received HTTP 201
 and committed its SQLite row while both Rust guards were held.
+When the installed uploader ran first, a separate local x64 trial at
+`bfd99b2` delivered its ordinary Quit in RDP after the upload committed.
+Rust subsequently acquired the endpoint and writer guard in the console.
+[Orderly WPF exit and Rust admission](../../tools/rust-qa/instance/cross-session/wpf-handover.md#local-server-2025-handover-at-bfd99b2).
 [Two Rust writers](rw02-cross-session.md#standard-user-console-and-rdp-handover-on-windows-server-2025-x64) ·
 [Both installed launch orders](rw02-cross-session.md#installed-304-worker-in-another-session).
 

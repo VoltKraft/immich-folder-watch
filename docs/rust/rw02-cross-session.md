@@ -636,3 +636,14 @@ before the Rust endpoint and writer acquire ownership. It retains the
 config identity, the upload and the SQLite row across the handover.
 The original two launch-order trials keep their own evidence.
 [Native setup, compiler inputs and replay](../../tools/rust-qa/instance/cross-session/wpf-handover.md).
+
+On the 4 GiB Server 2025 x64 guest at `bfd99b2`, Rust initially identified
+the installed WPF uploader (PID 9076) as the occupied pipe's server.
+The original worker uploaded one synthetic PNG and committed one SQLite
+row. The ordinary tray Quit ended WPF with code 0. Rust then acquired the
+endpoint in the console and took the writer guard. The original 441-byte
+configuration retained its file ID and contents. WPF recorded shutdown and
+the start of flushing. Its log contains no separate flush-complete event.
+The independent replay used the 22 source hashes captured during the test
+and three modules read from the same guest checkout afterwards.
+[Guest ZIP, source supplement and replay](../../tools/rust-qa/instance/cross-session/wpf-handover.md#local-server-2025-handover-at-bfd99b2).

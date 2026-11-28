@@ -44,6 +44,14 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+The local standard user's x64 RDP and console sessions verified a
+WPF-to-Rust handover after one committed upload. The original WPF process
+exited through tray Quit before the Rust endpoint and writer guard were
+acquired. The reverse launch order still permits a WPF upload with Rust
+already admitted, leaving RI-AC05 open.
+[WPF-first handover](../../tools/rust-qa/instance/cross-session/wpf-handover.md#local-server-2025-handover-at-bfd99b2) ·
+[Both launch orders](rw02-cross-session.md#installed-304-worker-in-another-session).
+
 On the local 4 GiB Server 2025 x64 guest, the ordinary Explorer surface
 opened the background-start editor and reopened its original HWND after
 close. Both cases preserved the inventory worker, acquired keyboard
