@@ -137,6 +137,15 @@ def private_gui_input(root, name, approved):
     return {"archiveSha256": archive, "notices": notices, "reconstructedSource": dict(approved["trees"][name], **upstream),
             **extras}
 
+def private_hyper_input(root, archive):
+    from realtime import hyper_util_source
+    if root != hyper_util_source.SOURCE:
+        raise ValueError("Expected the reviewed local CONNECT metadata source")
+    receipt = hyper_util_source.verify(archive, root)
+    return dict(archiveSha256=receipt["archiveSha256"], reconstructedSource=receipt,
+                notices=receipt["notices"], fonts=[], native=[], shaders=[])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path, help="root Cargo.toml for the assessed workspace")
@@ -178,6 +187,11 @@ def main():
             if package["source"] is not None:
                 raise ValueError(f"Expected the reconstructed GUI source for {name}")
             entry.update(private_gui_input(Path(package["manifest_path"]).resolve().parent, name, approved))
+        elif name == "hyper-util" and manifest == REPOSITORY / "tools/rust-qa/realtime/Cargo.toml":
+            from realtime import hyper_util_source
+            if package["source"] is not None:
+                raise ValueError("Expected the reconstructed hyper-util package")
+            entry.update(private_hyper_input(Path(package["manifest_path"]).resolve().parent, hyper_util_source.ARCHIVE))
         elif package["source"] and package["source"].startswith("registry+"):
             entry.update(archive_inputs(package, locked, args.verify_unpacked))
         elif package["source"] is None:

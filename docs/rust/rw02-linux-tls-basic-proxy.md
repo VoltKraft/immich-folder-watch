@@ -1,0 +1,107 @@
+# Linux HTTPS through a Basic-authenticated HTTP proxy
+
+The Linux transport handles a named HTTP proxy from the environment when the
+Immich origin uses HTTPS. It first asks for a CONNECT tunnel anonymously.
+If the configured proxy returns 407 and offers Basic, the client may repeat
+the same operation once using that proxy's credentials. The ordinary rustls
+connection inside the accepted tunnel validates the Immich origin before
+sending an API key. The HTTPS, redirect and timeout settings are identical
+for both clients. The retry uses the remaining request budget and disables
+idle connection reuse on its authenticated client. TLS, cancellation and
+a later error from the origin cannot select that client. A matching
+`NO_PROXY` entry takes the direct route.
+
+## Measurements against 3.0.4
+
+On Fedora 45 x64, the development driver called the signed Linux 3.0.4
+ImmichAssetClient and ImmichRealtimeClient assemblies. The fixed sender,
+listener, test CA and synthetic key were confined to a fresh loopback
+namespace. The subjects used a named namespace and the ordinary HTTPS REST,
+polling and WSS paths. The password included percent-escaped characters.
+Both TLS peers required a matching host name and private issuer. The
+observer matched each inner request to its connection and recorded only
+whether the supplied proxy credential was absent, correct or incorrect, or
+used another scheme.
+
+| Route / relay response | Signed client | Original Rust connector with loopback admission enabled |
+| --- | --- | --- |
+| Anonymous | Four anonymous tunnels, one event, close 1000 | Nine anonymous tunnels, one event, close 1000 |
+| Basic, correct password | Four initial 407s followed by four authenticated tunnels | Nine tunnels included Basic on the first CONNECT |
+| Basic, incorrect password | Authentication failed before TLS | First CONNECTs carried the incorrect credential. No TLS handshake |
+| Digest only | .NET started anonymously, then answered using Digest. The fixed relay rejected that method | The relay received the Basic credential before offering any method |
+| Bypass with a credential-bearing proxy environment variable | Direct TLS, no proxy connection | Direct TLS, no proxy connection |
+
+The first Rust attempt with the previously archived ELF stopped at the
+fixture's credential-free endpoint comparison. A second run admitted only
+the fixed loopback relay and measured the unmodified reqwest connector.
+Its report is `artifacts/rust/realtime-assessment/linux-tls-basic-admitted-01/report.json`,
+SHA-256 `120d736f147c84fcaee3678407d89937c3727466bef32c0bc2982719595bf831`.
+The [detached reader](../../tools/rust-qa/realtime/replay_linux_tls_basic_proxy.py)
+accepts this baseline with `--baseline`. The corrected comparator uses its
+default mode. The Linux candidate supports the scoped Basic challenge.
+Digest authentication remains a distinct shipping behavior.
+
+## CONNECT error metadata
+
+The upstream connector retained the status of a refused CONNECT but discarded
+its authentication challenge fields before the first-party transport could
+inspect them. The private source changes two Rust files. A 407 carrying
+challenge fields exposes them through a typed source on the same connection
+error. The existing status description, TLS verification, retry choice and
+actual connector stay independent of the new metadata. Challenge values are
+marked sensitive. The first-party adapter checks the scheme, including quoted
+commas in a different scheme's parameters. It never derives permission to
+send a password from a formatted error message.
+[Original tunnel source](https://github.com/hyperium/hyper-util/blob/23a868965964c1d6bb1b94f30ba4c420a4bebe7c/src/client/legacy/connect/proxy/tunnel.rs) ·
+[Maintained diff](../../tools/rust-qa/realtime/hyper-util-connect.patch).
+
+The exact hyper-util 0.1.21 archive has SHA-256
+`ddc03d96684f9226b8a787cdb71488417b53ab5ea8fdb1dac946cb9431cc8bff`.
+It identifies upstream commit `23a868965964c1d6bb1b94f30ba4c420a4bebe7c`.
+Its original Sean McArthur MIT license has SHA-256
+`9e0a97848ea543aef745c98e84fde696a9a3e0735538f6daefdd3cb1942effc1`.
+The patch SHA-256 is `761b075d5fbf1d5c98c478bcc6f443898a1171973d4dcc557380ce45d84f9cd0`.
+Reconstruction compares all 62 compiler inputs to the original archive or
+the two reviewed replacements. The resulting file map has SHA-256
+`acd12c39160b6bfe7d7872fcbb6b7974ae880b23e01936576934c23127f4d4a4`.
+The native run retains the archive, diff and original license with the
+compiler results. Two independent reconstructions agreed. Verification
+rejected modified versions of either Rust file, a changed notice and an
+unexpected extra file. After accounting for the source and lockfile receipt,
+all four target graphs matched their previous package and feature records.
+[Original crate](https://static.crates.io/crates/hyper-util/hyper-util-0.1.21.crate) ·
+[Original license](https://github.com/hyperium/hyper-util/blob/23a868965964c1d6bb1b94f30ba4c420a4bebe7c/LICENSE) ·
+[Reconstruction](../../tools/rust-qa/realtime/hyper_util_source.py).
+
+## Native entry points
+
+Both Ubuntu architectures use the [normal Linux transport suite](../../tools/rust-qa/realtime/README.md).
+Eight HTTPS cases exercise valid and invalid credentials, a non-Basic
+challenge, a change to a different scheme after a successful realtime event,
+direct bypass, a mismatched TLS identity, a 407 generated inside an
+established HTTPS connection by the origin, and a redirect to a second
+listener. The distinct signed Linux comparison uses the existing private
+assembly and peer archive. Run the latter from the repository root with a
+new output filename and supply the native release binary's measured digest.
+
+```sh
+python3 -B tools/rust-qa/realtime/linux_basic_proxy.py --tls \
+  --archive artifacts/rust/realtime-assessment/proxy-fedora-05 \
+  --sdk artifacts/flatpak-local-2.11.2/sdk \
+  --candidate artifacts/rust/realtime-assessment/linux-tls-basic-final-01/ifw-realtime-probe \
+  --candidate-sha256 a896365075ed49ae7f08df6bde14fe6ec8a39ab9d29c66bd7eca9c158ddf5a04 \
+  --output artifacts/rust/realtime-assessment/linux-tls-basic-repeat.json
+python3 -B tools/rust-qa/realtime/replay_linux_tls_basic_proxy.py \
+  artifacts/rust/realtime-assessment/linux-tls-basic-repeat.json
+```
+
+The final Fedora x64 paired report at
+`artifacts/rust/realtime-assessment/linux-tls-basic-final-01/report.json`
+has SHA-256 `82fdfa779bccce32c6c794d71488f0ce1f88717b27df62c321170e8596c9dc4b`.
+The new Rust ELF received nine Basic challenges on nine anonymous CONNECTs
+and established nine authenticated tunnels. All requests inside these TLS
+connections carried the application key and no proxy header. The WebSocket
+delivered one event and closed normally. The incorrect password caused six
+407 pairs before any TLS request. A Digest-only relay received six anonymous
+CONNECTs and zero Basic credentials. A direct bypass made zero connections
+to that relay. The detached reader checked all ten signed and native cases.

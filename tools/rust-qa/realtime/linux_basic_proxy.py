@@ -147,6 +147,7 @@ def inside(client, mode):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--tls", action="store_true", help="run the HTTPS origin comparison")
     parser.add_argument("--archive", type=Path, required=True, help="paired native proxy-fedora-05 archive")
     parser.add_argument("--sdk", type=Path, required=True, help="shared .NET SDK containing the dotnet host")
     parser.add_argument("--output", type=Path, required=True)
@@ -177,14 +178,24 @@ def main():
         if digest(args.candidate) != args.candidate_sha256:
             raise ValueError("candidate binary does not match")
         launch.extend(("--ro-bind", str(args.candidate.resolve(strict=True)), "/candidate"))
-    launch.extend(("--setenv", "PYTHONPATH", "/fixture", "--chdir", "/tmp", "--", "/usr/bin/python3", "-B", "/case.py", "--inside"))
+    inner = "/case.py"
+    if args.tls:
+        tls_script = script.with_name("linux_tls_basic_proxy.py")
+        inner = "/tls.py"
+        launch.extend(("--ro-bind", str(tls_script), inner))
+    launch.extend(("--setenv", "PYTHONPATH", "/fixture", "--chdir", "/tmp", "--", "/usr/bin/python3", "-B", inner, "--inside"))
     cases = MATRIX + CANDIDATE_MATRIX if args.candidate else MATRIX
+    if args.tls:
+        cases = [(client, mode) for client in (("signed", "candidate") if args.candidate else ("signed",))
+                 for mode in ("anonymous", "correct", "incorrect", "other-scheme", "bypass")]
     observations = [json.loads(subprocess.check_output([*launch, *case], timeout=25)) for case in cases]
     evidence = {
         "host": Path("/etc/os-release").read_text(), "machine": os.uname().machine, "kernel": os.uname().release,
         "signedCommit": inputs["signedCommit"], "rustSourceHead": inputs["sourceHead"], "archiveInputs": pins,
         "dotnetHost": digest(sdk / "dotnet"), "trialScript": digest(script), "cases": observations,
     }
+    if args.tls:
+        evidence["tlsTrialScript"] = digest(tls_script)
     if args.candidate:
         evidence["candidateBinarySha256"] = args.candidate_sha256
     with args.output.open("x") as stream:

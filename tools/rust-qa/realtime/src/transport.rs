@@ -15,6 +15,8 @@ use tokio_tungstenite::tungstenite::{
 
 use crate::Error;
 
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+
 pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub(crate) type Socket = WebSocketStream<reqwest::Upgraded>;
 
@@ -22,6 +24,7 @@ pub(crate) struct Transport {
     api: Url,
     endpoint: Url,
     client: Client,
+    tls_basic_proxy_client: Option<Client>,
     plaintext_proxy: Option<Url>,
     proxy_authorization: Option<header::HeaderValue>,
     header: header::HeaderValue,
@@ -250,37 +253,52 @@ impl Transport {
         let endpoint = api.join("/socket.io/").map_err(|_| Error::Origin)?;
         let mut header = header::HeaderValue::from_str(api_key).map_err(|_| Error::Origin)?;
         header.set_sensitive(true);
-        let mut builder = Client::builder()
-            .tls_backend_rustls()
-            .http1_only()
-            .no_proxy()
-            .https_only(!allow_http)
-            .redirect(reqwest::redirect::Policy::none())
-            .retry(reqwest::retry::never())
-            .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(Duration::from_secs(120));
-        if let Some(roots) = roots {
-            builder = builder.tls_certs_only(roots);
-        }
+        let builder = || {
+            let base = Client::builder()
+                .tls_backend_rustls()
+                .http1_only()
+                .no_proxy()
+                .https_only(!allow_http)
+                .redirect(reqwest::redirect::Policy::none())
+                .retry(reqwest::retry::never())
+                .connect_timeout(CONNECT_TIMEOUT)
+                .timeout(REQUEST_TIMEOUT);
+            match &roots {
+                Some(roots) => base.tls_certs_only(roots.clone()),
+                None => base,
+            }
+        };
+        let mut primary = builder();
+        let mut tls_basic_proxy_client = None;
         let mut plaintext_proxy = None;
         let mut credentials = None;
         if let Some(mut proxy) = proxy {
-            if api.scheme() == "http" {
-                if cfg!(target_os = "linux")
-                    && proxy.scheme() == "http"
-                    && (!proxy.username().is_empty() || proxy.password().is_some())
-                {
+            if cfg!(target_os = "linux")
+                && proxy.scheme() == "http"
+                && (!proxy.username().is_empty() || proxy.password().is_some())
+            {
+                if api.scheme() == "https" {
+                    // Only an actual Basic challenge from this proxy selects this client.
+                    tls_basic_proxy_client = Some(
+                        builder()
+                            .pool_max_idle_per_host(0)
+                            .proxy(reqwest::Proxy::https(proxy.clone())?)
+                            .build()?,
+                    );
+                } else {
                     credentials = Some(proxy.clone());
-                    proxy.set_username("").map_err(|_| Error::Origin)?;
-                    proxy.set_password(None).map_err(|_| Error::Origin)?;
                 }
-                builder = builder.proxy(reqwest::Proxy::http(proxy.clone())?);
+                proxy.set_username("").map_err(|_| Error::Origin)?;
+                proxy.set_password(None).map_err(|_| Error::Origin)?;
+            }
+            if api.scheme() == "http" {
+                primary = primary.proxy(reqwest::Proxy::http(proxy.clone())?);
                 plaintext_proxy = Some(proxy);
             } else {
-                builder = builder.proxy(reqwest::Proxy::https(proxy)?);
+                primary = primary.proxy(reqwest::Proxy::https(proxy)?);
             }
         }
-        let client = builder.build().map_err(|_| Error::Transport)?;
+        let client = primary.build()?;
         // Reqwest decodes URL userinfo and builds a sensitive Basic header. This
         // request is never sent. Only a challenged proxy receives its header.
         let proxy_authorization = credentials
@@ -299,6 +317,7 @@ impl Transport {
             namespace,
             header,
             client,
+            tls_basic_proxy_client,
             proxy_authorization,
             plaintext_proxy,
         })
@@ -332,6 +351,20 @@ impl Transport {
     }
 
     async fn send(&self, request: RequestBuilder) -> Result<Response, Error> {
+        if let Some(authenticated) = &self.tls_basic_proxy_client {
+            let retry = request.try_clone().ok_or(Error::Protocol)?;
+            let deadline = tokio::time::Instant::now() + REQUEST_TIMEOUT;
+            return match request.send().await {
+                Err(error) if tunnel_challenged_basic(&error) => {
+                    let remaining = deadline
+                        .checked_duration_since(tokio::time::Instant::now())
+                        .ok_or(Error::Timeout)?;
+                    let request = RequestBuilder::from_parts(authenticated.clone(), retry.build()?);
+                    Ok(request.timeout(remaining).send().await?)
+                }
+                result => Ok(result?),
+            };
+        }
         let Some(auth) = &self.proxy_authorization else {
             return Ok(request.send().await?);
         };
@@ -407,7 +440,7 @@ impl Transport {
             )
             .await;
         }
-        let response = request.send().await?;
+        let response = self.send(request).await?;
         validate_upgrade(response.status(), response.headers(), accept)?;
         Ok(response.upgrade().await?)
     }
@@ -496,6 +529,23 @@ async fn bounded_ok_body(mut response: Response) -> Result<Vec<u8>, Error> {
         input.append(&chunk).map_err(|_| Error::Limit)?;
     }
     input.finish().map_err(|_| Error::Limit)
+}
+
+fn tunnel_challenged_basic(error: &reqwest::Error) -> bool {
+    use hyper_util::client::legacy::connect::proxy::ProxyAuthChallenge;
+    use std::error::Error as StdError;
+
+    if !error.is_connect() {
+        return false;
+    }
+    let mut cause = error.source();
+    while let Some(error) = cause {
+        if let Some(challenge) = error.downcast_ref::<ProxyAuthChallenge>() {
+            return crate::plaintext_proxy::offers_basic(challenge.headers());
+        }
+        cause = error.source();
+    }
+    false
 }
 
 impl From<reqwest::Error> for Error {

@@ -17,8 +17,9 @@ def rejected_connect(handler, authority):
 
 
 class FixedTunnel:
-    def __init__(self, authority, tls):
+    def __init__(self, authority, tls, authentication=None):
         self.authority = authority
+        self.authentication = authentication
         self.tls = tls
         self.counts = Counter()
         self.alerts = Counter()
@@ -63,6 +64,9 @@ class FixedTunnel:
             def do_CONNECT(self):
                 self.close_connection = True
                 tunnel.mark("connects")
+                if tunnel.authentication is not None:
+                    if not tunnel.authentication.accept(self, tunnel.authority):
+                        return
                 refusal = rejected_connect(self, tunnel.authority)
                 if refusal:
                     tunnel.mark(refusal)

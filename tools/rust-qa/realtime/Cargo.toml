@@ -15,6 +15,9 @@ path = "src/windows_settings.rs"
 test = false
 doctest = false
 
+[patch.crates-io]
+hyper-util = { path = "../../../artifacts/rust/realtime-sources/hyper-util" }
+
 [dependencies]
 ifw-immich = { path = "../../../rust/crates/ifw-immich" }
 futures-util = { version = "=0.3.34", default-features = false, features = ["sink", "std"] }

@@ -197,7 +197,7 @@ fn fixture_proxy(
     };
     if let Some(selected) = &proxy.endpoint {
         let mut address = selected.clone();
-        if cfg!(target_os = "linux") && api.scheme() == "http" && selected.password().is_some() {
+        if cfg!(target_os = "linux") && selected.password().is_some() {
             address.set_username("").map_err(|_| Error::Protocol)?;
             address.set_password(None).map_err(|_| Error::Protocol)?;
         }

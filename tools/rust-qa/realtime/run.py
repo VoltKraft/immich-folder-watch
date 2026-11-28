@@ -15,6 +15,7 @@ QA = HERE.parent
 ROOT = QA.parents[1]
 sys.path.insert(0, str(QA / "storage"))
 from evidence import sha256, verify_archive
+import hyper_util_source
 
 
 def canonical_digest(value):
@@ -28,15 +29,25 @@ def verify_graph(graph, inputs, metadata, cargo_home):
     reviewed = {(p["name"], p["version"]): p for p in inputs["packages"]}
     sources = {(p["name"], p["version"]): Path(p["manifest_path"]).parent for p in metadata["packages"]
                if p["source"]}
-    count = files = notices = 0
+    count = files = notices = rebuilt = 0
     for package in graph["packages"]:
-        if not package["source"]:
+        if not package["source"] and "reconstructedSource" not in package:
             continue
         key = package["name"], package["version"]
         entry = reviewed[key]
         if (entry["archiveSha256"] != package["archiveSha256"] or entry["notices"] != package["notices"]
                 or entry["declared"] != package["license"]):
             raise ValueError(f"Reviewed source or notice differs for {key}")
+        if "reconstructedSource" in package:
+            if key != ("hyper-util", "0.1.21"):
+                raise ValueError("Unexpected reconstructed transport input")
+            target = hyper_util_source.verify(hyper_util_source.ARCHIVE, hyper_util_source.SOURCE)
+            if target != package["reconstructedSource"]:
+                raise ValueError("CONNECT metadata source differs from the resolved graph")
+            files += target["fileCount"]
+            notices += len(target["notices"])
+            rebuilt += 1
+            continue
         source = sources[key]
         registry = cargo_home / "registry"
         if not source.is_relative_to(registry / "src"):
@@ -45,7 +56,9 @@ def verify_graph(graph, inputs, metadata, cargo_home):
         files += verify_archive(archive, source, entry["archiveSha256"])
         count += 1
         notices += len(entry["notices"])
-    return {"canonicalInventorySha256": canonical, "registryPackages": count,
+    if rebuilt != 1:
+        raise ValueError("Missing reconstructed CONNECT metadata source")
+    return {"canonicalInventorySha256": canonical, "registryPackages": count, "reconstructedPackages": rebuilt,
             "verifiedUnpackedFiles": files, "verifiedNotices": notices}
 
 
@@ -100,6 +113,11 @@ def main():
             raise RuntimeError(f"{name} failed ({status}), see {output / (name + '.txt')}")
 
     try:
+        original = hyper_util_source.original(cargo_home, fetch=not args.offline)
+        record["reconstructedHyperUtil"] = hyper_util_source.reconstruct(original, hyper_util_source.SOURCE)
+        shutil.copyfile(original, output / original.name)
+        shutil.copyfile(hyper_util_source.PATCH, output / hyper_util_source.PATCH.name)
+        shutil.copyfile(hyper_util_source.SOURCE / "LICENSE", output / "hyper-util-0.1.21-LICENSE.txt")
         step("compiler", [sys.executable, QA / "check-toolchain.py", args.target])
         if not args.offline:
             step("fetch", ["cargo", "fetch", "--locked", "--manifest-path", manifest])

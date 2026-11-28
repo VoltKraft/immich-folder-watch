@@ -29,11 +29,21 @@ trust cases and five named HTTP Basic proxy cases for explicitly enabled plainte
 The latter compare the initial anonymous request, the challenge and its single
 retry for REST, polling and WebSocket CONNECT. The controls exercise an incorrect
 password for all requests or just the tunnel, a different authentication scheme
-and an exact-host bypass. The separate paired reference uses the signed
-Linux assemblies. [Linux Basic proxy comparison](../../../docs/rust/rw02-linux-basic-proxy.md). Two strict polling peers accept only the
+and an exact-host bypass. Eight Linux HTTPS cases additionally require the actual Basic challenge from
+the anonymous CONNECT before an authenticated tunnel, and exercise refusal,
+later changed challenges, wrong server identity, origin-issued 407, a redirect
+and a direct bypass. The separate paired references use the signed Linux assemblies. [Linux Basic proxy comparison](../../../docs/rust/rw02-linux-basic-proxy.md). Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).
+
+The runner reconstructs hyper-util 0.1.21 from its pinned registry archive
+before Cargo resolves the workspace. Two source files expose the selected
+proxy's original CONNECT challenge on the connection error. The ordinary TLS
+stack still validates the origin. In offline mode the archive must exist in
+the isolated Cargo cache or `artifacts/rust/realtime-sources`. The runner
+verifies all 62 compiler files and the original MIT notice before building.
+[HTTPS reference, source and native evidence](../../../docs/rust/rw02-linux-tls-basic-proxy.md).
 
 After abrupt loss of an upgraded connection the peer expects the next
 request to open a WebSocket without the old SID. It sends a fresh

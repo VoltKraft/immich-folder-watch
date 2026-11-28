@@ -1,0 +1,84 @@
+--- a/src/client/legacy/connect/proxy/mod.rs
++++ b/src/client/legacy/connect/proxy/mod.rs
+@@ -3,4 +3,4 @@
+ mod tunnel;
+ 
+ pub use self::socks::{SocksV4, SocksV5};
+-pub use self::tunnel::Tunnel;
++pub use self::tunnel::{ProxyAuthChallenge, Tunnel};
+--- a/src/client/legacy/connect/proxy/tunnel.rs
++++ b/src/client/legacy/connect/proxy/tunnel.rs
+@@ -27,12 +27,32 @@
+     Extra(HeaderMap),
+ }
+ 
++/// The HTTP challenge fields sent by the selected proxy on a refused CONNECT.
++#[derive(Debug)]
++pub struct ProxyAuthChallenge(HeaderMap);
++
++impl ProxyAuthChallenge {
++    /// Return the Proxy-Authenticate fields from this CONNECT response.
++    pub fn headers(&self) -> &HeaderMap {
++        &self.0
++    }
++}
++
++impl std::fmt::Display for ProxyAuthChallenge {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.write_str("proxy authentication challenge")
++    }
++}
++
++impl StdError for ProxyAuthChallenge {}
++
+ #[derive(Debug)]
+ pub enum TunnelError {
+     ConnectFailed(Box<dyn StdError + Send + Sync>),
+     Io(std::io::Error),
+     MissingHost,
+     ProxyAuthRequired,
++    ProxyChallenge(ProxyAuthChallenge),
+     ProxyHeadersTooLong,
+     TunnelUnexpectedEof,
+     TunnelUnsuccessful,
+@@ -217,7 +237,22 @@
+         match res.parse(&buf[..pos]) {
+             Ok(httparse::Status::Complete(_)) => match res.code {
+                 Some(200) => return Ok(conn),
+-                Some(407) => return Err(TunnelError::ProxyAuthRequired),
++                Some(407) => {
++                    let mut challenges = HeaderMap::new();
++                    for h in res.headers.iter() {
++                        if h.name.eq_ignore_ascii_case("proxy-authenticate") {
++                            if let Ok(mut value) = HeaderValue::from_bytes(h.value) {
++                                value.set_sensitive(true);
++                                challenges.append(http::header::PROXY_AUTHENTICATE, value);
++                            }
++                        }
++                    }
++                    return Err(if challenges.is_empty() {
++                        TunnelError::ProxyAuthRequired
++                    } else {
++                        TunnelError::ProxyChallenge(ProxyAuthChallenge(challenges))
++                    });
++                }
+                 _ => return Err(TunnelError::TunnelUnsuccessful),
+             },
+             Ok(httparse::Status::Partial) => {
+@@ -238,7 +273,7 @@
+ 
+         f.write_str(match self {
+             TunnelError::MissingHost => "missing destination host",
+-            TunnelError::ProxyAuthRequired => "proxy authorization required",
++            TunnelError::ProxyAuthRequired | TunnelError::ProxyChallenge(_) => "proxy authorization required",
+             TunnelError::ProxyHeadersTooLong => "proxy response headers too long",
+             TunnelError::TunnelUnexpectedEof => "unexpected end of file",
+             TunnelError::TunnelUnsuccessful => "unsuccessful",
+@@ -253,6 +288,7 @@
+         match self {
+             TunnelError::Io(e) => Some(e),
+             TunnelError::ConnectFailed(e) => Some(&**e),
++            TunnelError::ProxyChallenge(fields) => Some(fields),
+             _ => None,
+         }
+     }
