@@ -379,10 +379,11 @@ def assemble(receipt, result_hash, files, revision, target, supplemental=None):
         else:
             row = checked[key]
             entry = external_package(key, row, extracted)
-            if "ringTargets" in row:
-                details = json.loads(entry["sourceInfo"])
-                details["ringTargetSelection"] = row["ringTargets"][target]
-                entry["sourceInfo"] = canonical(details)
+            for field, selection in (("ringTargets", "ringTargetSelection"), ("compressionSourceByTarget", "compressionSource")):
+                if field in row:
+                    details = json.loads(entry["sourceInfo"])
+                    details[selection] = row[field][target]
+                    entry["sourceInfo"] = canonical(details)
             if row["name"] == "granit-parser" and entry["licenseConcluded"] == UNKNOWN:
                 custom = extract(extracted, "GranitParserNotice", GRANIT_NOTICE)
                 inherited = package(ident("Notice", key + "/LICENSE"), "granit-parser inherited LICENSE", "SOURCE",

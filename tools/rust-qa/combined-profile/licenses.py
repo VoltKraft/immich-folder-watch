@@ -81,6 +81,17 @@ def inventory(rows, vendor, staged, text):
         for sample in originals:
             if "assets" in sample:
                 row["reviewedArchiveAssets"] = sample["assets"]
+        if name == "md-5":
+            # The selector dispatches only LoongArch to its assembly module.
+            # On both reviewed Linux targets the regular Rust compression module is compiled.
+            selected = {"src/compress.rs": "8df5241a891c79944a2da03d1ade5a3065d8028d5ea2f959977726b8c00f68c0",
+                        "src/compress/soft.rs": "6f1a40ee3c35d867cef9104f1e913b32547ef3d080f4a92dec513ef63f3af9c0"}
+            vcs = read(vendor / prefix / ".cargo_vcs_info.json")
+            if (version != "0.11.0" or any(files[path] != digest for path, digest in selected.items())
+                    or vcs != {"git": {"sha1": "b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a"}, "path_in_vcs": "md5"}):
+                raise ValueError("Changed md-5 compression dispatch or upstream revision requires review")
+            row["compressionSourceByTarget"] = {target: {"files": selected, "upstream": vcs} for target in
+                                                ("aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu")}
     record = {"packages": rows, "fonts": fonts, "originalNoticeFiles": {
             **{"rust/" + f["path"]: f["sha256"] for f in read(ROOT / "rust/audit/gui-inputs.json")["files"]
                if Path(f["path"]).suffix not in {".ttf", ".otf"}},

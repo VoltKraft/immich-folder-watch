@@ -1,10 +1,10 @@
 {
-  "allCompilerTreesSha256": "8ea27c8990838fd3ed78d0f40852c96155e1af621736e09a10902be3ed70f512",
-  "inventorySha256": "7250af5885bce270bd476143fffee80e3492ff6b9adab75b2bdc7439574a98c6",
-  "lockSha256": "88c614991fbfbdc84d461dfd44d5d359f7272e2064d5fd758df21be93a4b14d2",
-  "registryLockCount": 471,
+  "allCompilerTreesSha256": "297ae1b7111cb4e205083ab787020b04b920eee9f40f72cbe53ced10f73f18d1",
+  "inventorySha256": "363f4351b3023726684a47d0f06f47bdf0a37b6132d5f5d2b669cf821b89164d",
+  "lockSha256": "ff44785e595316c7182d7a020b5904f632c67fa0ac0e8d5d239c684794c00793",
+  "registryLockCount": 472,
   "summary": {
-    "activeExternalPackages": 351,
+    "activeExternalPackages": 352,
     "buildScriptOrMacroPackages": 69,
     "fonts": 5,
     "multiVersion": {
@@ -68,12 +68,12 @@
       ]
     },
     "native": 509,
-    "notices": 639,
+    "notices": 641,
     "protocols": 101,
-    "registryPackages": 347,
+    "registryPackages": 348,
     "shaders": 16,
-    "sourceAttributionBlocks": 1187,
-    "sourceAttributionFiles": 1981,
+    "sourceAttributionBlocks": 1188,
+    "sourceAttributionFiles": 1982,
     "supplementalNoticeFiles": 19
   },
   "targets": {
@@ -102,7 +102,7 @@
         "linux-services": 70,
         "performance/worker": 25,
         "portal-dialog": 118,
-        "realtime": 111,
+        "realtime": 113,
         "storage": 27,
         "yaml": 30
       },
@@ -111,10 +111,10 @@
         "syn 3.0.10"
       ],
       "newlyActiveFeatures": {},
-      "normalBuildFeatureSetsSha256": "b8bf43f3d188f26867abbdd54e965526fd266820522f94f035b281d21055e1e2",
-      "packages": 336,
-      "registryPackages": 326,
-      "treeSha256": "31141a5d533da91839628c42af088825422bfbe075006352940933e7adcdf3df"
+      "normalBuildFeatureSetsSha256": "f22518809b99b3f69a1817a676805d95c2f70cb7cc3d0b6c46a06ed44ff81fe9",
+      "packages": 337,
+      "registryPackages": 327,
+      "treeSha256": "32395145b32ecba819d8c78523a32f191907d6ed3e51589fae2e73d3e52820b9"
     },
     "x86_64-pc-windows-msvc": {
       "individualPackageCounts": {
@@ -141,7 +141,7 @@
         "linux-services": 70,
         "performance/worker": 26,
         "portal-dialog": 118,
-        "realtime": 111,
+        "realtime": 113,
         "storage": 26,
         "yaml": 31
       },
@@ -150,10 +150,10 @@
         "syn 3.0.10"
       ],
       "newlyActiveFeatures": {},
-      "normalBuildFeatureSetsSha256": "e9614ebaff26a85dca6014a94909d2f6354ab015eb3dc22e755662247a88f9ff",
-      "packages": 337,
-      "registryPackages": 327,
-      "treeSha256": "db746b9b637dd412a3ecf517fad1a1349b6fe47faf7baa54f11ef5d53fea2c13"
+      "normalBuildFeatureSetsSha256": "62e26a16fe3939da5bc22afa8fa2ca617c099dd32b3e763919c7423b295037a9",
+      "packages": 338,
+      "registryPackages": 328,
+      "treeSha256": "11c99a1f1ba30dd075c1082c4b0da3df731ed9d8e5e63f10561713d31004c7b9"
     }
   }
 }

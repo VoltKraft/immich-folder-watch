@@ -172,6 +172,12 @@ def check_native(args):
             case.assertEqual(record["upstreamArchiveSha256"], row["archiveSha256"])
             case.assertEqual(record["reviewedTopLevelLicense"], row["selected"])
             case.assertEqual(record["compilerTree"], row["compilerTree"])
+            if row["name"] == "md-5":
+                case.assertTrue("linux" in args.target)
+                case.assertEqual(record["reviewedTopLevelLicense"], "MIT")
+                case.assertEqual(set(record["notices"]), {root + "LICENSE-MIT", root + "LICENSE-APACHE"})
+                case.assertEqual(record["compressionSource"], row["compressionSourceByTarget"][args.target])
+                case.assertEqual(set(record["compressionSource"]["files"]), {"src/compress.rs", "src/compress/soft.rs"})
             expected.update(paths)
             protocols = {root + p: data for p, data in row.get("protocols", {}).items()}
             case.assertCountEqual(record.get("protocolXml", []), protocols.keys())

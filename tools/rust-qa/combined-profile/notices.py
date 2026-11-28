@@ -100,6 +100,8 @@ def external_notices(row, inventory, revision, caches, members, reuse, target):
         generator = row["coreProtocolGenerator"]
         originals[generator["path"]] = generator["sha256"]
         record["coreProtocolGenerator"] = generator
+    if "compressionSourceByTarget" in row:
+        record["compressionSource"] = row["compressionSourceByTarget"][target]
     if "ringSourceInputs" in row:
         originals["build.rs"] = row["ringSourceInputs"]["build.rs"]
         record["ringSourceInputs"] = row["ringSourceInputs"]

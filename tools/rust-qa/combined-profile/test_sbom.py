@@ -114,6 +114,16 @@ def check_build(args):
     case.assertEqual(sum(p["licenseConcluded"] == "LGPL-2.1-or-later" for p in protocols),
                      18 if "linux" in args.target else 0)
     ring = next(p for p in cargo.values() if p["name"] == "ring")
+    inventory = json.loads(files["inventory.json"])
+    if any(row["name"] == "md-5" for row in inventory["packages"]):
+        active = [p for p in cargo.values() if p["name"] == "md-5"]
+        case.assertEqual(len(active), int("linux" in args.target))
+        if active:
+            details = json.loads(active[0]["sourceInfo"])
+            case.assertEqual(details["compressionSource"]["files"]["src/compress/soft.rs"],
+                             "6f1a40ee3c35d867cef9104f1e913b32547ef3d080f4a92dec513ef63f3af9c0")
+            case.assertEqual(details["compressionSource"]["upstream"]["git"]["sha1"],
+                             "b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a")
     case.assertEqual(ring["licenseConcluded"], "NOASSERTION")
     details = json.loads(ring["sourceInfo"])
     case.assertIn("crypto/fipsmodule/aes/aes_nohw.c", details["ringTargetSelection"]["archSourceCandidates"])

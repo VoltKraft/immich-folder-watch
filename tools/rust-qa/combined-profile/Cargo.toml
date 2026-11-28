@@ -33,6 +33,8 @@ tokio-tungstenite = { version = "=0.30.0", default-features = false, features = 
 async-channel = "=2.5.0"
 async-io = "=2.6.0"
 futures-lite = "=2.6.1"
+md-5 = { version = "=0.11.0", default-features = false }
+percent-encoding = { version = "=2.3.2", default-features = false }
 raw-window-handle = "=0.6.2"
 wayland-backend = { version = "=0.3.17", features = ["client_system", "dlopen"] }
 wayland-client = "=0.31.15"

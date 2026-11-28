@@ -228,6 +228,47 @@ The verification receipt has SHA-256
 `19f26d9502f3b3a154f0693ff7dce9d6edef3095a08913cdf38f54c066581b24`.
 [Source-bound SPDX checks](rw02-combined-sbom.md) · [Notice checks](rw02-combined-notices.md).
 
+## Linux HTTP Digest source profile
+
+The Linux transport at `ed9268e` uses RustCrypto `md-5` 0.11.0 when an
+HTTP proxy offers the corresponding Digest algorithm. Its other direct
+inputs, `sha2` 0.11.1 and `percent-encoding` 2.3.2, were already in the
+combined profile. The combined root now directly selects `md-5` and
+`percent-encoding` on Linux with their default features disabled.
+The existing cross-platform `sha2` selection supplies the Linux input.
+[Shipping client and Rust comparison](rw02-linux-tls-basic-proxy.md#authority-bound-digest-on-fedora-x64).
+
+The crate archive has SHA-256
+`69b6441f590336821bb897fb28fc622898ccceb1d6cea3fde5ea86b090c4de98`.
+Its 18 unchanged files yield compiler tree SHA-256
+`fe2a0b687a9f61ecf7d80eccd1632b9ad24b3092ea61c5effbb36b5c82c05242`.
+At upstream commit `b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a`,
+the selector, the portable Rust compression module and both original
+license files matched the archive byte-for-byte. The profile selects
+MIT and retains both `LICENSE-MIT` and `LICENSE-APACHE`. For Linux x64
+and ARM64 the reviewed selector chooses `src/compress/soft.rs`. The
+LoongArch implementation has a separate target condition. The SPDX
+generator and notice manifest identify the selected source files by
+upstream revision, path and SHA-256.
+[RustCrypto selector](https://github.com/RustCrypto/hashes/blob/b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a/md5/src/compress.rs) ·
+[Portable Rust source](https://github.com/RustCrypto/hashes/blob/b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a/md5/src/compress/soft.rs).
+
+The offline comparison added four edges on each Linux target. The root
+selects `md-5` and `percent-encoding` directly, and `md-5` depends on
+`cfg-if` and `digest`. No features were enabled on `md-5`. All earlier
+package feature sets matched. The two Windows target trees remained
+byte-identical and contain no `md-5` package. These source results apply
+to the new lock, SHA-256
+`ff44785e595316c7182d7a020b5904f632c67fa0ac0e8d5d239c684794c00793`.
+The target comparison and original-source checks are in
+`artifacts/rust/combined-profile/verification/digest-upstream-ed9268e/`.
+The comparison receipt `comparison.json` has SHA-256
+`d83031ef05be6a82f9890b561ddbdc8cf57d0ae8f166d614f49319f85d49b121`.
+The second complete source replay reproduced the empty lock and all four
+target graphs in `artifacts/rust/combined-profile/runs/digest-offline-ed9268e-02/`.
+Its `result.json` has SHA-256
+`053f2793ee3fcb9cf3565ac01561fd1c21fb53dba82c3853cc02c78be9da426f`.
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
