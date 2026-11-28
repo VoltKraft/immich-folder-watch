@@ -17,8 +17,14 @@ on:
       - 'rust/toolchain-inputs.json'
       - '!**/*.md'
   workflow_dispatch:
+    inputs:
+      selection_artifact:
+        description: Optional original ARM64 display artifact ID for the filename selection trial
+        required: false
+        type: string
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -74,6 +80,41 @@ jobs:
         shell: pwsh
         run: python -B tools/rust-qa/windows-display/private_source.py --retained
 
+      - name: Select the current or requested original ARM64 selection subject
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        id: selection
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTION_ARTIFACT: ${{ inputs.selection_artifact }}
+          PREVIOUS_HEAD: ${{ github.event.before }}
+        run: |
+          $id = $env:SELECTION_ARTIFACT
+          if ($env:PREVIOUS_HEAD -match '^[0-9a-f]{40}$' -and $env:PREVIOUS_HEAD -notmatch '^0+$') {
+            $requests = @(git log --format='%(trailers:key=Selection-Artifact,valueonly)' "${env:PREVIOUS_HEAD}..${env:GITHUB_SHA}" | Where-Object { $_ } | Sort-Object -Unique)
+            if ($LASTEXITCODE -or $requests.Count -gt 1) { throw 'Expected at most one archived selection subject in this push' }
+            if ($requests.Count) { $id = $requests[0] }
+          }
+          if ($id) {
+            if ($id -notmatch '^[1-9][0-9]{0,18}$') { throw 'Expected a numeric display artifact ID' }
+            python -B tools/rust-qa/windows-display/selection_archive.py $id
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            'archive=true' >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Reopen the selected filename in the original ARM64 primary
+        if: ${{ !cancelled() && steps.selection.outcome == 'success' }}
+        shell: pwsh
+        env:
+          SELECTION_ARCHIVE: ${{ steps.selection.outputs.archive }}
+        run: |
+          if ($env:SELECTION_ARCHIVE -eq 'true') {
+            python -B tools/rust-qa/windows-display/private_selection.py --archive
+          } else {
+            python -B tools/rust-qa/windows-display/private_selection.py
+          }
+          exit $LASTEXITCODE
+
       - name: Retain both measurements and the original compiler outputs
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -86,5 +127,6 @@ jobs:
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-retained-runs/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-private/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-retained-private/
+            artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-selection-private/
           if-no-files-found: error
           retention-days: 14

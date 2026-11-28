@@ -1,18 +1,26 @@
 param(
     [Parameter(Mandatory)][string]$Binary,
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [string]$QaRoot = (Split-Path $PSScriptRoot)
+    [string]$QaRoot = (Split-Path $PSScriptRoot),
+    [ValidatePattern('^IfwQa_[a-f0-9]{32}$')][string]$HostedDesktop
 )
 
 $ErrorActionPreference = 'Stop'
-if ($env:COMPUTERNAME -ine 'IFW-QA25' -or $env:USERNAME -ine 'ifw-test' -or
-    $env:GITHUB_ACTIONS -or $env:RUNNER_ENVIRONMENT -or -not [Environment]::Is64BitProcess) {
-    throw 'Select the local disposable x64 Windows console and its standard QA account.'
+if ($HostedDesktop) {
+    if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or
+        $env:RUNNER_OS -cne 'Windows' -or $env:RUNNER_ARCH -cne 'ARM64' -or $env:IFW_QA_LOCAL_WINDOWS -or
+        $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or $env:GITHUB_REF -cne 'refs/heads/rewrite/rust') {
+        throw 'Select the private desktop of the native ARM64 rewrite runner.'
+    }
+} elseif ($env:COMPUTERNAME -ine 'IFW-QA25' -or $env:USERNAME -ine 'ifw-test' -or
+          $env:GITHUB_ACTIONS -or $env:RUNNER_ENVIRONMENT -or -not [Environment]::Is64BitProcess) {
+    throw 'Select the local disposable x64 Windows console and standard QA account.'
 }
 $binaryPath = (Resolve-Path $Binary).Path
 $out = (New-Item -ItemType Directory -Path $OutputDirectory -ErrorAction Stop).FullName
 $token = [Guid]::NewGuid().ToString('N')
-$trial = (New-Item -ItemType Directory -Path (Join-Path $out "ifw-rw02-$token")).FullName
+$parent = if ($HostedDesktop) { (Resolve-Path $env:RUNNER_TEMP).Path } else { $out }
+$trial = (New-Item -ItemType Directory -Path (Join-Path $parent "ifw-rw02-$token")).FullName
 [IO.File]::WriteAllText((Join-Path $trial 'inventory.owner'), $token, [Text.Encoding]::ASCII)
 [IO.File]::WriteAllBytes((Join-Path $trial 'launcher.pid'), [byte[]]@())
 $report = [ordered]@{ status='failed'; binarySha256=(Get-FileHash $binaryPath).Hash; stages=[ordered]@{} }
@@ -33,9 +41,11 @@ function Start-Subject {
         $info.EnvironmentVariables[$name] = $trial
     }
     $info.EnvironmentVariables['IFW_QA_ISOLATED'] = '1'
-    $info.EnvironmentVariables['IFW_QA_LOCAL_WINDOWS'] = '1'
+    if (-not $HostedDesktop) {
+        $info.EnvironmentVariables['IFW_QA_LOCAL_WINDOWS'] = '1'
+        $info.EnvironmentVariables['IFW_QA_LOCAL_TEMP'] = $out
+    }
     $info.EnvironmentVariables['IFW_QA_WINDOWS_LAUNCHER'] = '1'
-    $info.EnvironmentVariables['IFW_QA_LOCAL_TEMP'] = $out
     $info.EnvironmentVariables['IFW_QA_INVENTORY_TOKEN'] = $token
     $info.EnvironmentVariables['IFW_QA_INVENTORY_ROOT'] = $trial
     $info.EnvironmentVariables['IFW_QA_LAUNCHER_SID'] = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -54,9 +64,12 @@ function Get-SubjectWindow {
 function Read-Filename {
     $root = [Windows.Automation.AutomationElement]::FromHandle($handle)
     [uint32]$owner = 0
-    if (-not [IfwObservedWindow]::GetWindowThreadProcessId($handle,[ref]$owner) -or
-        $owner -ne $primary.process.Id -or $root.Current.ProcessId -ne $owner) {
+    $thread = [IfwObservedWindow]::GetWindowThreadProcessId($handle,[ref]$owner)
+    if (-not $thread -or $owner -ne $primary.process.Id -or $root.Current.ProcessId -ne $owner) {
         throw 'The window does not belong to the original live primary.'
+    }
+    if ($HostedDesktop -and [IfwSelectionDesktop]::ThreadName($thread) -cne $HostedDesktop) {
+        throw 'The owned GUI window is outside the selected private desktop.'
     }
     $field = Get-Field 'Dateiname' ([Windows.Automation.ControlType]::Edit)
     if ($null -eq $field -or $field.Current.IsPassword -or $field.Current.ProcessId -ne $owner) {
@@ -135,6 +148,26 @@ try {
         $a.StringConstantType -eq 'SingleQuotedHereString' -and $a.Value.Contains('public static class IfwObservedWindow {') },$true))
     if ($errors -or $bridge.Count -ne 1) { throw 'Cannot load the shared native window observer.' }
     Add-Type -TypeDefinition $bridge[0].Value
+    if ($HostedDesktop) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class IfwSelectionDesktop {
+    [DllImport("user32.dll")] static extern IntPtr GetThreadDesktop(uint thread);
+    [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)]
+    static extern bool GetUserObjectInformation(IntPtr handle, int index, StringBuilder value, uint bytes, out uint needed);
+    public static string ThreadName(uint id) {
+        var name = new StringBuilder(256);
+        uint needed;
+        return GetUserObjectInformation(GetThreadDesktop(id), 2, name, 512, out needed) ? name.ToString() : null;
+    }
+}
+'@
+        $report.observerDesktop = [IfwSelectionDesktop]::ThreadName([IfwSelectionDesktop]::GetCurrentThreadId())
+        if ($report.observerDesktop -cne $HostedDesktop) { throw 'The observer did not start on the private desktop.' }
+    }
     foreach ($name in 'Get-AccessibleName','Get-Field','Wait-Observation') {
         $defs = @($ast.FindAll({ param($a) $a -is [Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -ceq $name },$true))
         if ($defs.Count -ne 1) { throw "Missing shared observer $name." }
@@ -205,6 +238,10 @@ try {
             $report.status = 'failed'
             $report.error = 'The native launcher, window or drain receipts are incomplete.'
         }
+    }
+    if ($HostedDesktop) {
+        [IO.Directory]::Delete($trial, $true)
+        $report.profileRemoved = -not [IO.Directory]::Exists($trial)
     }
     [IO.File]::WriteAllText((Join-Path $out 'selection.json'), ($report | ConvertTo-Json -Depth 7), [Text.UTF8Encoding]::new($false))
 }

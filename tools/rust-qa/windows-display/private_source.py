@@ -13,9 +13,7 @@ DESKTOP = DISPLAY["TEXT"]["DESKTOP"]
 TARGET = "aarch64-pc-windows-msvc"
 
 
-def verify_session(session, observation, name):
-    owner = observation["originalWindow"]
-    membership = observation["privateWindowBefore"]
+def verify_restoration(session, name):
     original = session["beforeSwitch"]
     endpoint = session["returnedDesktop"]
     if (not DISPLAY["named_desktop"](name) or not DESKTOP["ordinary_console"](original, "Default")
@@ -25,6 +23,13 @@ def verify_session(session, observation, name):
             or not all(session["cleanup"].get(k) is True for k in ("switchBack", "namedClosed", "originalHandleClosed"))
             or not session.get("switchToFixture")):
         raise ValueError("The private input desktop or return to the original unlocked console differs")
+
+
+def verify_session(session, observation, name):
+    verify_restoration(session, name)
+    owner = observation["originalWindow"]
+    membership = observation["privateWindowBefore"]
+    original = session["beforeSwitch"]
     if (session["workerExit"] != 0 or session.get("jobClosed") is not True or observation["privateWorkerPid"] != session["workerPid"]
             or observation["requestedPrivateDesktop"] != name or not DESKTOP["ordinary_console"](observation["desktop"], name)
             or observation["protocol"] != {"status": "observed", "code": 0, "transport": "console"}

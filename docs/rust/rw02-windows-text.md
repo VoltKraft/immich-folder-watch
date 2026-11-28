@@ -127,6 +127,25 @@ QMP reported 3,221,225,472 bytes of RAM. The guest shut down and released its
 temporary SSD layers. This observation covers the canonical x64 console
 editor.
 
+### Running the selection observation on the ARM64 console
+
+The [native ARM64 display workflow](../../.github/workflows/rust-windows-arm64-display.yaml)
+starts the same field observer on a freshly created input desktop in the
+runner's existing unlocked console session. The supervisor gives the worker
+a bounded job lifetime and returns to the original Default desktop.
+`windows-selection-private/session.json` records the actual build, the
+native worker and the verified desktop restoration. The UIA stages and both
+application logs are under `windows-selection-private/field/`.
+
+The workflow normally uses the canonical executable from its current build.
+For a replay on the rewrite branch, request the original ARM64 display
+artifact with a `Selection-Artifact: <numeric ID>` Git commit trailer in
+the push or with the manual workflow's `selection_artifact` input. The
+workflow checks the Actions digest, source revision, branch, workflow, binary,
+graph and compiler receipts. It compares the original sources and font and
+dependency inputs to the current canonical receipt before using the archived
+executable. This trial exercises one console desktop at its current DPI.
+
 ## Ordinary filename on the reopened retained HWND
 
 The disposable Windows desktop job also runs the same eight glyph crops and three editing sequences on the retained executable. Its separate process starts with the original filename, hides through WM_CLOSE and reopens through the existing supervisor. The native observer verifies the loaded executable path and hash, the process creation time and the original HWND. The GUI must retain generation one in DX12 CPU Mailbox/Wait mode. A create/destroy hook and root hide/show events cover the field observation.
