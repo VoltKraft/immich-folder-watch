@@ -117,6 +117,35 @@ exits, job closure and return to the original desktop. Keep the original
 `artifacts/rust/gui-native/x86_64-pc-windows-msvc/windows-quit-private/`
 directory with the guest and compiler archives.
 
+On November 28, 2026, the offline 3072 MiB guest ran the ordinary GUI at
+`245a921` on two fresh input desktops in standard-user console session 1.
+The initial native tray add failed on each desktop and the editor opened.
+Windows UI Automation invoked the enabled, on-screen **Beenden** button
+after the worker had scanned the same synthetic file twice. The second
+observation identified a 70 × 22 button on HWND 328098, owned by GUI
+PID 4336. Worker PID 5152 exited successfully. The GUI returned exit
+code 0, logged `DRAINED passes=11` and left no inventory process. The
+supervisor closed its job and restored the original unlocked Default desktop.
+The [paired compiler archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46127111221/artifacts/15256855970)
+had SHA-256 `8f5355ecae8a0b913ccf0d15a6fd9833910b29e9f031b6630dfe1445420347f3`.
+
+The first observer rejected the successful shutdown because it expected
+tray cleanup before worker exit. Its original log shows worker exit first
+and both operations before the final drain. The corrected observer at
+`07c0d70` verified this log and passed the second native trial with the
+same GUI and worker binaries. The first and second guest ZIPs have SHA-256
+`3962c30c2ca77ade66bfba1f7c0c108e48d942a991dd5a876bb2cb056a043f09` and
+`789291feb07f3e24781f30562ed3e22f234bc2ba303e88cfb8f4f76fbd7016e6`.
+Both originals and the host replay are under
+`artifacts/rust/local-windows-server-2025-x64/20261128/window-quit-245a921/`.
+
+In the same guest the five native harnesses passed all 30 cases, including
+12 Windows tray tests. The host verified the individual test logs, the
+companion build receipt and both original Actions digests. The guest then
+shut down and released its private SSD overlays.
+[Native GUI test kit](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46127111182/artifacts/15256302590)
+· [Companion GUI receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46127111182/artifacts/15256029030).
+
 ### GUI tests on Server 2025 at 1660aeb
 
 The offline 4 GiB VM ran all five original x64 test executables from
