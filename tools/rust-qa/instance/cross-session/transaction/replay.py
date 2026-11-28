@@ -14,6 +14,7 @@ SUCCESSOR = '{C09DB689-221F-4AE3-8C72-2D5B5C92DD82}'
 COMPILER = '0f19d7e208bb84aa0aa9839da944cafc0cdf17ea91a3e47bae222af4bdf4b634'
 HANDOVER = '0f30bc04dfe0337bf4bb5cab177d1ee048a314d342618f59719343c4d42dbcae'
 WIX = 'bbb8627d4914333b6b4b91e6d1fc94eea96e28349968550248d8da95cfe80ca0'
+UTIL = '19166934d5bcb47857869e943bc55822955d95a0cac17c9dd9956a4705335b3b'
 
 
 def ordered(log, fragments):
@@ -31,7 +32,38 @@ def transaction_actions(log):
     return '\n'.join(action for thread, action in actions if thread == outer)
 
 
-def replay(guest_zip, compiler_zip, profile_zip, checkout_zip):
+def verify_wpf_quit(z, wpf, own, menu_path):
+    token, windows = wpf['token'], wpf['window']
+    check_identity(token, own, 'ImmichFolderWatch.exe')
+    menu = read(z, menu_path)
+    verify_menu_anchor(menu, {'hwnd': windows['window'], 'pid': token['pid'], 'tid': windows['thread']})
+    require(wpf['exit'] == 0 and menu['status'] == 'invoked' and menu['sourceSha256'] == QUIT_SOURCE
+            and menu['rawInteraction'] == f'tray-menu-quit; popup={menu["menuHwnd"]}; verifiedHighlightedCommandId=3; nativeMouseClick'
+            and menu['receiver'] == windows['receiver'] and menu['created'] == token['created100ns'],
+            'The original WPF did not exit through its own visible menu')
+
+
+def verify_running_veto(z, manifest, admin, result):
+    wpf = result['activeWpf']
+    process = read(z, 'active-process.json')
+    own = result['identity']
+    require(manifest['util.nupkg'] == admin['utilSha256'].lower() == UTIL and admin['activeWpfExit'] == 1603,
+            'Native refusal or original WiX extension differs')
+    require(process['pid'] == wpf['token']['pid'] and process['session'] == own['sessionId']
+            and process['created'] == wpf['token']['created100ns']
+            and process['image'].lower() == r'c:\program files\immich folder watch\bin\immichfolderwatch.exe'
+            and read(z, 'running-wpf/after-refusal.json') == wpf['window'],
+            'The administrator and standard user did not observe the same installed WPF')
+    log = z.read('active-wpf.log').decode('utf-16')
+    ordered(log, ['Doing action: Wix4CloseApplications_X64', 'Doing action: RefuseActiveWpf',
+                  'Quit Immich Folder Watch in every session and retry the cutover.', 'MainEngineThread is returning 1603'])
+    require(all('Doing action: ' + action not in log for action in ('InstallInitialize', 'RemoveExistingProducts')),
+            'The active-WPF refusal started an upgrade transaction')
+    verify_wpf_quit(z, wpf, own, 'running-wpf/wpf-handover/quit-menu.json')
+    return process['pid']
+
+
+def replay(guest_zip, compiler_zip, profile_zip, checkout_zip, require_running_veto=False):
     require(digest(compiler_zip.read_bytes()) == COMPILER and digest(profile_zip.read_bytes()) == HANDOVER,
             'Expected the original compiler and WPF handover archives')
     with ZipFile(guest_zip) as archive, ZipFile(compiler_zip) as compiler, ZipFile(profile_zip) as profile, ZipFile(checkout_zip) as checkout:
@@ -93,23 +125,18 @@ def replay(guest_zip, compiler_zip, profile_zip, checkout_zip):
         for name, product in [('remove-trial', SUCCESSOR), ('reinstall-original', PRODUCT)]:
             log = z.read(name + '.log').decode('utf-16')
             require(product in log and 'MainEngineThread is returning 0' in log, 'Incomplete native ' + name)
-        wpf = result['restoredWpf']
-        token = wpf['token']
-        check_identity(token, own, 'ImmichFolderWatch.exe')
-        menu = read(z, 'wpf-handover/quit-menu.json')
-        windows = wpf['window']
-        verify_menu_anchor(menu, {'hwnd': windows['window'], 'pid': token['pid'], 'tid': windows['thread']})
-        require(wpf['exit'] == 0 and menu['status'] == 'invoked' and menu['sourceSha256'] == QUIT_SOURCE
-                and menu['rawInteraction'] == f'tray-menu-quit; popup={menu["menuHwnd"]}; verifiedHighlightedCommandId=3; nativeMouseClick'
-                and menu['receiver'] == windows['receiver'] and menu['created'] == token['created100ns'],
-                'The original WPF did not exit through its own visible menu')
-        return {'guestSha256': digest(guest_zip.read_bytes()), 'revision': guest['observerRevision'],
+        verify_wpf_quit(z, result['restoredWpf'], own, 'wpf-handover/quit-menu.json')
+        receipt = {'guestSha256': digest(guest_zip.read_bytes()), 'revision': guest['observerRevision'],
                 'trialMsiSha256': admin['candidateSha256'].lower(), 'exits': admin['exits'],
-                'ordinarySession': own['sessionId'], 'restoredWpfPid': token['pid'], 'profileSha256': files}
+                'ordinarySession': own['sessionId'], 'restoredWpfPid': result['restoredWpf']['token']['pid'], 'profileSha256': files}
+        if require_running_veto or 'util.nupkg' in manifest:
+            receipt['activeWpfPid'] = verify_running_veto(z, manifest, admin, result)
+        return receipt
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--require-running-veto', action='store_true')
     for key in ('guest_zip', 'compiler_zip', 'profile_zip', 'checkout_zip'):
         parser.add_argument(key, type=Path)
     print(json.dumps(replay(**vars(parser.parse_args())), indent=2))

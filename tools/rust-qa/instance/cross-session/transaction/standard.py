@@ -19,7 +19,16 @@ CANDIDATE = Path(r'C:\Program Files\IFW Cutover QA\msi-session-endpoint.exe')
 PHASES = ('baseline', 'rolled-back', 'committed', 'restored')
 
 
-def stock_launch(accounts, own, sid, work):
+def wait_for_admin(phase):
+    gate = ADMIN / 'transaction' / (phase + '.ready')
+    deadline = time.monotonic() + 420
+    while not gate.is_file():
+        require(not (gate.parent / 'failure.log').is_file(), f'The installer failed before {phase}')
+        require(time.monotonic() < deadline, f'Timed out waiting for {phase}')
+        time.sleep(.25)
+
+
+def stock_launch(accounts, own, sid, work, *, running_trial=None):
     with (work / 'wpf.log').open('xb') as output:
         proc = subprocess.Popen([APP], cwd=APP.parent, stdout=output, stderr=subprocess.STDOUT)
         try:
@@ -30,6 +39,13 @@ def stock_launch(accounts, own, sid, work):
                     break
                 time.sleep(.15)
             active = desktop_state(Win32(), proc)
+            if running_trial is not None:
+                (running_trial / 'active-wpf.ok').touch(exist_ok=False)
+                wait_for_admin('active-wpf')
+                after = desktop_state(Win32(), proc)
+                require(after == active and instance.sha(APP) == APP_SHA,
+                        'The refused upgrade disturbed the original WPF desktop or installation')
+                write(work / 'after-refusal.json', after)
             quit_area = work / 'wpf-handover'
             quit_area.mkdir()
             subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-STA', '-File', HERE / 'handover_quit.ps1',
@@ -61,21 +77,23 @@ def run(disc, work):
     work.mkdir()
     native = stage(disc / 'endpoint.zip', ARCHIVE, work)
     require(instance.sha(disc / 'handover.zip') == PROFILE_ARCHIVE, 'Unexpected profile archive')
+    active = work.with_name('trial-running-wpf')
+    active.mkdir()
+    refused = stock_launch(accounts, own, sid, active, running_trial=work)
+    active.rename(work / 'running-wpf')
+    if profile.exists():
+        profile.rename(work / 'running-wpf' / 'default-profile')
     profile.mkdir()
     with ZipFile(disc / 'handover.zip') as archive:
         files = {name.replace('\\', '/'): name for name in archive.namelist()}
         for name in PROFILE_FILES:
             (profile / name).write_bytes(archive.read(files['wpf-handover/finished-profile/' + name]))
     original = {name: instance.sha(profile / name) for name in PROFILE_FILES}
-    result = {'identity': own, 'desktop': desktop, 'profileInput': PROFILE_ARCHIVE, 'files': original, 'phases': {}}
+    result = {'identity': own, 'desktop': desktop, 'profileInput': PROFILE_ARCHIVE,
+              'activeWpf': refused, 'files': original, 'phases': {}}
     for phase in PHASES:
         if phase != 'baseline':
-            gate = ADMIN / 'transaction' / (phase + '.ready')
-            deadline = time.monotonic() + 420
-            while not gate.is_file():
-                require(not (gate.parent / 'failure.log').is_file(), f'The installer failed before {phase}')
-                require(time.monotonic() < deadline, f'Timed out waiting for {phase}')
-                time.sleep(.25)
+            wait_for_admin(phase)
         require(not any(image.lower() == APP.name.lower() for _, image in Win32().processes().values()),
                 f'An old worker was active at {phase}')
         absent = phase == 'committed'

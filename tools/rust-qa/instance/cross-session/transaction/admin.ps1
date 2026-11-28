@@ -23,6 +23,7 @@ $sid = ([Security.Principal.NTAccount]::new($env:COMPUTERNAME, 'ifw-test')).Tran
 if ([IO.File]::ReadAllText("$marker\marker.txt") -cne "IFW disposable installed MSI session test`n$sid`n" -or
     (Get-FileHash $msi).Hash -ine '419938c3fec0c113bf0f33dbf1a9bd4a6748df1e7930acb20fec5fc3f265a187' -or
     (Get-FileHash "$Disc\wix.nupkg").Hash -ine 'bbb8627d4914333b6b4b91e6d1fc94eea96e28349968550248d8da95cfe80ca0' -or
+    (Get-FileHash "$Disc\util.nupkg").Hash -ine '19166934d5bcb47857869e943bc55822955d95a0cac17c9dd9956a4705335b3b' -or
     (Get-FileHash "$Disc\endpoint.zip").Hash -ine '0f19d7e208bb84aa0aa9839da944cafc0cdf17ea91a3e47bae222af4bdf4b634' -or
     (Test-Path $area) -or (Test-Path "$registry\$successor")) {throw 'Expected the original, fresh synthetic installation.'}
 [void](New-Item -Type Directory $area)
@@ -59,7 +60,15 @@ function Check-Stage([string]$Phase, [bool]$InstalledStock) {
         ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$area\$Phase.json"
 }
 function Invoke-TrialMsi([string]$Phase, [int]$Expected, [string[]]$Options) {
-    if (@(Get-Process -Name ImmichFolderWatch -ErrorAction SilentlyContinue).Count) {throw 'Drain WPF in all sessions before this trial.'}
+    $running = @(Get-Process -Name ImmichFolderWatch -ErrorAction SilentlyContinue)
+    if ($Phase -eq 'active-wpf') {
+        if ($running.Count -ne 1 -or $running[0].Path -ine $stock -or $running[0].SessionId -eq (Get-Process -Id $PID).SessionId) {
+            throw 'Expected only the original installed WPF in the other session.'
+        }
+        [ordered]@{pid=$running[0].Id; session=$running[0].SessionId; image=$running[0].Path
+                   created=$running[0].StartTime.ToUniversalTime().ToFileTimeUtc()} |
+            ConvertTo-Json | Set-Content -Encoding UTF8 "$area\active-process.json"
+    } elseif ($running.Count) {throw 'Drain WPF in all sessions before this trial.'}
     $log = Join-Path $area "$Phase.log"
     $arguments = @($Options) + @('/qn','/norestart','/l*v',"`"$log`"")
     $p = Start-Process msiexec.exe -PassThru -ArgumentList $arguments
@@ -74,13 +83,21 @@ try {
     try {
         & tar.exe -xf "$Disc\wix.nupkg" tools/net472/x64
         if ($LASTEXITCODE) {throw 'Could not extract WiX'}
+        & tar.exe -xf "$Disc\util.nupkg" wixext6/WixToolset.Util.wixext.dll
+        if ($LASTEXITCODE) {throw 'Could not extract the shipping WiX Util extension'}
         & tar.exe -xf "$Disc\endpoint.zip" msi-session-endpoint.exe
         if ($LASTEXITCODE -or (Get-FileHash .\msi-session-endpoint.exe).Hash -ine $endpointHash) {throw 'Invalid native endpoint'}
-        & .\tools\net472\x64\wix.exe build -arch x64 -d "Endpoint=$area\msi-session-endpoint.exe" "$Disc\Cutover.wxs" -o $candidate *> "$area\compiler.log"
+        & .\tools\net472\x64\wix.exe build -arch x64 -ext .\wixext6\WixToolset.Util.wixext.dll -d "Endpoint=$area\msi-session-endpoint.exe" "$Disc\Cutover.wxs" -o $candidate *> "$area\compiler.log"
         if ($LASTEXITCODE -or !(Test-Path $candidate)) {throw 'Private successor MSI failed to compile'}
     } finally {Pop-Location}
     $admin = [ordered]@{candidateSha256=(Get-FileHash $candidate).Hash; compilerSha256=(Get-FileHash "$Disc\wix.nupkg").Hash
+                        utilSha256=(Get-FileHash "$Disc\util.nupkg").Hash
                         wixSourceSha256=(Get-FileHash "$Disc\Cutover.wxs").Hash; exits=[ordered]@{}}
+    Wait-ForObserver 'active-wpf'
+    $admin.activeWpfExit = Invoke-TrialMsi 'active-wpf' 1603 @('/i',"`"$candidate`"",'IFW_CUTOVER_TEST=1')
+    if ((Get-FileHash $stock).Hash -ine $stockHash -or !(Test-Path "$registry\$original") -or
+        (Test-Path "$registry\$successor") -or (Test-Path $trial)) {throw 'The running-application refusal changed the installation.'}
+    [IO.File]::WriteAllText("$area\active-wpf.ready",'')
     Wait-ForObserver 'baseline'
     Check-Stage 'baseline' $true
     $admin.exits.failedUpgrade = Invoke-TrialMsi 'failed-upgrade' 1603 @('/i',"`"$candidate`"",'IFW_CUTOVER_TEST=1','IFW_ROLLBACK=1')
