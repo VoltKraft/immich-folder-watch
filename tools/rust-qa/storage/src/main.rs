@@ -1,10 +1,13 @@
 //! Development-only synthetic storage assessment, not an application adapter.
 #![forbid(unsafe_code)]
 
+mod preflight;
+mod wal_preflight_cases;
+
 use ifw_legacy::timestamp::UtcTicks;
 use rusqlite::backup::Backup;
 use rusqlite::types::ValueRef;
-use rusqlite::{Connection, OpenFlags, params};
+use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::error::Error;
@@ -35,17 +38,6 @@ impl fmt::Display for UnsupportedSchema {
 }
 
 impl Error for UnsupportedSchema {}
-
-fn initialize_wal(database: &Connection) -> Result<()> {
-    let version: i64 = database.pragma_query_value(None, "user_version", |row| row.get(0))?;
-    if version != 1 {
-        return Err(UnsupportedSchema(version).into());
-    }
-    database.execute_batch(
-        "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; PRAGMA trusted_schema=OFF;",
-    )?;
-    Ok(())
-}
 
 fn main() -> Result<()> {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
@@ -102,7 +94,9 @@ fn main() -> Result<()> {
         "Format":"ifw-rw02-sqlite-assessment-v1", "Os":std::env::consts::OS, "Arch":std::env::consts::ARCH,
         "SQLiteVersion":rusqlite::version(), "SQLiteSourceId":SQLITE_SOURCE,
         "Cases":cases, "AccountHashVectors":accounts.len(),
-        "Unproven":["production migration adapter", "old optional schema repair", "future-schema WAL preflight",
+        "QuiescentWalPreflight":wal_preflight_cases::run(&output)?,
+        "FinalizedRollbackJournal":wal_preflight_cases::persistent_journal(&output)?,
+        "Unproven":["production migration adapter", "old optional schema repair", "exclusion of a live legacy writer",
             "full disk and process-crash recovery", "YAML", "device identities", "other native targets"]
     });
     std::fs::write(
@@ -110,7 +104,7 @@ fn main() -> Result<()> {
         serde_json::to_vec_pretty(&report)?,
     )?;
     println!(
-        "SQLite assessment passed: two casing modes, four tables, writes, rollback, live WAL backup, future DELETE-mode refusal and five account hashes."
+        "SQLite assessment passed: two casing modes, four tables, writes, rollback, live WAL backup, quiescent schema preflight and five account hashes."
     );
     Ok(())
 }
@@ -135,13 +129,14 @@ fn exercise_database(fixtures: &Path, output: &Path, mode: &str) -> Result<Value
         .ok_or("missing synthetic account")?
         .to_owned();
     let path = output.join(format!("{mode}.db"));
-    let mut database = Connection::open(&path)?;
+    // Create the synthetic C# corpus, then use the ordinary existing-profile entry point.
+    Connection::open(&path)?.execute_batch(&sql)?;
+    let mut database = preflight::open_existing(&path, &output.join("preflight"))?;
     ensure(
         database.query_row::<String, _, _>("SELECT sqlite_source_id()", [], |row| row.get(0))?
             == SQLITE_SOURCE,
         "wrong SQLite native source identity",
     )?;
-    database.execute_batch(&sql)?;
     let compile_options: Vec<String> = database
         .prepare("PRAGMA compile_options")?
         .query_map([], |row| row.get(0))?
@@ -185,7 +180,6 @@ fn exercise_database(fixtures: &Path, output: &Path, mode: &str) -> Result<Value
     repair["CreationTimeUtc"] = json!(creation);
     repair["ContentSha256"] = json!(content_hash);
     let encoded_repair = serde_json::to_string(&repair)?;
-    initialize_wal(&database)?;
     let before_rollback = snapshot(&database)?;
     {
         let transaction = database.transaction()?;
@@ -288,23 +282,16 @@ fn exercise_database(fixtures: &Path, output: &Path, mode: &str) -> Result<Value
         future.pragma_update(None, "user_version", 99)?;
     }
     let future_before = digest_file(&future_path)?;
-    for access in [
-        OpenFlags::SQLITE_OPEN_READ_ONLY,
-        OpenFlags::SQLITE_OPEN_READ_WRITE,
-    ] {
-        let future =
-            Connection::open_with_flags(&future_path, access | OpenFlags::SQLITE_OPEN_NO_MUTEX)?;
-        let error = initialize_wal(&future)
-            .err()
-            .ok_or("future schema reached WAL setup")?;
-        ensure(
-            matches!(
-                error.downcast_ref::<UnsupportedSchema>(),
-                Some(UnsupportedSchema(99))
-            ),
-            "unexpected error for future schema",
-        )?;
-    }
+    let error = preflight::open_existing(&future_path, &output.join("preflight"))
+        .err()
+        .ok_or("future schema reached WAL setup")?;
+    ensure(
+        matches!(
+            error.downcast_ref::<UnsupportedSchema>(),
+            Some(UnsupportedSchema(99))
+        ),
+        "unexpected error for future schema",
+    )?;
     ensure(
         digest_file(&future_path)? == future_before,
         "future DELETE-mode preflight changed bytes",

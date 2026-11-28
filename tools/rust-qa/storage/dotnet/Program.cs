@@ -105,6 +105,8 @@ internal static class Program
         engineVersionCommand.CommandText = "SELECT sqlite_version();";
         var engineVersion = (string)(await engineVersionCommand.ExecuteScalarAsync())!;
         SqliteConnection.ClearAllPools();
+        var walPreflight = report.RootElement.TryGetProperty("QuiescentWalPreflight", out var records)
+            ? WalPreflight.Check(output, records) : null;
         Console.WriteLine($"C# readback passed: {checks} assertions over Rust-written original and WAL backup databases; .NET {Environment.Version}, {RuntimeInformation.OSDescription}, {RuntimeInformation.ProcessArchitecture}, SQLite {engineVersion}.");
         File.WriteAllText(Path.Combine(output, "csharp-readback.json"), JsonSerializer.Serialize(new
         {
@@ -114,7 +116,8 @@ internal static class Program
             OperatingSystem = operatingSystem,
             Architecture = RuntimeInformation.ProcessArchitecture.ToString(),
             OSArchitecture = RuntimeInformation.OSArchitecture.ToString(),
-            SQLiteVersion = engineVersion
+            SQLiteVersion = engineVersion,
+            QuiescentWalPreflight = walPreflight
         }));
     }
 }

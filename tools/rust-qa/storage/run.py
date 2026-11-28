@@ -96,6 +96,8 @@ def main() -> int:
     parser.add_argument("--cargo-home", type=Path, default=ARTIFACTS / "storage-cargo-home")
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--compile-for-local-vm", action="store_true",
+                        help="Archive the Windows x64 SQLite assessment and C# reader for local execution")
     parser.add_argument("--stored-keys", action="store_true",
                         help="Inspect synthetic C# identities and check concordant inserts through the native rollback writer")
     parser.add_argument("--worker-activity", action="store_true",
@@ -103,6 +105,13 @@ def main() -> int:
     parser.add_argument("--installed-upload-backup", action="store_true",
                         help="Build and retain the native backup helper for the isolated installed-application upload trial")
     args = parser.parse_args()
+    if args.compile_for_local_vm and (
+            os.name != "nt" or args.target != "x86_64-pc-windows-msvc"
+            or os.getenv("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch"
+            or os.getenv("GITHUB_REF") != "refs/heads/rewrite/rust" or os.getenv("RUNNER_ARCH") != "X64"
+            or os.getenv("RUNNER_ENVIRONMENT") != "github-hosted"
+            or args.worker_activity or args.stored_keys or args.installed_upload_backup):
+        parser.error("Select the dedicated rewrite compiler for the local Windows x64 storage assessment")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
     output = isolated_path(args.output or ARTIFACTS / "storage-native" / f"{args.target}-{run_id}")
     cargo_home = isolated_path(args.cargo_home)
@@ -159,7 +168,7 @@ def main() -> int:
         "offline": args.offline, "removedBuildOverrideNames": sorted(removed),
         "nativeBuild": {"LIBSQLITE3_FLAGS": inputs["sqlite"]["flags"], "LIBSQLITE3_SYS_USE_PKG_CONFIG": "0"},
         "steps": {}, "unproven": ["production storage adapter", "YAML", "old optional schema migration",
-                                   "future schema with existing WAL", "full disk and process crash recovery",
+                                   "migration of a live legacy profile", "full disk and process crash recovery",
                                    "cross-environment Unicode identity migration"],
     }
     write_json(output / "result.json", result)
@@ -187,7 +196,8 @@ def main() -> int:
         if args.worker_activity and result["modifiedSources"]:
             raise ValueError("the worker handoff requires committed test, compiler and worker sources")
         command("native-compiler", [sys.executable, str(ROOT / "tools/rust-qa/check-toolchain.py"), args.target])
-        command("evidence-tests", [sys.executable, str(HERE / "test_evidence.py")])
+        if not args.compile_for_local_vm:
+            command("evidence-tests", [sys.executable, str(HERE / "test_evidence.py")])
         expected_lock = {(entry["name"], entry["version"]): entry["archive_sha256"] for entry in inputs["packages"]}
         if sha256(HERE / "Cargo.lock") != inputs["lock_sha256"] or external_lock(HERE / "Cargo.lock") != expected_lock:
             raise ValueError("generated Cargo.lock differs from the reviewed 31-package input")
@@ -217,7 +227,8 @@ def main() -> int:
         result["nativeGraphPackages"] = len(graph)
         command("features", ["cargo", "tree", "--manifest-path", str(MANIFEST), "--frozen",
                              "--target", args.target, "--edges", "normal,build,features"], verbose=False)
-        command("format", ["cargo", "fmt", "--manifest-path", str(MANIFEST), "--", "--check"])
+        if not args.compile_for_local_vm:
+            command("format", ["cargo", "fmt", "--manifest-path", str(MANIFEST), "--", "--check"])
         if os.name != "nt":
             native_cc = next((env[name] for name in
                               ("CC_" + args.target, "CC_" + args.target.replace("-", "_"), "HOST_CC", "CC")
@@ -243,7 +254,8 @@ def main() -> int:
         result["nativeBuildLogs"] = len(native_logs)
         executable = work / "rust" / args.target / "release" / ("ifw-sqlite-assessment.exe" if os.name == "nt" else "ifw-sqlite-assessment")
         result["rustExecutableSha256"] = sha256(executable)
-        command("rust-roundtrip", [str(executable), str(fixtures), str(output / "databases")])
+        if not args.compile_for_local_vm:
+            command("rust-roundtrip", [str(executable), str(fixtures), str(output / "databases")])
         project = HERE / "dotnet/StorageReadback.csproj"
         dotnet_common = [str(project), "--artifacts-path", str(work / "dotnet"), "-p:EnableWindowsTargeting=false"]
         restore = [dotnet, "restore", *dotnet_common]
@@ -253,6 +265,26 @@ def main() -> int:
         command("csharp-build", [dotnet, "build", *dotnet_common, "--no-restore", "--configuration", "Release"])
         assembly = work / "dotnet/bin/StorageReadback/release/StorageReadback.dll"
         result["csharpAssemblySha256"] = sha256(assembly)
+        if args.compile_for_local_vm:
+            if result["modifiedSources"] or os.environ["GITHUB_SHA"] != result["source"]:
+                raise ValueError("Local VM inputs require the unmodified source revision of the compiler run")
+            kit = output / "guest"
+            kit.mkdir()
+            shutil.copy2(executable, kit / executable.name)
+            shutil.copytree(assembly.parent, kit / "dotnet")
+            compiler = kit / "compiler"
+            compiler.mkdir()
+            for name in ("first-party-source-hashes.json", "native-graph.json", "native-compiler.log", "build.log", "csharp-build.log"):
+                shutil.copy2(output / name, compiler / name)
+            shutil.copytree(output / "native-build-logs", compiler / "native-build-logs")
+            write_json(kit / "storage-build.json", {
+                "revision": result["source"], "target": args.target, "compilerRun": os.environ["GITHUB_RUN_ID"],
+                "fixtureManifestSha256": result["fixtureManifestSha256"], "lockSha256": result["lockSha256"],
+                "rustExecutableSha256": result["rustExecutableSha256"], "csharpAssemblySha256": result["csharpAssemblySha256"],
+                "files": {p.relative_to(kit).as_posix(): sha256(p) for p in sorted(kit.rglob("*")) if p.is_file()},
+            })
+            result["status"] = "compiled"
+            return 0
         command("csharp-readback", [dotnet, str(assembly), str(output / "databases")])
         rust_result = json.loads((output / "databases/result.json").read_text(encoding="utf-8"))
         csharp_result = json.loads((output / "databases/csharp-readback.json").read_text(encoding="utf-8"))
@@ -264,6 +296,10 @@ def main() -> int:
             raise ValueError("native Rust/C# result identity or assertion count mismatch")
         result["rust"] = rust_result
         result["csharp"] = csharp_result
+        expected_wal = {"newer-with-index": 99, "newer-without-index": 99, "supported-without-index": 1}
+        if csharp_result["QuiescentWalPreflight"] != [
+                {"Case": name, "Version": version, "Value": version} for name, version in expected_wal.items()]:
+            raise ValueError("C# did not recover all three quiescent database profiles")
         if args.installed_upload_backup:
             command("installed-backup-build", ["cargo", "build", "--manifest-path", str(MANIFEST), "--frozen", "--release",
                                               "--target", args.target, "--example", "installed_upload_backup"])

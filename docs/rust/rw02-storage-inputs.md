@@ -170,8 +170,9 @@ Native Fedora Linux x64 execution passed on 2026-11-20 with Rust 1.100.0 and
   returned `ok`. This was not a raw main-file copy or a checkpoint-only test.
 - A future-version database in **DELETE journal mode** was inspected through a
   read-only SQLite connection. This first experiment observed version 99 and
-  omitted the initializer. It retained identical bytes with no new WAL/SHM/journal. Future-version databases
-  with an existing WAL remain a separate, unproven no-mutation case.
+  omitted the initializer. It retained identical bytes with no new WAL/SHM/journal.
+  The [quiescent WAL assessment](#schema-version-in-a-quiescent-wal) covers
+  the separate case where only the committed WAL contains the newer version.
 - All five account SHA-256 vectors matched the actual C# corpus, including URL
   spelling and key-space sensitivity. SHA-256 of the rewritten repair's synthetic
   content was independently checked again by C#.
@@ -232,10 +233,30 @@ The [observed native casing divergence](rw02-legacy.md#casing-source-and-license
 requires preservation of stored identity keys and explicit legacy-variant
 compatibility. This experiment does not rewrite keys or infer one universal map.
 Remaining work includes complete YAML semantics/budgets, old optional schema
-upgrades, future WAL preflight, full-disk/process-crash recovery, device identities
+upgrades, handoff from live writers, full-disk/process-crash recovery, device identities
 and the other native targets. Final application adoption requires primary-agent
 integration of the approved manifest/lock/build-input policy, independent review
 and the remaining [acceptance gates](acceptance.md).
+
+## Schema version in a quiescent WAL
+
+After the writer stops, the main SQLite header can still advertise version 1
+while a committed transaction in the WAL declares version 99. Even opening
+the original read-only can create or change its shared index. The assessment
+copies the main file and WAL into a new private directory and lets SQLite
+read the version there. It removes the directory after inspection. For
+version 1 it rechecks the original and confirms that SQLite entered WAL mode.
+A pending rollback journal requires separate recovery. The caller must retain
+exclusive ownership from the start of copying until the original opens.
+Budget temporary space for a complete main file, the WAL and recovery files.
+[SQLite read-only WAL behavior](https://sqlite.org/wal.html#read_only_databases).
+
+The fixtures place both the version change and an identifiable row in one
+committed transaction. Two newer profiles exercise presence and absence of
+the original index. The supported profile starts with version 0 in the
+main header and reaches version 1 through the WAL. A separate case keeps
+the original finalized SQLite PERSIST journal across refusal. These checks
+use stopped, synthetic single-database profiles.
 
 ## Maintained native runner
 

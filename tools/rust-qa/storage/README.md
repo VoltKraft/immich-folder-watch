@@ -136,8 +136,24 @@ source review before regenerating it. Do not hand-edit Cargo.lock or inputs.json
 
 See [the storage audit](../../../docs/rust/rw02-storage-inputs.md) for license
 disposition, measured behavior, original source evidence and outstanding cases.
-YAML, production migration, existing future-schema WAL, full-disk/process-crash
+YAML, production migration, full-disk/process-crash
 recovery and cross-environment identity policy are outside this bounded proof.
+
+### Version stored in the committed WAL
+
+The normal assessment stops the fixture writer and creates a fresh private
+directory for each preflight. Rust streams the main database and its optional
+WAL there, then lets SQLite reconstruct its index and read the committed
+version. The caller must own the directory and exclude writers until handoff.
+Allow scratch space for the full database, its WAL and SQLite's recovery files.
+A pending rollback journal requires separate recovery.
+
+The two version-99 cases compare every original file digest and filename, with
+and without the original shared index. A supported version-1 case reads the
+committed row through the first writable connection. A C# process independently
+opens private copies with the shipping SQLite library. A separate Rust case
+retains the finalized PERSIST journal of an unsupported database.
+See the [storage preflight evidence](../../../docs/rust/rw02-storage-inputs.md#schema-version-in-a-quiescent-wal).
 
 ### Read the frozen three-profile Fedora study
 
