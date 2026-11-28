@@ -8,6 +8,16 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
+GUI from a background start and reopened its original window after close.
+Both windows gained keyboard focus and kept their inventory worker.
+Independent replay verified the color changes, two native callbacks and
+clean Quit for both starts. On Fedora x64 the combined profile at
+`2f63c15` passed Clippy, its native smoke test, five upload cases and
+the offline Wayland relink. Its SPDX inventory contains 447 packages.
+[Explorer results](rust/rw02-windows-services.md#both-explorer-starts-on-windows-server-2025) ·
+[Combined build and notices](rust/rw02-combined-profile.md#native-linux-x64-digest-inventory-at-2f63c15).
+
 On Server 2025 x64 at `36190f1`, the standard user ran the combined Rust
 executable, its five held-file upload cases and the SPDX generator. The
 host reproduced the guest's 258-package inventory byte for byte. On Fedora
