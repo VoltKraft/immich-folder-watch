@@ -6,6 +6,18 @@ from digest_peer import DigestPeer
 
 
 class ConnectDigestTests(TestCase):
+    def test_auth_int_binds_the_actual_polling_post_body_and_absolute_target(self):
+        target = "http://127.0.0.1:28431/socket.io/?EIO=4&transport=polling&sid=synthetic-1"
+        response = "1ec32468441eda2bc3e81d1de2e2e057e55200f0b4606534f2231c150f3113c1"
+        with patch("digest_peer.secrets.token_hex", return_value="fixture-nonce"):
+            peer = DigestPeer("kit-password", "127.0.0.1:28431", "sha256", qop="auth-int")
+        values = [f'Digest username="fixture", realm="synthetic proxy", nonce="fixture-nonce", '
+                  f'algorithm=SHA-256, qop=auth-int, nc=00000009, cnonce="fixture-cnonce", '
+                  f'uri="{target}", response="{response}"']
+        self.assertEqual(peer.check(values, method="POST", target=target, body=b"40/collection,"), ("correct", "absolute"))
+        self.assertEqual(peer.check(values, method="POST", target=target, body=b"40/other,"), ("incorrect", "absolute"))
+        self.assertEqual(peer.check(values, method="POST", target=target + "2", body=b"40/collection,"), ("invalid-fields", "other"))
+
     def test_authority_and_historical_root_are_independently_verified(self):
         authority = "127.0.0.1:28431"
         samples = {

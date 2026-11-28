@@ -1,9 +1,9 @@
 """Validate the original request sequence from the archived Linux Basic proxy trial."""
 
 from collections import Counter
+import argparse
 import json
 from pathlib import Path
-import sys
 
 
 def verify_retries(proxy, operations, credential, status):
@@ -12,6 +12,17 @@ def verify_retries(proxy, operations, credential, status):
         attempts = [(r["credentials"], r["status"]) for r in proxy if r["operation"] == op]
         assert len(attempts) >= 2 and len(attempts) % 2 == 0
         assert attempts == [("absent", "407"), (credential, status)] * (len(attempts) // 2)
+
+
+def verify_session(rows):
+    upgrades = [r for r in rows if r["kind"] == "innerUpgrade"]
+    assert upgrades == [{"kind": "innerUpgrade", "proxyHeader": False, "apiKey": True}]
+    sent = [r for r in rows if r["kind"] == "sent" and r["body"].startswith("42/collection,")]
+    assert len(sent) == 1 and json.loads(sent[0]["body"].split(",", 1)[1])[0] == "on_album_update"
+    socket_id = sent[0]["id"]
+    closed = [r for r in rows if r["kind"] == "echo-close"]
+    assert len(closed) == 1 and closed[0]["body"].startswith("03e8") and closed[0]["id"] == socket_id
+    assert any(r["kind"] == "received" and r["id"] == socket_id and r["body"] == "41/collection," for r in rows)
 
 
 def replay(cases, candidate=False):
@@ -61,17 +72,55 @@ def replay(cases, candidate=False):
             verify_retries(proxy, ["inventory", "pollingGET", "pollingPOST", "connect"], "correct", "allow")
         else:
             assert all(r["status"] == "allow" and r["credentials"] == "absent" for r in proxy)
-        upgrades = [r for r in rows if r["kind"] == "innerUpgrade"]
-        assert upgrades == [{"kind": "innerUpgrade", "proxyHeader": False, "apiKey": True}]
-        sent = [r for r in rows if r["kind"] == "sent" and r["body"].startswith("42/collection,")]
-        assert len(sent) == 1 and json.loads(sent[0]["body"].split(",", 1)[1])[0] == "on_album_update"
-        socket_id = sent[0]["id"]
-        closed = [r for r in rows if r["kind"] == "echo-close"]
-        assert len(closed) == 1 and closed[0]["body"].startswith("03e8") and closed[0]["id"] == socket_id
-        assert any(r["kind"] == "received" and r["id"] == socket_id and r["body"] == "41/collection," for r in rows)
+        verify_session(rows)
+
+
+def replay_digest(cases, baseline):
+    modes = {f"digest-{algorithm}{policy}{suffix}" for algorithm in ("sha256", "md5")
+             for policy in ("", "-legacy") for suffix in ("", "-incorrect")}
+    assert Counter((c["client"], c["mode"]) for c in cases) == {
+        (client, mode): 1 for client in ("signed", "candidate") for mode in modes}
+    for case in cases:
+        rows = case["observations"]
+        signed, mode = case["client"] == "signed", case["mode"]
+        assert case["netDevices"] == [[1, "lo"]] and case["stopped"] and case["exitCode"] == 0
+        assert not case["fixtureProtocolRejected"] and not any(row["kind"] == "handlerError" for row in rows)
+        proxy = [row for row in rows if row["kind"] == "proxy"]
+        assert proxy and all(row["apiKey"] == (row["operation"] != "connect") for row in proxy)
+        passed = not mode.endswith("incorrect") and ("legacy" in mode if signed else not baseline)
+        assert case["eventObserved"] == case["inventorySucceeded"] == passed
+        operations = {"inventory", "pollingGET", "pollingPOST", "connect"} if passed else {"inventory", "pollingGET"}
+        if baseline and not signed:
+            assert {r["operation"] for r in proxy} == operations
+            assert all(r["credentials"] == "absent" and r["digestUri"] is None and r["status"] == "407" for r in proxy)
+        else:
+            outcome = "incorrect" if mode.endswith("incorrect") else "correct" if passed else "target-mismatch"
+            verify_retries(proxy, operations, outcome, "allow" if passed else "407")
+            for row in proxy:
+                if row["credentials"] == "absent":
+                    assert row["digestUri"] is None
+                elif row["operation"] == "connect":
+                    assert row["digestUri"] == ("root" if signed else "authority")
+                else:
+                    assert row["digestUri"] == ("origin" if signed else "absolute")
+        if not signed:
+            assert case["acceptedNonceCounts"] == list(range(1, 1 + sum(row["status"] == "allow" for row in proxy)))
+        if passed:
+            verify_session(rows)
+        else:
+            assert rows == proxy
 
 
 if __name__ == "__main__":
-    report = json.loads(Path(sys.argv[1]).read_text())
-    replay(report["cases"], "candidateBinarySha256" in report)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("receipt", type=Path)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--digest-reference", action="store_true")
+    mode.add_argument("--digest", action="store_true")
+    args = parser.parse_args()
+    report = json.loads(args.receipt.read_text())
+    if args.digest_reference or args.digest:
+        replay_digest(report["cases"], baseline=args.digest_reference)
+    else:
+        replay(report["cases"], "candidateBinarySha256" in report)
     print(f"Validated {len(report['cases'])} archived Linux proxy observations.")

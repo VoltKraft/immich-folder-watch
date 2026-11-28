@@ -43,6 +43,11 @@ def inside(client, mode):
     secret = secrets.token_hex(16) + "@:+/"
     user = "fixture"
     expected = "Basic " + base64.b64encode(f"{user}:{secret}".encode()).decode()
+    digest_peer = None
+    if mode.startswith("digest-"):
+        from digest_peer import DigestPeer
+        digest_peer = DigestPeer(secret, AUTHORITY, mode.split("-")[1], legacy_root="-legacy" in mode,
+                                 check_counts=client == "candidate")
 
     class Relay(ThreadingHTTPServer):
         lang = "signed" if client == "signed" else "rust"
@@ -70,6 +75,7 @@ def inside(client, mode):
                 self.server.record("innerUpgrade", proxyHeader=bool(values), apiKey=api == ["synthetic"])
                 assert not values
             else:
+                target = self.path
                 if self.command == "CONNECT":
                     assert self.path == AUTHORITY and not api
                     label = "connect"
@@ -79,15 +85,21 @@ def inside(client, mode):
                     assert url.path in ("/socket.io/", "/collection/api/albums")
                     self.path = url.path + ("?" + url.query if url.query else "")
                     label = "inventory" if url.path.endswith("/albums") else "polling" + self.command
-                allowed = (mode == "anonymous" or mode == "connect-only" and label != "connect"
-                           or mode != "other-scheme" and valid)
-                self.server.record("proxy", operation=label, credentials=(
-                    "correct" if valid else "incorrect" if values else "absent"),
-                    apiKey=api == ["synthetic"], status="allow" if allowed else "407")
+                if digest_peer:
+                    credential, form = digest_peer.check(values, method=self.command, target=target, origin_form=self.path)
+                    allowed = credential == "correct"
+                    info = {"digestUri": form}
+                else:
+                    credential = "correct" if valid else "incorrect" if values else "absent"
+                    allowed = (mode == "anonymous" or mode == "connect-only" and label != "connect"
+                               or mode != "other-scheme" and valid)
+                    info = {}
+                self.server.record("proxy", operation=label, credentials=credential, apiKey=api == ["synthetic"],
+                                   status="allow" if allowed else "407", **info)
                 if not allowed:
                     self.send_response(407)
-                    challenge = 'Digest realm="protected, Basic realm", nonce="fixture"' if mode == "other-scheme" else 'Basic realm="fixture"'
-                    self.send_header("Proxy-Authenticate", challenge)
+                    challenge = 'Digest realm="protected, Basic realm", nonce="fixture", algorithm=unavailable' if mode == "other-scheme" else 'Basic realm="fixture"'
+                    self.send_header("Proxy-Authenticate", digest_peer.challenge if digest_peer else challenge)
                     self.send_header("Content-Length", "0")
                     self.send_header("Connection", "close")
                     self.end_headers()
@@ -115,7 +127,7 @@ def inside(client, mode):
     api = f"http://{AUTHORITY}/collection/api"
     proxy = f"http://{RELAY}"
     if mode != "anonymous":
-        chosen = secret + "x" if mode in ("incorrect", "connect-only") else secret
+        chosen = secret + "x" if mode.endswith("incorrect") or mode == "connect-only" else secret
         proxy = f"http://{user}:{quote(chosen, safe='')}@{RELAY}"
     env = {
         "HTTP_PROXY": proxy, "HOME": "/tmp", "PATH": "/usr/bin", "LANG": "C.UTF-8",
@@ -142,21 +154,20 @@ def inside(client, mode):
         "stopped": "Stopped" in lines or any(line.startswith("stopped events=") for line in lines),
         "fixtureProtocolRejected": "Protocol" in subject.stderr.split(),
         "netDevices": socket.if_nameindex(),
+        **({"acceptedNonceCounts": sorted(digest_peer.counts)} if digest_peer and digest_peer.check_counts else {}),
     }))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tls", action="store_true", help="run the HTTPS origin comparison")
-    parser.add_argument("--digest", action="store_true", help="compare CONNECT Digest with a verifying TLS relay")
+    parser.add_argument("--digest", action="store_true", help="compare Digest with a verifying proxy for the selected origin scheme")
     parser.add_argument("--archive", type=Path, required=True, help="paired native proxy-fedora-05 archive")
     parser.add_argument("--sdk", type=Path, required=True, help="shared .NET SDK containing the dotnet host")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, help="additional native release binary")
     parser.add_argument("--candidate-sha256", help="expected digest of the additional binary")
     args = parser.parse_args()
-    if args.digest and not args.tls:
-        parser.error("--digest requires --tls")
     if bool(args.candidate) != bool(args.candidate_sha256):
         parser.error("supply both the candidate and its expected digest")
     archive = args.archive.resolve(strict=True)
@@ -186,12 +197,12 @@ def main():
         tls_script = script.with_name("linux_tls_basic_proxy.py")
         inner = "/tls.py"
         launch.extend(("--ro-bind", str(tls_script), inner))
-        if args.digest:
-            digest_script = script.with_name("digest_peer.py")
-            launch.extend(("--ro-bind", str(digest_script), "/digest_peer.py"))
+    if args.digest:
+        digest_script = script.with_name("digest_peer.py")
+        launch.extend(("--ro-bind", str(digest_script), "/digest_peer.py"))
     launch.extend(("--setenv", "PYTHONPATH", "/fixture", "--chdir", "/tmp", "--", "/usr/bin/python3", "-B", inner, "--inside"))
     cases = MATRIX + CANDIDATE_MATRIX if args.candidate else MATRIX
-    if args.tls:
+    if args.tls or args.digest:
         modes = ("anonymous", "correct", "incorrect", "other-scheme", "bypass")
         if args.digest:
             modes = [f"digest-{algorithm}{policy}{password}"

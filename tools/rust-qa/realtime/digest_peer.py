@@ -1,4 +1,4 @@
-"""Verify a Digest response on the fixed loopback CONNECT route without retaining credentials."""
+"""Verify Digest on the fixed loopback relay without retaining credentials."""
 import hashlib
 import hmac
 import re
@@ -8,7 +8,7 @@ from urllib.request import parse_http_list, parse_keqv_list
 
 
 class DigestPeer:
-    def __init__(self, password, authority, algorithm, *, legacy_root=False, check_counts=False):
+    def __init__(self, password, authority, algorithm, *, legacy_root=False, check_counts=False, qop="auth"):
         self.password = password
         self.authority = authority
         self.realm = "synthetic proxy"
@@ -16,12 +16,14 @@ class DigestPeer:
         self.algorithm = {"sha256": "SHA-256", "md5": "MD5"}[algorithm]
         self.legacy_root = legacy_root
         self.check_counts = check_counts
+        assert qop in ("auth", "auth-int")
+        self.qop = qop
         self.counts = set()
         self.lock = threading.Lock()
         self.challenge = (f'Digest realm="{self.realm}", nonce="{self.nonce}", '
-                          f'algorithm={self.algorithm}, qop="auth"')
+                          f'algorithm={self.algorithm}, qop="{self.qop}"')
 
-    def check(self, values):
+    def check(self, values, *, method="CONNECT", target=None, origin_form=None, body=b""):
         """Return only the comparison outcome and the observed request-target category."""
         if not values:
             return "absent", None
@@ -33,22 +35,28 @@ class DigestPeer:
         except ValueError:
             return "malformed", None
         uri = params.get("uri")
-        category = "authority" if uri == self.authority else "root" if uri == "/" else "other"
+        if method == "CONNECT":
+            category = "authority" if uri == self.authority else "root" if uri == "/" else "other"
+        else:
+            category = "absolute" if uri and uri == target else "origin" if uri and uri == origin_form else "other"
         if (len(fields) != len(params) or params.get("username") != "fixture" or params.get("realm") != self.realm
                 or params.get("nonce") != self.nonce or params.get("algorithm", "MD5").upper() != self.algorithm
-                or params.get("qop") != "auth" or not re.fullmatch("[0-9a-fA-F]{8}", params.get("nc", ""))
+                or params.get("qop") != self.qop or not re.fullmatch("[0-9a-fA-F]{8}", params.get("nc", ""))
                 or not params.get("cnonce") or category == "other"):
             return "invalid-fields", category
 
         def hashed(value):
-            return hashlib.new(self.algorithm.replace("-", "").lower(), value.encode(), usedforsecurity=False).hexdigest()
+            data = value.encode() if isinstance(value, str) else value
+            return hashlib.new(self.algorithm.replace("-", "").lower(), data, usedforsecurity=False).hexdigest()
 
         ha1 = hashed(f"fixture:{self.realm}:{self.password}")
-        ha2 = hashed(f"CONNECT:{uri}")
-        expected = hashed(":".join([ha1, self.nonce, params["nc"], params["cnonce"], "auth", ha2]))
+        a2 = f"{method}:{uri}"
+        if self.qop == "auth-int":
+            a2 += ":" + hashed(body)
+        expected = hashed(":".join([ha1, self.nonce, params["nc"], params["cnonce"], self.qop, hashed(a2)]))
         supplied = params.get("response", "").lower()
         valid = bool(re.fullmatch(r"[0-9a-f]+", supplied)) and hmac.compare_digest(expected, supplied)
-        if valid and category == "root" and not self.legacy_root:
+        if valid and category in ("root", "origin") and not self.legacy_root:
             return "target-mismatch", category
         if valid and self.check_counts:
             nc = int(params["nc"], 16)

@@ -3,6 +3,7 @@
 from collections import Counter
 import hmac
 from http.server import BaseHTTPRequestHandler
+import io
 import ssl
 import threading
 from urllib.parse import parse_qs, urlsplit
@@ -140,9 +141,9 @@ def plaintext_handler(origin, authority, refuse_connect):
                 self.record_target(label)
     return FixedPlaintext
 
-def basic_proxy_handler(origin, authority, name, expected):
+def authenticated_proxy_handler(origin, authority, name, expected, digest):
     """Authenticate only the absolute HTTP request or CONNECT on this fixed listener."""
-    class BasicProxy(origin):
+    class AuthenticatedProxy(origin):
         def parse_request(self):
             if not super().parse_request():
                 return False
@@ -160,23 +161,47 @@ def basic_proxy_handler(origin, authority, name, expected):
                 assert target.path in (self.server.api + "/albums", "/socket.io/")
                 assert self.headers.get_all("x-api-key") == ["synthetic"]
                 operation = "inventory" if target.path.endswith("/albums") else "polling" + self.command
-            valid = len(supplied) == 1 and hmac.compare_digest(supplied[0], expected)
-            credentials = "correct" if valid else "incorrect" if supplied else "absent"
-            allowed = ((name == "http-basic-connect-refused" and operation != "connect")
-                       or (valid and name != "http-basic-other-scheme"))
+            if digest:
+                body = b""
+                if self.command == "POST" and digest.qop == "auth-int":
+                    size = int(self.headers["Content-Length"])
+                    assert 0 < size <= 1024 and "Transfer-Encoding" not in self.headers
+                    self.original_body = body = self.rfile.read(size)
+                    assert len(body) == size
+                credentials, form = digest.check(supplied, method=self.command, target=self.path, body=body)
+                if credentials == "correct":
+                    assert form == ("authority" if operation == "connect" else "absolute")
+                allowed = credentials == "correct"
+                challenge = digest.challenge
+            else:
+                valid = len(supplied) == 1 and hmac.compare_digest(supplied[0], expected)
+                credentials = "correct" if valid else "incorrect" if supplied else "absent"
+                allowed = ((name == "http-basic-connect-refused" and operation != "connect")
+                           or (valid and name != "http-basic-other-scheme"))
+                challenge = ('Digest realm="private, Basic realm", nonce="fixture", algorithm=unavailable'
+                             if name == "http-basic-other-scheme" else 'Basic realm="fixture"')
             with self.server.lock:
                 self.server.auth_attempts.append((operation, credentials, "allow" if allowed else "407"))
             if allowed:
                 del self.headers["Proxy-Authorization"]
                 return True
-            challenge = ('Digest realm="private, Basic realm", nonce="fixture"'
-                         if name == "http-basic-other-scheme" else 'Basic realm="fixture"')
             self.close_connection = True
             self.body(b"", 407, {"Proxy-Authenticate": challenge, "Connection": "close"})
             return False
-    return BasicProxy
+        def do_POST(self):
+            if not hasattr(self, "original_body"):
+                return super().do_POST()
+            # Pass the exact bytes already read to verify auth-int to the ordinary origin handler.
+            original_stream = self.rfile
+            try:
+                self.rfile = io.BytesIO(self.original_body)
+                del self.original_body
+                super().do_POST()
+            finally:
+                self.rfile = original_stream
+    return AuthenticatedProxy
 
-def check_basic_attempts(name, attempts, trace, stats):
+def check_http_auth_attempts(name, attempts, trace, stats):
     """Verify every observed retry and return whether the session was refused."""
     operations = {op for op, _, _ in attempts}
     if name == "http-basic-bypass":
@@ -190,15 +215,15 @@ def check_basic_attempts(name, attempts, trace, stats):
         assert not trace["Event"] and not stats["tunneledUpgrades"] and trace["Inventory"] >= 3
         assert trace["UpgradeDeclined Status(407)"] == 1
         return True
-    refused = name in ("http-basic-refused", "http-basic-other-scheme")
+    refused = name.endswith("-refused") or name == "http-basic-other-scheme"
     step = [("absent", "407")]
     if refused:
         assert operations == {"inventory", "pollingGET"} and not stats["openingRequests"]
         assert not trace["Inventory"] and not trace["Event"] and not stats["tunneledUpgrades"]
-        if name == "http-basic-refused":
+        if name.endswith("-refused"):
             step.append(("incorrect", "407"))
     else:
-        assert name == "http-basic-proxy" and operations == {"inventory", "pollingGET", "pollingPOST", "connect"}
+        assert operations == {"inventory", "pollingGET", "pollingPOST", "connect"}
         step.append(("correct", "allow"))
     for operation in operations:
         observed = [(credentials, status) for op, credentials, status in attempts if op == operation]
