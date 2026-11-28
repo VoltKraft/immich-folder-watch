@@ -169,6 +169,69 @@ and [package and notice inventory](../../tools/rust-qa/plasma/ubuntu-amd64.tsv).
 
 ## Reproduction
 
+### Open, Restart and Quit from the Plasma menu
+
+The shipping Linux application exports three menu entries in the order
+Open GUI, Restart and Quit. A right-click asks the Plasma panel to show
+them. The Rust fixture exports the same IDs and supplies the current
+editor language through the StatusNotifierItem's `Menu` property and
+`com.canonical.dbusmenu`.
+[Shipping exporter](../../src/ImmichFolderWatch.App.Linux/Platform/StatusNotifierItem.cs) ·
+[Rust exporter](../../tools/rust-qa/gui/src/linux_tray_menu.rs).
+
+With the audited Noble userspace, the offline Rust GUI build and the
+reviewed worker sources available, stage the paired executables and run
+the menu trial from the repository root. Use a new name for each build.
+
+```sh
+python3 -B tools/rust-qa/performance/build_worker.py --name plasma-menu
+subject=artifacts/rust/performance/subjects/plasma-menu
+python3 -B tools/rust-qa/plasma/run.py --binary "$subject/native-gui-assessment" \
+  --worker "$subject/ifw-performance-worker" --restart-watcher
+```
+
+The observer uses a fresh private X server, D-Bus and synthetic media
+directory. It unloads and reloads the guest KDED watcher module, observes
+the original GUI's registration, then selects the three commands on the
+panel. It checks the foreground window, the language change, both worker
+processes and the final removal of the tray entry. The `plasma/runs`
+directory retains each run's inputs, screenshots, bus trace and results.
+[Launcher](../../tools/rust-qa/plasma/run.py) ·
+[Menu observer](../../tools/rust-qa/plasma/menu.py).
+
+#### Native Linux x64 menu and watcher reload
+
+Two fresh private Plasma sessions on x64 completed all three physical menu
+selections. KDED unloaded and reloaded the watcher plugin on its existing
+bus connection. In the second trace the watcher name lost owner `:1.5`,
+regained that owner and received a new registration from the original
+background GUI. The GUI stayed hidden with its original worker until Open.
+
+| Selection | Observation on the second desktop |
+| --- | --- |
+| GUI öffnen | KWin activated the original editor window `0x1a00002` of PID 94. Clicking its English language button changed the menu revision from 1 to 2. The next popup displayed Open GUI, Restart and Quit. |
+| Restart | Worker 100 exited normally before the GUI announced its new child 299. Its first inventory found two new files and the next found both unchanged. |
+| Quit | Worker 299 exited normally. The primary drained and exited with code 0. KDED's item list was empty afterwards. |
+
+The panel's own popup received all three clicks. The observations bind the
+drawn rows and pointer coordinates to its X11 window and to each menu event
+on the original bus. The panel exposed no accessible child rows for this
+popup. The German and English popup images were byte-identical across the
+two sessions.
+
+Both sessions used the same Ubuntu-linked executable
+`8c8bfba1496d0b74424e6c316de6f8d58a488e6ebec6e89643384de88aecfb12`
+and inventory worker `1df5522e13556332eb87523337eb4178f28765e4caa67d5945c3a4b38d94f5b0`.
+The reports in `artifacts/rust/plasma/runs/plasma-oyacr1cj/` and
+`plasma-18cgqlq_/` have SHA-256
+`0081520fcacec4d932f3ee14a7f527da3ae1a4fdd7ccf00622f82a979815258c`
+and `c094cea2e7c1797357077a2221dc4d796f8e45aa1d9f5495bd5afb48f712e728`.
+The second menu bus trace has SHA-256
+`641ecc655075fb3a3849206026aedfbc91fa71bce19f09c72496341a538c990b`.
+The native ARM64 run of this three-command trial is pending.
+
+### Panel activation and artwork
+
 In the desktop runs at `549066f` and `ba02f8b`, the public binary-pool
 request received HTTP 403 on both architectures after fetching Ubuntu Base.
 The corresponding Noble source acquisitions also received HTTP 403. The

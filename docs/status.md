@@ -14,14 +14,25 @@ held-file upload cases. Independent reconstruction reproduced the 446-package
 SPDX inventory and the notices archive byte for byte.
 [Native ARM64 compiler and archive comparison](rust/rw02-combined-profile.md#native-ubuntu-arm64-digest-inventory-at-378b36a).
 
-The local 4 GiB Windows x64 VM refused an ordinary NTFS replacement of
-two open synthetic configuration files at `fa337fa`. Independent readback
-confirmed the original names, file IDs and bytes. The Rust tray receiver
-now implements the shipping menu commands. Both Windows targets passed
-cross-target Clippy. Physical selection of all three menu commands in a
-single local Explorer session still needs a native result.
+The local 4 GiB Windows x64 VM passed all three physical Explorer menu
+selections with the GUI from `56b7ae8`. Open focused the original editor,
+Restart drained worker 3412 before spawning worker 6396, and Quit ended
+both processes and removed the icon. Offline replay passed. The same VM
+previously refused an ordinary NTFS replacement of two open synthetic
+configuration files at `fa337fa`. Independent readback confirmed the
+original names, file IDs and bytes.
 [NTFS save trial](rust/rw02-cross-session.md#ordinary-replacement-of-two-rust-owned-config-files-on-ntfs) ·
-[Explorer menu trial](rust/rw02-windows-services.md#native-notification-area-menu).
+[Explorer menu trial](../tools/rust-qa/windows-launcher/tray-menu.md#local-server-2025-result-at-56b7ae8).
+
+On Fedora x64 the hidden Linux GUI registered with five successive private
+watcher owners. Only the two current accepting owners made its tray
+available. The GUI stayed hidden through both late replies and drained on
+desktop Quit. On two isolated Plasma desktops the x64 GUI registered
+again after a KDED module reload. Physical Open, Restart and Quit worked.
+The English editor button updated the visible menu. The three-command
+trial on native Linux ARM64 is pending.
+[Five watcher owners](rust/rw02-linux-services.md#watcher-handover-in-the-original-background-gui) ·
+[Original panel captures and worker results](rust/rw02-plasma.md#native-linux-x64-menu-and-watcher-reload).
 
 On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
 GUI from a background start and reopened its original window after close.

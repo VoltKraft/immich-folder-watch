@@ -36,6 +36,32 @@ of the later Documents reference-build failure.
 The separate GUI assessment covers native window close and Wayland presentation.
 [Native GUI evidence](rw02-native-gui.md)
 
+### Watcher handover in the original background GUI
+
+On Fedora x64, five separate owners requested or released the watcher name
+while the same Rust GUI stayed hidden. The first owner delayed its reply.
+The second accepted registration before that delayed reply arrived.
+Another delayed reply arrived after the fourth owner had already refused
+registration. The GUI accepted only the second and fifth owners. D-Bus
+serials 7, 9, 20, 23 and 27 identify the requests and their matching replies.
+The original GUI exited on desktop Quit without mapping a window.
+
+The executable SHA-256 was
+`9ffe6349d5d7a56ef652ef823bd174ff9ef366a50e21c3708f3b8bdb47f4d3fc`.
+The report under `artifacts/rust/linux-services/gui-watcher-9ffe634/replay-01/`
+has SHA-256 `2512d739db79b7765dc915800f5f0f994c0555548f5af5b14bdf4597392d6c7f`.
+The original bus trace has SHA-256
+`5da695ecdf97b8d1cd72abaeaff3bacbb1f8fdda3d1fe3cef96533a17c5c033e`.
+Run the observer against a matching native build and a fresh output directory.
+[GUI observer](../../tools/rust-qa/linux-services/gui_watcher.py) ·
+[Panel test](rw02-plasma.md#open-restart-and-quit-from-the-plasma-menu).
+
+```sh
+python3 -B tools/rust-qa/linux-services/gui_watcher.py \
+  --gui artifacts/rust/gui-build/release/native-gui-assessment \
+  --output artifacts/rust/linux-services/tray-gui-handover
+```
+
 ## Actual Documents grant
 
 The driver ran the packaged `xdg-document-portal` 1.22.1-2.fc45, its real

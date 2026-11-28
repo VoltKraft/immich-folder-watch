@@ -21,8 +21,12 @@ def main():
     parser.add_argument("--userspace", type=Path, help="private, audited Ubuntu Noble guest root")
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--blank-control", action="store_true", help="replay the frozen pre-IconPixmap native binary")
+    parser.add_argument("--worker", type=Path, help="run the three native menu commands with the paired inventory worker")
+    parser.add_argument("--restart-watcher", action="store_true", help="reload KDED's watcher before the menu selections")
     parser.add_argument("--output", type=Path, default=ART / "runs")
     args = parser.parse_args()
+    if args.restart_watcher and not args.worker:
+        parser.error("--restart-watcher requires the menu trial and its worker")
     arch = native_architecture()
     guest = (args.userspace or ART / f"guest-{arch}").resolve(strict=True)
     if not guest.is_relative_to(ART) or "VERSION_CODENAME=noble" not in (guest / "usr/lib/os-release").read_text().splitlines():
@@ -53,6 +57,18 @@ def main():
             raise ValueError("Unexpected historical control build")
     elif build["sources"].get(icon.relative_to(ROOT).as_posix()) != sha(icon) or any(sha(ROOT / p) != v for p, v in build["sources"].items()):
         raise ValueError("Rebuild the matching native GUI from the current audited source")
+    menu_inputs = None
+    if args.worker:
+        worker = args.worker.resolve(strict=True)
+        if args.blank_control or worker != binary.with_name("ifw-performance-worker"):
+            parser.error("Supply the worker beside its paired current GUI")
+        verify_elf(worker, arch)
+        receipt = worker.with_name("worker.inputs.json")
+        pair = json.loads(receipt.read_bytes())
+        if (sha(worker) != pair["worker_sha256"] or sha(binary) != pair["gui_sha256"]
+                or any(sha(ROOT / path) != digest for path, digest in pair["sources"].items())):
+            raise ValueError("The worker, GUI or reviewed worker sources differ from the paired build")
+        menu_inputs = {"worker": sha(worker), "receipt": sha(receipt), "restartWatcher": args.restart_watcher}
     args.output.mkdir(exist_ok=True, parents=True)
     run = Path(tempfile.mkdtemp(prefix="plasma-", dir=args.output)).resolve()
     (run / "machine-id").write_text(uuid.uuid4().hex + "\n")
@@ -60,9 +76,9 @@ def main():
     (run / "group").write_text(f"root:x:0:\nfixture:x:{os.getgid()}:\n")
     namespaces = {n: os.readlink(f"/proc/self/ns/{n}") for n in ("user", "mnt", "pid", "net", "ipc", "uts")}
     (run / "inputs.json").write_text(json.dumps({"binary": build["binary_sha256"], "target": build["target"],
-        "build": sha(manifest), "blankControl": args.blank_control, "icon": sha(icon), "ubuntuReview": sha(review_file),
+        "build": sha(manifest), "blankControl": args.blank_control, "menu": menu_inputs, "icon": sha(icon), "ubuntuReview": sha(review_file),
         "brandingSvg": sha(ROOT / "assets/branding/logo.svg"),
-        "drivers": {p.name: sha(p) for p in (Path(__file__), HERE / "prepare.py", HERE / "audit.py", HERE / "observe.py", HERE / "brand.py",
+        "drivers": {p.name: sha(p) for p in (Path(__file__), HERE / "prepare.py", HERE / "audit.py", HERE / "observe.py", HERE / "menu.py", HERE / "brand.py",
                                               HERE.parent / "performance/session.py", HERE.parent / "performance/x11.py")},
         "namespaces": namespaces}, indent=2) + "\n")
     command = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv"]
@@ -88,6 +104,8 @@ def main():
         "GSETTINGS_BACKEND": "memory", "IFW_QA_ISOLATED": "1", "VK_DRIVER_FILES": "/usr/share/vulkan/icd.d/lvp_icd.json"}
     for key, value in environment.items():
         command += ["--setenv", key, value]
+    if menu_inputs:
+        command += ["--ro-bind", str(worker), "/app/ifw-performance-worker", "--setenv", "LP_NUM_THREADS", "2"]
     print(run, flush=True)
     subprocess.run([*command, "--chdir", "/qa", "--", "/usr/bin/python3", "/app/fixture/observe.py"], check=True)
 

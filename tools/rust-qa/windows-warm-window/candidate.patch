@@ -69,7 +69,7 @@
                  return;
              }
 @@ -101,6 +123,11 @@
-             Command::Quit => self.lifecycle.request_quit(),
+             }
              Command::DestroyGraphics => {
                  self.graphics.request_test_fault();
 +                None

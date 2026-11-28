@@ -249,6 +249,9 @@ to reconcile project decisions, defaults, and recorded state.
   read-only [Windows contrast baseline](docs/rust/rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
   The Plasma fixture uses separate audited Ubuntu package sets for x64 and
   ARM64. Run its native GUI and panel on the matching architecture.
+  For [Linux tray menu changes](docs/rust/rw02-plasma.md#open-restart-and-quit-from-the-plasma-menu),
+  follow the original GUI and both inventory workers through the three
+  Plasma menu selections after the private KDED watcher reloads.
   Use the dedicated native service fixtures with disposable profiles.
   For [installed Windows activation](tools/rust-qa/windows-msi-interop/reverse/README.md)
   and [live worker backup](docs/development.md#installed-windows-worker-backup),

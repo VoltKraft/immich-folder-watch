@@ -50,6 +50,22 @@ close. Both cases preserved the inventory worker, acquired keyboard
 focus and removed the tray icon on Quit.
 [Native callbacks and raw guest archive](rw02-windows-services.md#both-explorer-starts-on-windows-server-2025).
 
+In a separate local x64 session, the three physical Explorer menu selections
+at `56b7ae8` focused the original GUI, replaced its worker and drained both
+processes on Quit. The observer verified both worker exit codes, the final
+empty process job and removal of the original Shell icon. On Fedora x64 the
+background GUI accepted only the two current accepting watchers across five
+different owners and kept its window hidden through both delayed replies.
+[Explorer menu and replay](../../tools/rust-qa/windows-launcher/tray-menu.md#local-server-2025-result-at-56b7ae8) ·
+[Linux bus and process observations](rw02-linux-services.md#watcher-handover-in-the-original-background-gui).
+
+Two isolated x64 Plasma sessions passed the same three menu selections after
+the KDED watcher was unloaded and reloaded. The English editor button also
+changed the menu on screen. The second run preserved the original editor
+window and observed both inventories of the replacement worker before Quit.
+This three-command Linux ARM64 measurement remains open.
+[Native Plasma menu and worker observations](rw02-plasma.md#native-linux-x64-menu-and-watcher-reload).
+
 Windows Server 2022 x64 at `47fe26d` showed the registered background-start
 icon and its acknowledged color change at the same point. At `3c4d62c` the
 same hosted image delivered the Shell callback, showed and focused the

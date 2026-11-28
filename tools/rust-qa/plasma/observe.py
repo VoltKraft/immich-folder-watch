@@ -115,27 +115,12 @@ def capture(name, rect=None):
                 "pngSha256": hashlib.sha256((WORK / (name + ".png")).read_bytes()).hexdigest()}
 
 
-def click_item(x, shell_pid, number):
-    def button(name="Desktop input probe"):
-        found = [describe(n) for n in desktop_nodes(shell_pid) if n.get_name() == name
-                 and n.get_role() == Atspi.Role.PUSH_BUTTON and n.get_state_set().contains(Atspi.StateType.SHOWING)]
-        bounded = [n for n in found if 0 <= n["rect"][0] < 1280 and 0 <= n["rect"][1] < 900
-                   and 8 <= n["rect"][2] <= 180 and 8 <= n["rect"][3] <= 128]
-        return bounded[0] if len(bounded) == 1 else None
-    item = wait_for(button, 8, "No unique visible Plasma tray button for the subject")
-    left, top, width, height = item["rect"]
-    px, py = left + width // 2, top + height // 2
+def move_pointer(x, px, py):
     xtest, xlib = c.CDLL("libXtst.so.6"), c.CDLL("libX11.so.6")
     motion = bind(xtest, "XTestFakeMotionEvent", c.c_int, c.c_void_p, c.c_int, c.c_int, c.c_int, c.c_ulong)
-    press = bind(xtest, "XTestFakeButtonEvent", c.c_int, c.c_void_p, c.c_uint, c.c_int, c.c_ulong)
     window, integer = c.c_ulong, c.c_int
     query = bind(xlib, "XQueryPointer", integer, c.c_void_p, window, c.POINTER(window), c.POINTER(window),
                  *([c.POINTER(integer)] * 4), c.POINTER(c.c_uint))
-    icon = capture(f"tray-item-{number}", item["rect"])
-    control = wait_for(lambda: button("Expand System Tray"), 4, "The neighbouring Plasma tray control is missing")
-    control_pixels = capture(f"tray-control-{number}", control["rect"])
-    if control_pixels["rgbColors"] < 2:
-        raise ValueError("The panel screenshot failed to resolve a known drawn tray control")
     if not motion(x.display, 0, px, py, 0):
         raise RuntimeError("Synthetic pointer motion failed")
     x.sync(x.display, 0)
@@ -149,17 +134,53 @@ def click_item(x, shell_pid, number):
             break
         target = child.value
         path.append((target, properties(target)))
-    docks = [w for w, p in path if re.search(rf"_NET_WM_PID\(CARDINAL\) = {shell_pid}$", p, re.MULTILINE)
-             and "_NET_WM_WINDOW_TYPE_DOCK" in p]
-    if len(docks) != 1 or docks[0] != target or button() != item:
-        raise RuntimeError(f"Tray click did not hit the verified Plasma panel: {path}")
-    if not press(x.display, 1, 1, 0) or not press(x.display, 1, 0, 0):
+    return target, path
+
+
+def press_button(x, button_number):
+    xtest = c.CDLL("libXtst.so.6")
+    press = bind(xtest, "XTestFakeButtonEvent", c.c_int, c.c_void_p, c.c_uint, c.c_int, c.c_ulong)
+    if not press(x.display, button_number, 1, 0) or not press(x.display, button_number, 0, 0):
         raise RuntimeError("Native tray click failed")
     x.sync(x.display, 0)
-    return {**item, "point": [px, py], "panelXid": hex(docks[0]), "pixels": icon, "neighbour": control_pixels}
 
 
-def run(stack, report, blank):
+def click_item(x, shell_pid, number, button_number=1):
+    def button(name="Desktop input probe"):
+        found = [describe(n) for n in desktop_nodes(shell_pid) if n.get_name() == name
+                 and n.get_role() == Atspi.Role.PUSH_BUTTON and n.get_state_set().contains(Atspi.StateType.SHOWING)]
+        bounded = [n for n in found if 0 <= n["rect"][0] < 1280 and 0 <= n["rect"][1] < 900
+                   and 8 <= n["rect"][2] <= 180 and 8 <= n["rect"][3] <= 128]
+        return bounded[0] if len(bounded) == 1 else None
+    def stable_target():
+        item = button()
+        neighbour = button("Expand System Tray")
+        if not item or not neighbour:
+            return None
+        left, top, width, height = item["rect"]
+        px, py = left + width // 2, top + height // 2
+        target, path = move_pointer(x, px, py)
+        docks = [w for w, p in path if re.search(rf"_NET_WM_PID\(CARDINAL\) = {shell_pid}$", p, re.MULTILINE)
+                 and "_NET_WM_WINDOW_TYPE_DOCK" in p]
+        if docks != [target] or button() != item:
+            return None
+        icon = capture(f"tray-item-{number}", item["rect"])
+        control_pixels = capture(f"tray-control-{number}", neighbour["rect"])
+        if control_pixels["rgbColors"] < 2:
+            return None
+        if button_number == 3 and (icon["goldPixels"] < 12 or icon["rgbColors"] < 8):
+            return None
+        if button() != item or move_pointer(x, px, py)[0] != target:
+            return None
+        return {**item, "point": [px, py], "panelXid": hex(target), "pixels": icon, "neighbour": control_pixels}
+
+    # The panel can still be arranging its items after a watcher reload.
+    item = wait_for(stable_target, 10, "No stable drawn subject icon on the original Plasma panel")
+    press_button(x, button_number)
+    return item
+
+
+def run(stack, report, blank, menu):
     bus = session(stack)
     arch = native_architecture()
     if report["target"] != os.uname().machine + "-unknown-linux-gnu":
@@ -196,7 +217,15 @@ def run(stack, report, blank):
         return call(bus, watcher["owner"], "/StatusNotifierWatcher", "org.freedesktop.DBus.Properties", "Get",
                     GLib.Variant("(ss)", (WATCHER, "RegisteredStatusNotifierItems")))[0]
     report["itemsBefore"] = items()
-    subject = start("gui", ["/app/native-gui-assessment", "--background"])
+    command = ["/app/native-gui-assessment", "--background"]
+    if menu:
+        from session import fresh_profile
+        media = WORK / "files"
+        media.mkdir()
+        (media / "first.jpg").touch()
+        profile = fresh_profile(WORK / "profile", media)
+        command = ["/usr/bin/env", "XDG_CONFIG_HOME=" + profile["XDG_CONFIG_HOME"], "IFW_QA_BENCHMARK=1", *command]
+    subject = start("gui", command)
     app = wait_owner(ITEM)
     if app["pid"] != subject.pid:
         raise ValueError("Unexpected GUI service owner")
@@ -239,6 +268,12 @@ def run(stack, report, blank):
         hidden()
         time.sleep(.12)
     capture("panel-hidden")
+    if menu:
+        from menu import exercise
+        exercise(stack, x, bus, subject, shell.pid, app, item, report, menu["restartWatcher"])
+        wait_for(lambda: canonical not in items(), 5, "The menu Quit left the item registered")
+        report["itemsAfterQuit"] = items()
+        return
     report["activations"] = []
     for number in (1, 2):
         interaction = click_item(x, shell.pid, number)
@@ -298,7 +333,7 @@ def main():
     report = {"passed": False, "target": inputs["target"], "guiSha256": inputs["binary"], "blankControl": inputs["blankControl"]}
     try:
         with ExitStack() as stack:
-            run(stack, report, inputs["blankControl"])
+            run(stack, report, inputs["blankControl"], inputs.get("menu"))
             report["passed"] = True
     except Exception as error:
         report["error"] = str(error)

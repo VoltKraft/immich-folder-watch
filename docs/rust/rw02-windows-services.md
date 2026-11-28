@@ -863,6 +863,13 @@ open until it exits through Quit.
 [Local Explorer test and replay](../../tools/rust-qa/windows-launcher/tray-menu.md) ·
 [Delivery tests](../../tools/rust-qa/gui/tests/windows_tray.rs).
 
+The local Server 2025 x64 console passed all three physical selections
+with the original executable from `56b7ae8`. Open focused the original
+editor, Restart replaced its worker after the first process exited, and
+Quit drained both the GUI and its replacement worker. Explorer removed
+the icon. The offline observer reproduced the results from the guest logs.
+[Original process and window observations](../../tools/rust-qa/windows-launcher/tray-menu.md#local-server-2025-result-at-56b7ae8).
+
 ## Canonical GUI startup on the staged Windows desktop at 13e4af8
 
 On x64 and ARM64 the ordinary launcher primary on Default, the launcher

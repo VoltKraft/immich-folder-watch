@@ -33,11 +33,17 @@ use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 
+#[cfg(target_os = "linux")]
+use linux::TrayLanguage;
+#[cfg(windows)]
+use native_gui_assessment::TrayLanguage;
+
 #[derive(Clone, Copy, Debug)]
 enum Command {
-    #[cfg(windows)]
     RestartWorker,
-    #[cfg(target_os = "windows")]
+    #[cfg(target_os = "linux")]
+    TrayStatusChanged,
+    #[cfg(windows)]
     TrayAvailability(bool),
     #[cfg(target_os = "windows")]
     ObserveTrayOpen(u32),
@@ -90,10 +96,10 @@ enum ControlId {
 }
 
 struct Model {
-    #[cfg(windows)]
     restarts: Option<benchmark::Restarts>,
-    #[cfg(windows)]
-    tray_language: Option<native_gui_assessment::TrayLanguage>,
+    tray_language: Option<TrayLanguage>,
+    #[cfg(target_os = "linux")]
+    tray_status: Arc<std::sync::atomic::AtomicBool>,
     #[cfg(target_os = "windows")]
     ime_sample: Option<u8>,
     #[cfg(windows)]
@@ -113,8 +119,14 @@ struct Model {
 
 impl Model {
     fn command(&mut self, command: Command) -> Option<HostCommand> {
+        #[cfg(target_os = "linux")]
+        {
+            // An already queued command also delivers the latest watcher state
+            // if its dedicated wake found the bounded GUI queue full.
+            let available = self.tray_status.load(std::sync::atomic::Ordering::Acquire);
+            self.lifecycle.tray_result(available);
+        }
         let action = match command {
-            #[cfg(windows)]
             Command::RestartWorker => {
                 if self.lifecycle.shutdown() == Shutdown::Running
                     && let Some(restarts) = self.restarts.as_ref()
@@ -123,7 +135,9 @@ impl Model {
                 }
                 None
             }
-            #[cfg(target_os = "windows")]
+            #[cfg(target_os = "linux")]
+            Command::TrayStatusChanged => None,
+            #[cfg(windows)]
             Command::TrayAvailability(available) => self.lifecycle.tray_result(available),
             #[cfg(target_os = "windows")]
             Command::ObserveTrayOpen(ordinal) => {
@@ -139,7 +153,12 @@ impl Model {
             }
             Command::Open => self.lifecycle.activate(),
             Command::Close => self.lifecycle.close_window(),
-            Command::Quit => self.lifecycle.request_quit(),
+            Command::Quit => {
+                if let Some(restarts) = &self.restarts {
+                    restarts.begin_quit();
+                }
+                self.lifecycle.request_quit()
+            }
             Command::DestroyGraphics => {
                 self.graphics.request_test_fault();
                 None
@@ -352,7 +371,6 @@ impl eframe::App for Window {
             let language = ui.add(button);
             if language.clicked() {
                 model.german = !de;
-                #[cfg(windows)]
                 if let Some(language) = model.tray_language.as_ref() {
                     language.set_german(model.german);
                 }
@@ -516,11 +534,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         lifecycle.window_intent(),
         lifecycle.tray()
     );
+    #[cfg(target_os = "linux")]
+    let assessment = benchmark::Benchmark::start()?;
     let model = Rc::new(RefCell::new(Model {
-        #[cfg(windows)]
         restarts: assessment.restarts(),
         #[cfg(windows)]
         tray_language: native.tray.as_ref().map(|tray| tray.language.clone()),
+        #[cfg(target_os = "linux")]
+        tray_language: Some(native.tray_language()),
+        #[cfg(target_os = "linux")]
+        tray_status: native.tray_status(),
         #[cfg(target_os = "windows")]
         ime_sample: None,
         #[cfg(windows)]
@@ -537,8 +560,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         last_focus: None,
         restore_focus: false,
     }));
-    #[cfg(target_os = "linux")]
-    let assessment = benchmark::Benchmark::start()?;
     let result = supervise(
         Rc::clone(&model),
         &control,

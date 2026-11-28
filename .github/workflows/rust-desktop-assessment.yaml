@@ -305,6 +305,7 @@ jobs:
           python3 -B tools/rust-qa/appearance/linux.py --binary artifacts/rust/gui-build/release/native-gui-assessment
 
       - name: Activate the visible native tray icon from the Plasma panel on Ubuntu
+        id: plasma
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: |
           python3 -B tools/rust-qa/plasma/prepare.py --acquire
@@ -360,6 +361,13 @@ jobs:
       - name: Observe StatusNotifierItem loss, replacement and activation
         if: ${{ !cancelled() && steps.linux_services.outcome == 'success' }}
         run: python3 tools/rust-qa/linux-services/native.py tray
+
+      - name: Check the original hidden GUI across five watcher owners
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
+        run: |
+          python3 -B tools/rust-qa/linux-services/gui_watcher.py \
+            --gui artifacts/rust/gui-build/release/native-gui-assessment \
+            --output artifacts/rust/linux-services/tray-gui-handover
 
       - name: Build the shipping Documents grant reference
         id: portal_oracle
@@ -484,6 +492,13 @@ jobs:
       - name: Reopen the Linux GUI by launching its ordinary executable while the inventory worker runs
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.worker.outcome == 'success' }}
         run: python3 -B tools/rust-qa/performance/worker/check_hidden.py graphics-ci --second-launch
+
+      - name: Select Open, Restart and Quit after reloading the private Plasma watcher
+        if: ${{ !cancelled() && runner.os == 'Linux' && steps.worker.outcome == 'success' && steps.plasma.outcome == 'success' }}
+        run: |
+          subject=artifacts/rust/performance/subjects/graphics-ci
+          python3 -B tools/rust-qa/plasma/run.py --binary "$subject/native-gui-assessment" \
+            --worker "$subject/ifw-performance-worker" --restart-watcher
 
       - name: Rebuild the native installed-worker backup helper from cached inputs
         id: installed_backup
