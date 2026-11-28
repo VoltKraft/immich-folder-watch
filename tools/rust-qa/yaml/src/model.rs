@@ -56,7 +56,7 @@ legacy_mapping! {
 
 legacy_mapping! {
     struct RawImmich {
-        allow_insecure_http: Option<bool> => "allowInsecureHttp",
+        allow_insecure_http: RawFlag => "allowInsecureHttp",
         server_api_url: Option<String> => "serverApiUrl",
         api_key: Option<String> => "apiKey",
     }
@@ -77,12 +77,12 @@ legacy_mapping! {
     struct RawSource {
         path: Option<String> => "path",
         album_name: Option<String> => "albumName",
-        include_subdirectories: Option<bool> => "includeSubdirectories",
+        include_subdirectories: RawFlag => "includeSubdirectories",
         extensions: Option<Vec<Option<String>>> => "extensions",
         exclude_directories: Option<Vec<Option<String>>> => "excludeDirectories",
         exclude_file_names: Option<Vec<Option<String>>> => "excludeFileNames",
         sync_mode: Option<String> => "syncMode",
-        delete_after_upload: Option<bool> => "deleteAfterUpload",
+        delete_after_upload: RawFlag => "deleteAfterUpload",
     }
 }
 
@@ -93,15 +93,122 @@ legacy_mapping! {
     }
 }
 
+// Quoted values retain their spelling. Untagged plain numbers and booleans
+// can already have their native representation from the YAML reader.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LegacyScalar<T> {
+    Value(T),
+    Text(String),
+}
+
+impl<T> LegacyScalar<T> {
+    fn read<'de, D>(input: D, native_tag: &str) -> Result<(Option<Self>, bool), D::Error>
+    where
+        D: serde::Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        let serde_saphyr::Tagged(value, tag) =
+            serde_saphyr::Tagged::<Option<Self>>::deserialize(input)?;
+        let string_conversion = match tag.as_deref() {
+            Some("tag:yaml.org,2002:str") => true,
+            None | Some("!" | "tag:yaml.org,2002:null") => false,
+            Some(tag) if tag == native_tag => false,
+            _ => {
+                return Err(serde::de::Error::custom(
+                    "unexpected configuration scalar tag",
+                ));
+            }
+        };
+        Ok((value, string_conversion))
+    }
+}
+
 // A missing integer keeps its C# class initializer. An explicit null assigns zero.
 #[derive(Default)]
 struct RawInteger(Option<i32>);
 
+fn legacy_integer(text: &str) -> Option<i32> {
+    let (negative, digits) = match text.as_bytes().first() {
+        Some(b'-') => (true, &text[1..]),
+        Some(b'+') => (false, &text[1..]),
+        _ => (false, text),
+    };
+    let magnitude = if digits.starts_with('0') && digits.len() > 1 {
+        let (radix, suffix) = match digits.as_bytes()[1] {
+            b'b' => (2, &digits[2..]),
+            b'x' => (16, &digits[2..]),
+            _ => (8, &digits[1..]),
+        };
+        u64::from_str_radix(&suffix.replace('_', ""), radix).ok()?
+    } else {
+        // YamlDotNet treats each following decimal component as a base-60 digit.
+        let mut number = 0u64;
+        for (i, component) in digits.split(':').enumerate() {
+            let part = component.replace('_', "");
+            let part = part.trim_ascii().parse::<u64>().ok()?;
+            if i != 0 && part >= 60 {
+                return None;
+            }
+            number = number.checked_mul(60)?.checked_add(part)?;
+        }
+        number
+    };
+    let number = i64::try_from(magnitude).ok()?;
+    i32::try_from(if negative { -number } else { number }).ok()
+}
+
 impl<'de> Deserialize<'de> for RawInteger {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Ok(Self(Some(
-            Option::<i32>::deserialize(deserializer)?.unwrap_or(0),
-        )))
+        let (value, tagged_string) = LegacyScalar::read(deserializer, "tag:yaml.org,2002:int")?;
+        let number = match value {
+            None => 0,
+            Some(LegacyScalar::Value(number)) => number,
+            Some(LegacyScalar::Text(text)) => {
+                // A !!str tag supplies an actual String to .NET's property converter.
+                let number = if tagged_string {
+                    text.trim().parse().ok()
+                } else {
+                    legacy_integer(&text)
+                };
+                number.ok_or_else(|| {
+                    serde::de::Error::custom("invalid legacy configuration integer")
+                })?
+            }
+        };
+        Ok(Self(Some(number)))
+    }
+}
+
+#[derive(Default)]
+struct RawFlag(bool);
+
+impl<'de> Deserialize<'de> for RawFlag {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let (value, tagged_string) = LegacyScalar::read(deserializer, "tag:yaml.org,2002:bool")?;
+        let flag = match value {
+            None => false,
+            Some(LegacyScalar::Value(flag)) => flag,
+            Some(LegacyScalar::Text(text)) => {
+                // A tagged String uses Boolean.Parse; the ordinary YAML patterns allow
+                // legacy names and match just before a single final LF.
+                let value = if tagged_string {
+                    text.trim()
+                } else {
+                    text.strip_suffix('\n').unwrap_or(&text)
+                };
+                match (value.to_ascii_lowercase().as_str(), tagged_string) {
+                    ("true", _) | ("y" | "yes" | "on", false) => true,
+                    ("false", _) | ("n" | "no" | "off", false) => false,
+                    _ => {
+                        return Err(serde::de::Error::custom(
+                            "invalid legacy configuration boolean",
+                        ));
+                    }
+                }
+            }
+        };
+        Ok(Self(flag))
     }
 }
 
@@ -323,7 +430,7 @@ impl RawConfig {
                 Source {
                     path: rules.text(source.path, ""),
                     album_name: rules.text(source.album_name, ""),
-                    include_subdirectories: source.include_subdirectories.unwrap_or(false),
+                    include_subdirectories: source.include_subdirectories.0,
                     extensions: if extensions.is_empty() {
                         legacy.clone()
                     } else {
@@ -332,7 +439,7 @@ impl RawConfig {
                     exclude_directories: rules.list(source.exclude_directories, false),
                     exclude_file_names: rules.list(source.exclude_file_names, false),
                     sync_mode: rules.choice(source.sync_mode, &["uploadAll", "sync"], "uploadNew"),
-                    delete_after_upload: source.delete_after_upload.unwrap_or(false),
+                    delete_after_upload: source.delete_after_upload.0,
                 }
             })
             .collect();
@@ -340,7 +447,7 @@ impl RawConfig {
         let log_directory = rules.text(logging.log_directory, "logs");
         Config {
             immich: Immich {
-                allow_insecure_http: immich.allow_insecure_http.unwrap_or(false),
+                allow_insecure_http: immich.allow_insecure_http.0,
                 server_api_url: rules.text(immich.server_api_url, ""),
                 api_key: rules.text(immich.api_key, ""),
             },

@@ -41,6 +41,54 @@ and 228 C# readbacks.
 [Windows x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15206866464) ·
 [Windows ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15206786928).
 
+## Base-60 intervals in existing user profiles
+
+The signed Linux 3.0.4 reader accepts `batchIntervalSeconds: 1:30` as 90
+seconds and `fileReadyTimeoutSeconds: '1:05'` as 65 seconds. Its writer
+saves the integer in decimal. A string field such as `albumName: 12:30`
+retains its spelling. The previous Rust executable rejected both interval
+forms. In the other direction it accepted `includeSubdirectories: ' yes '`,
+which the shipping reader rejects.
+
+The Rust assessment now converts the legacy interval in integer properties
+and checks quoted Boolean spellings before accepting them. An explicitly
+tagged string follows the shipping property's string conversion. For example,
+`maxBatchSize: !!str '010'` is decimal 10. The untagged integer `010` is
+octal 8. The native corpus includes a three-part interval, an invalid
+base-60 digit, a clock-like album name and a padded Boolean.
+[Rust field conversion](../../tools/rust-qa/yaml/src/model.rs) ·
+[Shipping reference cases](../../tools/rust-qa/yaml/dotnet/Program.cs).
+
+The earlier executable and the signed Flatpak's original assemblies agreed
+on 31 of 34 ordinary inputs on Fedora x64. The cases included a 1.4.x-style
+global extension list, date- and number-like names, numeric settings and
+ordinary Boolean settings. The updated
+reader agreed on all 34. The local comparison used the supplied
+`ImmichFolderWatch.Core.dll` (SHA-256
+`22fd3d96b18f11a6bd018a3d378cbf7903140e1aed5bee2eb5a39c9a730a8e03`)
+and `YamlDotNet.dll` (SHA-256
+`d618138109a40e4a7250e49e2abad8c450e3636bee18d7499ab231e37fa9150a`)
+with .NET 10.0.12. [Original package identities](#reading-the-rust-output-with-the-delivered-304-flatpak-assemblies).
+
+The frozen Fedora x64 run preserved 93 C# inputs and passed 279 file-byte
+checks, 418 differential assertions and 236 C# readbacks. The 87 earlier
+case results matched the preceding run, and all 114 previously emitted
+YAML files were byte-identical. The current
+`artifacts/rust/yaml-assessment/runs/ordinary-intervals-fedorax64-04/result.json`
+has SHA-256 `4d5ac09e00640efad7862635f8c80aa0884f5af4dbf5a2025d4bc3d994ee035d`.
+The original signed 3.0.4 assemblies separately reopened, validated and
+resaved 14 unchanged or edited outputs from seven profiles. The readback
+under `artifacts/rust/yaml-assessment/ordinary-scalars-20261128/signed-guarded/readback.json`
+has SHA-256 `9c024fa5cb67e907c619b59cb3b65240160edb03825e312be72f3f656dfb9091`.
+
+A separate comparison of 24 additional spellings leaves six known
+differences. The shipping reader accepts `!!int 1:30` and `!!float 9.0`
+in an integer setting and accepts an explicitly tagged integer or Boolean
+in a string album name. It rejects the integer `0o25` and the explicitly
+tagged, padded Boolean `!!bool " yes "`. Each of these six already differed
+before the interval change. Windows and native ARM64 have separate
+qualification runs.
+
 ## Reading the original YAML file bytes
 
 The shipping loader calls `File.ReadAllText`. Its byte-order mark selects

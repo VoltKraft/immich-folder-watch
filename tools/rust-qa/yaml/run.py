@@ -82,6 +82,19 @@ def verify_encodings(profile: Path, cases: dict) -> None:
             raise ValueError(f"Unexpected original bytes or fallback for {name}")
 
 
+def verify_scalar_fields(exported):
+    inputs = {row["name"]: row for row in exported["cases"]}
+    intervals = inputs["legacy-intervals"]["editable"]
+    tagged = inputs["legacy-tagged-string"]["editable"]["watch"]
+    if (intervals["watch"]["batchIntervalSeconds"] != 90 or intervals["watch"]["fileReadyTimeoutSeconds"] != 65
+            or intervals["watch"]["sources"][0]["albumName"] != "12:30"
+            or intervals["retry"]["baseDelayMilliseconds"] != 3605
+            or tagged["maxBatchSize"] != 10 or tagged["sources"][0]["includeSubdirectories"] is not True
+            or any(inputs[name]["accepted"] for name in ("legacy-interval-invalid", "legacy-tagged-interval-string",
+                                                        "boolean-padded", "boolean-tagged-legacy-word"))):
+        raise ValueError("The shipping reader's typed interval or boolean conversion changed")
+
+
 def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust: dict, csharp: dict) -> None:
     if (exported["format"] != "ifw-rw02-yaml-reference-v2" or rust["format"] != "ifw-rw02-yaml-result-v2"
             or csharp["format"] != "ifw-rw02-yaml-readback-v2"):
@@ -292,6 +305,7 @@ def main() -> int:
         command("csharp-readback", [dotnet, str(assembly), "verify", str(reference), str(output / "rust-output")])
         result["rust"] = json.loads((output / "rust-output/result.json").read_text(encoding="utf-8"))
         result["csharp"] = json.loads((output / "rust-output/csharp-readback.json").read_text(encoding="utf-8"))
+        verify_scalar_fields(exported)
         verify_file_inputs(reference, output / "rust-output", exported, result["rust"], result["csharp"])
         if (result["rust"]["platform"] != native or result["rust"]["architecture"] != args.target.split("-")[0]
                 or exported["corpusAssertions"] != 10):
