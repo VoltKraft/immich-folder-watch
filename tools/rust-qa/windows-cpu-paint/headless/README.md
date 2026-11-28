@@ -24,7 +24,17 @@ python3 tools/rust-qa/windows-cpu-paint/upstream.py artifacts/rust/egui-cpu-asse
 python3 tools/rust-qa/windows-cpu-paint/headless/run.py artifacts/rust/egui-cpu-assessment/cache
 ```
 
-The runner verifies the native compiler, private GUI source trees and five font files. It compiles a frozen test copy with an isolated home, network namespace and read-only inputs. Each execution writes its 18 original BGRA files, compiler/test log and JSON report to a new directory under `artifacts/rust/egui-cpu-assessment/`. To repeat the channel comparisons without compiling, pass that directory's `pixels/` subdirectory to [pixels.py](pixels.py). Both commands return a failure on an incomplete frame, a failed edit/restore or a channel difference above two.
+The ordinary invocation reads the checked-in GUI and its sibling YAML library.
+It verifies the 385 registry archives and their compiler trees through the
+[ordinary directory-source verifier](../../gui/startup/vendor.py), the native
+compiler, private GUI text trees and five font files. One Cargo job compiles
+the frozen test copy with an isolated home, network namespace and read-only
+sources. Each run writes its 18 BGRA files, compiler/test log, registry receipt
+and JSON report under `artifacts/rust/egui-cpu-assessment/`.
+The report includes the SHA-256 of each first-party input and each rendered
+frame. To repeat the comparisons, pass the run's `pixels/` directory to
+[pixels.py](pixels.py). Both commands fail on incomplete frames, an edit or
+restore that produces unexpected pixels, or a channel difference above two.
 
 The original comparison used rustc 1.100.0 and llvmpipe with LLVM 23.1.5. Its `artifacts/rust/egui-cpu-view-local/pixel-comparison.json` has SHA-256 `1b9a7958707800295c5aabc4d7e5d5ac7eb3c214256da0ee6680e685bc578f01`, and `cpu-comparison.log` has SHA-256 `be7a48c5c2592dd8ed9b109c5d6a08d9797c7c9f655ec4f0c61a8600e4c9d4da`. Reconstructing the test from its staged GUI and the verified renderer archive reproduced all 18 original image files byte for byte. The ordinary application source SHA-256 was `a22d904d24eec3a7eabe543a176278ce46ed9f3ec2f90772d8137e5e03a201f9`.
 
@@ -108,17 +118,19 @@ With the local reviewed archives and combined receipt already present, run
 from the repository root.
 
 ```sh
-area=artifacts/rust/combined-profile
+area=artifacts/rust
+receipt=1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3
 python3 -B tools/rust-qa/windows-cpu-paint/headless/run.py \
   artifacts/rust/cpu-paint-cache \
   --build-cache artifacts/rust/egui-cpu-assessment/headless-build \
-  --startup-vendor "$area/startup-vendor/registry/src/reviewed" \
-  --combined-receipt "$area/runs/digest-native-2f63c15"
+  --startup-vendor "$area/gui-registry/$receipt/registry/src/reviewed" \
+  --combined-receipt "$area/combined-profile/runs/digest-native-2f63c15"
 ```
 
-The two startup arguments select the staged editor. The ordinary invocation
-above continues to reconstruct the original renderer control. In the local
-Fedora replay, both preparations matched all 30 respective original files,
+The two startup arguments select the historical staged editor and its
+`c63d91c` YAML library. Use `--original-control` with the renderer archive
+cache to reconstruct the same revision's original editor before adding the
+startup reader. In the local Fedora replay, both preparations matched all 30 respective original files,
 including the manifest and lock. The staged headless lock had SHA-256
 `b5a1e53f83d3f17811fc88bd0bdfed3b304b3ae8be2c95d337d4662ef771b8ca`.
 

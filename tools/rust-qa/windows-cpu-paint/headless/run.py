@@ -16,6 +16,8 @@ sys.path.insert(0, str(QA))
 sys.path.insert(0, str(HERE.parent))
 import upstream
 from gui import source_profile
+from gui.compiler_inputs import linux_project_sources
+from gui.startup import qualify, vendor
 
 from pixels import compare
 
@@ -36,11 +38,10 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def stage(out, *, startup_gui=None):
-    gui = startup_gui or GUI
-    subject_sha = STARTUP_SUBJECT_SHA if startup_gui else SUBJECT_SHA
-    lock_sha = STARTUP_LOCK_SHA if startup_gui else LOCK_SHA
-    patch = GUI / "startup/headless-view.patch" if startup_gui else HERE / "test-view.patch"
+def stage(out, gui, *, original_control=False):
+    subject_sha = SUBJECT_SHA if original_control else STARTUP_SUBJECT_SHA
+    lock_sha = LOCK_SHA if original_control else STARTUP_LOCK_SHA
+    patch = HERE / "test-view.patch" if original_control else GUI / "startup/headless-view.patch"
     if sha(gui / "src/main.rs") != subject_sha:
         raise ValueError("The ordinary application's source differs from the qualified Window::ui")
     out.mkdir()
@@ -52,19 +53,42 @@ def stage(out, *, startup_gui=None):
                     "--whitespace=error", str(patch)], cwd=out, check=True)
     for name in ("cpu_view_observation.rs", "view_gpu_reference.rs"):
         shutil.copyfile(HERE / name, out / "src" / name)
-    if startup_gui and (sha(out / "Cargo.toml") != STARTUP_MANIFEST_SHA
-                        or source_profile.tree_info(out / "src") != STARTUP_SOURCE_TREE):
+    if not original_control and (sha(out / "Cargo.toml") != STARTUP_MANIFEST_SHA
+                                 or source_profile.tree_info(out / "src") != STARTUP_SOURCE_TREE):
         raise ValueError("The startup editor instrumentation differs from the originally measured sources")
     if sha(out / "Cargo.lock") != lock_sha:
         raise ValueError("The headless test's lockfile changed")
+    return patch
 
 
-def run(cache, build, *, startup_vendor=None, combined_receipt=None):
+def project_inputs(project):
+    return {p.relative_to(project).as_posix(): sha(p) for p in linux_project_sources(project)}
+
+
+def stage_dependencies(project, inputs, destination):
+    # Give local path crates fresh mtimes even when reusing a target cache from a newer historical snapshot.
+    mounts = []
+    for relative in ("rust", "tools/rust-qa/yaml"):
+        if relative + "/Cargo.toml" not in inputs:
+            continue
+        for name, digest in inputs.items():
+            if name.startswith(relative + "/"):
+                path = destination / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(project / name, path)
+                if sha(path) != digest:
+                    raise ValueError(f"The staged first-party compiler input changed: {name}")
+        mounts.append((destination / relative, "/project/" + relative))
+    return mounts
+
+
+def run(cache, build, *, startup_vendor=None, combined_receipt=None, original_control=False):
     if sys.platform != "linux" or platform.machine() != "x86_64" or not ICD.is_file():
         raise ValueError(f"This headless reference requires Linux x64 and {ICD}")
     build = build.resolve()
     if not build.is_relative_to(AREA) or build == AREA:
         raise ValueError("The writable build cache must be inside artifacts/rust/")
+    runner_sha = sha(Path(__file__))
     compiler = subprocess.check_output([sys.executable, str(QA / "check-toolchain.py"),
                                         "x86_64-unknown-linux-gnu", "--rustc", str(AREA / "toolchain/bin/rustc")],
                                        text=True).strip()
@@ -79,27 +103,38 @@ def run(cache, build, *, startup_vendor=None, combined_receipt=None):
     source = trial / "source"
     pixels = trial / "pixels"
     pixels.mkdir()
-    startup_gui = None
+    gui = GUI
     startup_record = None
-    cargo_config = []
-    registry = [(AREA / "assessment-cache/registry", "/cargo/registry")]
-    rust = ROOT / "rust"
+    profile = "ordinary"
     if (startup_vendor is None) != (combined_receipt is None):
         raise ValueError("Supply both the startup directory source and its original combined receipt")
+    if startup_vendor is not None and original_control:
+        raise ValueError("Select one historical editor for the replay")
+    snapshot = trial / "startup"
     if startup_vendor is not None:
-        from gui.startup import qualify
-        vendor = startup_vendor.resolve(strict=True)
-        snapshot = trial / "startup"
-        qualify.assess(snapshot, vendor, combined_receipt.resolve(strict=True), AREA / "toolchain")
-        startup_gui = snapshot / "project/tools/rust-qa/gui"
-        rust = snapshot / "project/rust"
-        registry = [(vendor, "/reviewed"), (startup_gui.parent / "yaml", "/project/tools/rust-qa/yaml")]
-        cargo_config = qualify.source_config("/reviewed")
+        profile = "staged-startup"
+        directory = startup_vendor.resolve(strict=True)
+        qualify.assess(snapshot, directory, combined_receipt.resolve(strict=True), AREA / "toolchain")
+        gui = snapshot / "project/tools/rust-qa/gui"
+        receipt = snapshot / "registry-sources.json"
         startup_record = {"revision": qualify.BASE, "originalSourcesSha256": sha(snapshot / "original-sources.json"),
                           "supplySha256": sha(snapshot / "supply.json"), "registrySourcesSha256": sha(snapshot / "registry-sources.json"),
                           "patchSha256": sha(GUI / "startup/headless-view.patch"), "manifestSha256": STARTUP_MANIFEST_SHA,
-                          "runnerSha256": sha(Path(__file__)), "comparatorSha256": sha(HERE / "pixels.py")}
-    stage(source, startup_gui=startup_gui)
+                          "runnerSha256": runner_sha, "comparatorSha256": sha(HERE / "pixels.py")}
+    else:
+        if original_control:
+            profile = "original-control"
+            gui, _ = qualify.stage(snapshot)
+        directory = vendor.compiler_directory(AREA / "assessment-cache/registry", gui)
+        receipt = directory.parents[2] / "registry-sources.json"
+    project = gui.parents[2]
+    inputs = project_inputs(project)
+    dependencies = stage_dependencies(project, inputs, trial / "first-party")
+    patch = stage(source, gui, original_control=original_control)
+    registry_receipt = trial / "registry-sources.json"
+    shutil.copyfile(receipt, registry_receipt)
+    if sha(registry_receipt) != vendor.GUI_LOCK_RECEIPTS[inputs["tools/rust-qa/gui/Cargo.lock"]]:
+        raise ValueError("The compiler source receipt differs from the reviewed GUI lock")
     args = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
             "--ro-bind", "/usr", "/usr", "--symlink", "usr/bin", "/bin",
             "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
@@ -109,9 +144,9 @@ def run(cache, build, *, startup_vendor=None, combined_receipt=None):
             "--setenv", "CARGO_NET_OFFLINE", "true", "--setenv", "VK_DRIVER_FILES", str(ICD),
             "--setenv", "PATH", "/toolchain/bin:/usr/bin", "--setenv", "CARGO_TARGET_DIR", "/build",
             "--setenv", "IFW_QA_FONT_DIR", "/fonts", "--setenv", "IFW_QA_FALLBACK_DIR", "/fallback-fonts"]
-    sources = [*registry, (AREA / "toolchain", "/toolchain"),
-               (rust, "/project/rust"), (source, "/project/tools/rust-qa/gui"),
-               ((startup_gui or GUI) / "artifacts", "/project/tools/rust-qa/gui/artifacts"),
+    sources = [*dependencies, (directory, "/reviewed"), (AREA / "toolchain", "/toolchain"),
+               (source, "/project/tools/rust-qa/gui"),
+               (gui / "artifacts", "/project/tools/rust-qa/gui/artifacts"),
                (ROOT / "rust/assets/fonts", "/fonts"), (source_profile.FONTS, "/fallback-fonts")]
     for path in prepared.sources.values():
         sources.append((path, "/review/" + path.name))
@@ -119,7 +154,7 @@ def run(cache, build, *, startup_vendor=None, combined_receipt=None):
         args.extend(["--ro-bind", str(path), mount])
     args.extend(["--bind", str(build.resolve()), "/build", "--bind", str(pixels), "/pixels",
                  "--chdir", "/project/tools/rust-qa/gui", "--", "/toolchain/bin/cargo",
-                 "test", "--release", "--frozen", "--jobs", "1" if startup_gui else "2", *cargo_config, "--bin", "native-gui-assessment",
+                 "test", "--release", "--frozen", "--jobs", "1", *qualify.source_config("/reviewed"), "--bin", "native-gui-assessment",
                  "cpu_view_observation::actual_view_mesh_and_texture_requests", "--", "--exact", "--nocapture"])
     log = trial / "render.log"
     print(trial, flush=True)
@@ -128,8 +163,13 @@ def run(cache, build, *, startup_vendor=None, combined_receipt=None):
     if status.returncode:
         raise RuntimeError(f"Isolated render failed with exit {status.returncode}. See {log}")
     rows = compare(pixels)
-    report = {"compiler": compiler, "applicationSha256": sha((startup_gui or GUI) / "src/main.rs"),
+    if project_inputs(project) != inputs or sha(Path(__file__)) != runner_sha:
+        raise ValueError("The original project sources or runner changed during the headless render")
+    report = {"compiler": compiler, "applicationSha256": sha(gui / "src/main.rs"),
               "lockSha256": sha(source / "Cargo.lock"),
+              "profile": profile, "firstPartyInputs": inputs, "registryReceiptSha256": sha(registry_receipt),
+              "manifestSha256": sha(source / "Cargo.toml"), "patchSha256": sha(patch),
+              "runnerSha256": runner_sha, "comparatorSha256": sha(HERE / "pixels.py"),
               "rendererInputsSha256": sha(prepared.receipt), "baseFonts": base_fonts, "lavapipeIcdSha256": sha(ICD),
               "stagedSources": source_profile.tree_info(source / "src"), "renderLogSha256": sha(log),
               "frames": rows}
@@ -148,10 +188,13 @@ if __name__ == "__main__":
     parser.add_argument("cache", type=Path, help="Archive cache seeded by the sibling upstream.py")
     parser.add_argument("--build-cache", type=Path, default=SCOPE / "headless-build",
                         help="Private Cargo target directory, separate from each run's new pixel files")
-    parser.add_argument("--startup-vendor", type=Path, help="Reconstruct the qualified GUI using these reviewed directory sources")
+    replay = parser.add_mutually_exclusive_group()
+    replay.add_argument("--original-control", action="store_true", help="Reconstruct the editor before startup integration")
+    replay.add_argument("--startup-vendor", type=Path, help="Reconstruct the qualified startup GUI using these reviewed sources")
     parser.add_argument("--combined-receipt", type=Path, help="Original combined source and four-target feature receipt directory")
     options = parser.parse_args()
     if (options.startup_vendor is None) != (options.combined_receipt is None):
         parser.error("--startup-vendor and --combined-receipt must be used together")
     SCOPE.mkdir(exist_ok=True, parents=True)
-    run(options.cache, options.build_cache, startup_vendor=options.startup_vendor, combined_receipt=options.combined_receipt)
+    run(options.cache, options.build_cache, startup_vendor=options.startup_vendor, combined_receipt=options.combined_receipt,
+        original_control=options.original_control)
