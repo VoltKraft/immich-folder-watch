@@ -14,7 +14,7 @@ INSTALLED = ROOT / "tools/RustCompatibilityOracle/installed"
 AREA = ROOT / "artifacts/rust/windows-msi-interop"
 TARGETS = {"x86_64-pc-windows-msvc": ("windows-x64", 0x8664),
            "aarch64-pc-windows-msvc": ("windows-arm64", 0xaa64)}
-BEFORE = "a4587fa61645df77f456d5e5ebe77985d835a71cca8880785bde6826d5ebdb95"
+BEFORE = "67c3359dbbb352a0db36a4b9dbfa98ee7c305965e463d8cb3827cace9a987288"
 AFTER = "58c04d0ea71fd89846499c79214572db3645eff933c0197e0f80034a1f526c01"
 
 

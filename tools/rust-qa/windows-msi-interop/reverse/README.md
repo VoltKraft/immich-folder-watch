@@ -107,3 +107,17 @@ python -B -m unittest discover -s tools/rust-qa/windows-msi-interop/reverse
 pwsh -NoProfile -NonInteractive -File tools/rust-qa/windows-msi-interop/reverse/test_profile.ps1
 pwsh -NoProfile -NonInteractive -File tools/rust-qa/windows-msi-interop/reverse/test_quit_source.ps1
 ```
+
+
+### Launcher source after enabling the local x64 tray trial
+
+The ordinary GUI now supports the disposable x64 VM in addition to the
+hosted rewrite runner. For these installed ARM64 comparisons, each private
+patch reconstructs the exact launcher previously measured at `1910195`.
+The Rust-primary source retains SHA-256
+`58c04d0ea71fd89846499c79214572db3645eff933c0197e0f80034a1f526c01`.
+The WPF-primary source retains
+`7a7f5efbcddff0b17a77aed5d69ffe34cefdfda693ad020dc1a2f12154b20941`.
+Both variants check the hosted environment before using the installed
+endpoint name. The build checks all other compiled GUI files against the
+ordinary retained build from the same revision.

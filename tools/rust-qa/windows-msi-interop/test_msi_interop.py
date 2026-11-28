@@ -9,7 +9,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from common import AFTER, BEFORE, HERE, QA, launcher, module, sha
+from common import BEFORE, HERE, QA, launcher, launcher_variant, module, sha
 from msi_evidence import activation, sparse_inventory, verify_transactions
 
 
@@ -112,13 +112,22 @@ assert Path(sys.modules[verify.__module__].__file__).resolve() == base / 'msi_ev
             base = Path(folder)
             (base / "src").mkdir()
             changed = base / "src/windows_launcher.rs"
-            shutil.copyfile(original,changed)
-            subprocess.run(["git","-c","core.autocrlf=false","apply","--no-index","--whitespace=error","-"],
-                           cwd=base,input=(HERE / "launcher.patch").read_bytes(),check=True)
-            self.assertEqual(sha(changed), AFTER)
-            source = changed.read_text(encoding="utf-8")
-            self.assertLess(source.index("if msi_primary {",source.index("if !primary {")),source.index("local::connect(&pipe"))
-            self.assertIn("let client = local::peer_pid(&pipe, false)?;",source)
+            for wpf_primary in (False, True):
+                with self.subTest(wpf_primary=wpf_primary):
+                    change, expected = launcher_variant(wpf_primary)
+                    shutil.copyfile(original, changed)
+                    subprocess.run(["git", "-c", "core.autocrlf=false", "apply", "--no-index", "--whitespace=error", "-"],
+                                   cwd=base, input=change.read_bytes(), check=True)
+                    self.assertEqual(sha(changed), expected)
+                    source = changed.read_text(encoding="utf-8")
+                    self.assertIn('("RUNNER_ENVIRONMENT", "github-hosted")', source)
+                    if wpf_primary:
+                        self.assertIn('("IFW_QA_MSI_SECONDARY", "1")', source)
+                        self.assertLess(source.index("let existing = unsafe { OpenMutexW("), source.index("local::connect(&pipe"))
+                    else:
+                        self.assertLess(source.index("if msi_primary {", source.index("if !primary {")),
+                                        source.index("local::connect(&pipe"))
+                        self.assertIn("let client = local::peer_pid(&pipe, false)?;", source)
         self.assertEqual(sha(original), BEFORE)
 
     def test_two_post_reopen_file_queries_and_worker_are_bound_to_the_original(self):
