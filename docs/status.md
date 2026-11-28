@@ -8,6 +8,13 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+The local Windows Server 2025 x64 VM passed the connected RDP and
+mixed-DPI trials with 96- and 192-DPI displays. Windows ARM64 still
+needs both observations. Its runner reported a single 96-DPI console
+display, and the user currently has no separate ARM64 test system.
+[Local x64 display trial](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial) ·
+[ARM64 console](rust/rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
+
 At `9d4d550`, the SQLite preflight read the committed version from the
 WAL on all four native targets. Two newer profiles retained every original
 byte and filename. A supported read-only file was also refused, and the
@@ -35,6 +42,15 @@ The running inventory worker honored the same profile. The ordinary
 cross-platform build still needs the integrated input profile.
 [Typed YAML values](rust/rw02-yaml.md#grouped-floats-and-untagged-scalar-aliases) ·
 [Linux startup language](rust/rw02-native-gui.md#saved-language-at-linux-editor-and-tray-startup).
+
+At `14541fb` the local Windows x64 VM also executed the complete synthetic
+YAML exchange. The two native programs preserved all 110 original files,
+passed 330 byte checks, 475 Rust comparisons and 268 C# comparisons.
+All 14 Rust tests and three source-filter tests passed. The host verified
+the 255 files returned from the guest. A clean Fedora x64 run at
+`cdfd328` passed the same comparison counts.
+[Windows guest run](../tools/rust-qa/windows-local/yaml.md) ·
+[Fedora readback](rust/rw02-yaml.md#grouped-floats-and-untagged-scalar-aliases).
 
 At `c268a82` the Fedora x64 editor showed the German and English notice
 after its tray watcher exited. A normal second launch reopened the same

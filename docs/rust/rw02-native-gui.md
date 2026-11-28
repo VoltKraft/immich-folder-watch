@@ -1143,6 +1143,10 @@ measured input digests are in
 These measurements cover source reconstruction. Adoption in the ordinary
 cross-platform build and native GUI checks at the integrated revision remain open.
 
+The isolated Fedora renderer also reproduced all 18 original images at
+100% and 150% scale. Across six frames every CPU-to-Vulkan pixel comparison
+was within two channel levels. [Six-frame replay](../../tools/rust-qa/windows-cpu-paint/headless/README.md#editor-with-the-staged-linux-startup-language).
+
 ## Reproduction
 
 At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed

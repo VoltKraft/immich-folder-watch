@@ -167,6 +167,14 @@ in every case at `bb3afd5`. The previous executable agreed on eight.
 The corrected native executable has SHA-256
 `6dedb16534da56e969006d869c773bb6245a269aafee0ec81afb59116663799e`.
 
+The shared exchange used by the Windows guest also ran from clean Fedora
+x64 inputs at `cdfd328`. It preserved all 110 originals and passed
+330 byte checks, 475 Rust and 268 C# comparisons, and 14 Rust tests.
+All 134 source digests matched that Git revision. All 400 archived file
+digests matched the evidence index. The receipt under
+`artifacts/rust/yaml-assessment/runs/guest-adapter-clean-fedorax64-02/result.json`
+has SHA-256 `134950508b1890da4877cd389ee50a73a1a50f70ff2b9e468b6356416b2be970`.
+
 ## Reading the original YAML file bytes
 
 The shipping loader calls `File.ReadAllText`. Its byte-order mark selects
