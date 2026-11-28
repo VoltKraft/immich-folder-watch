@@ -207,3 +207,38 @@ competing launch during the transaction, treatment of unregistered copies,
 and rollback after a production Rust writer has actually changed the profile.
 The private candidate continued to veto writes. Native ARM64 migration
 remains open.
+
+### Installed path and process snapshot after commit
+
+In the three completed x64 archives, Windows Installer returned 0 for the
+upgrade before the administrator checked the registration and the installed
+paths. The private successor was registered, the old desktop shortcut was
+absent, and an ordinary launch from the removed WPF path returned Win32
+error 2. The administrator reported zero processes named
+`ImmichFolderWatch`. The standard user's separate system-wide Toolhelp
+snapshot completed without a matching executable name. The successor's
+preflight returned 21 and kept the writer disabled.
+[Administrator and RDP observations](transaction/running-wpf.md#windows-server-2025-x64-results)
+· [Toolhelp enumeration](../../../../tools/rust-qa/windows-performance/native.py#L554).
+
+The [detached reader](transaction/replay.py) reports these observations in
+`postCommit`. It reproduced them from the original `cutover-transaction-03`,
+`cutover-running-wpf-01` and `cutover-running-wpf-3072` archives. The 3072 MiB
+guest archive has SHA-256
+`d45a7673d47af1d0bea990dd3fc67656ffed674c33ab3b0b524e5c8a752d0b1b`.
+
+The [updated administrator observer](transaction/admin.ps1) first checks
+the original executable's file attributes, then queries `Win32_Process`
+across sessions for its executable name. It writes
+`committed-inventory.json` in the administrator's transaction directory
+before checking the results. Each matching row records its PID, session
+and whether its image path matched the installed path, differed or was
+unavailable. Failure of either query remains visible independently. An
+unresolved path, a process-query failure or any matching row stops the
+trial. The read-only check samples the known installation at this point
+in time. Other executable names and later launches remain outside it.
+
+Local tests exercised the actual PowerShell reader with synthetic CIM
+responses and checked that the detached reader rejected missing, occupied
+and indeterminate observations. The extended CIM receipt still needs a
+native Windows run. The earlier archives used `Get-Process` and Toolhelp.

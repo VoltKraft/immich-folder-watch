@@ -35,9 +35,41 @@ function Wait-ForObserver([string]$Phase) {
         Start-Sleep -Milliseconds 250
     }
 }
+function Read-StockInventory([string]$Image) {
+    $result = [ordered]@{image=$Image; pathStatus='indeterminate'; pathError=$null
+        processStatus='indeterminate'; processError=$null; processes=$null}
+    try {
+        [void][IO.File]::GetAttributes($Image)
+        $result.pathStatus = 'present'
+    } catch [IO.FileNotFoundException], [IO.DirectoryNotFoundException] {
+        $result.pathStatus = 'absent'
+    } catch {
+        $result.pathError = $_.Exception.GetBaseException().GetType().FullName
+    }
+    try {
+        $result.processes = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'ImmichFolderWatch.exe'" `
+            -Property Name, ProcessId, SessionId, ExecutablePath -ErrorAction Stop | ForEach-Object {
+                if ($_.Name -ine 'ImmichFolderWatch.exe' -or !$_.ProcessId -or $null -eq $_.SessionId) {
+                    throw 'Incomplete process inventory row.'
+                }
+                $identity = if ([string]::IsNullOrWhiteSpace($_.ExecutablePath)) {'unavailable'}
+                            elseif ($_.ExecutablePath -ieq $Image) {'installed-path'} else {'other-path'}
+                [ordered]@{pid=$_.ProcessId; session=$_.SessionId; image=$identity}
+            })
+        $result.processStatus = 'enumerated'
+    } catch {
+        $result.processError = $_.Exception.GetBaseException().GetType().FullName
+    }
+    return $result
+}
 function Check-Stage([string]$Phase, [bool]$InstalledStock) {
-    $legacyProcesses = @(Get-Process -Name ImmichFolderWatch -ErrorAction SilentlyContinue)
-    if ($legacyProcesses.Count -ne 0 -or (Test-Path $stock) -ne $InstalledStock -or
+    $inventory = Read-StockInventory $stock
+    if ($Phase -eq 'committed') {
+        $inventory | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 "$area\committed-inventory.json"
+    }
+    $expectedPath = if ($InstalledStock) {'present'} else {'absent'}
+    if ($inventory.pathStatus -ne $expectedPath -or $inventory.processStatus -ne 'enumerated' -or
+        $inventory.processes.Count -ne 0 -or
         (Test-Path "$registry\$original") -ne $InstalledStock -or (Test-Path $trial) -eq $InstalledStock -or
         (Test-Path "$registry\$successor") -eq $InstalledStock) {throw "Unexpected registration, executable or running WPF at $Phase"}
     $shortcuts = @()
@@ -56,7 +88,7 @@ function Check-Stage([string]$Phase, [bool]$InstalledStock) {
     $hash = (Get-FileHash $image).Hash
     if ($hash -ine $expectedHash) {throw "Unexpected installed payload at $Phase"}
     [ordered]@{phase=$Phase; product=$package; version=(Get-ItemProperty "$registry\$package").DisplayVersion
-        image=$image; sha256=$hash; shortcuts=$shortcuts; runningWpf=$legacyProcesses.Count} |
+        image=$image; sha256=$hash; shortcuts=$shortcuts; runningWpf=$inventory.processes.Count} |
         ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "$area\$Phase.json"
 }
 function Invoke-TrialMsi([string]$Phase, [int]$Expected, [string[]]$Options) {

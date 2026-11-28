@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 from zipfile import ZipFile
 
@@ -15,6 +16,8 @@ COMPILER = '0f19d7e208bb84aa0aa9839da944cafc0cdf17ea91a3e47bae222af4bdf4b634'
 HANDOVER = '0f30bc04dfe0337bf4bb5cab177d1ee048a314d342618f59719343c4d42dbcae'
 WIX = 'bbb8627d4914333b6b4b91e6d1fc94eea96e28349968550248d8da95cfe80ca0'
 UTIL = '19166934d5bcb47857869e943bc55822955d95a0cac17c9dd9956a4705335b3b'
+STOCK_EXE = r'C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.exe'
+INVENTORY = 'committed-inventory.json'
 
 
 def ordered(log, fragments):
@@ -61,6 +64,29 @@ def verify_running_veto(z, manifest, admin, result):
             'The active-WPF refusal started an upgrade transaction')
     verify_wpf_quit(z, wpf, own, 'running-wpf/wpf-handover/quit-menu.json')
     return process['pid']
+
+
+def post_commit(z, snapshot, admin_source):
+    extended = INVENTORY.encode('ascii') in admin_source
+    require((INVENTORY in z.files) == extended, 'Post-commit inventory differs from the original observer')
+    state = read(z, 'committed.json')
+    require(state['phase'] == 'committed' and state['product'] == SUCCESSOR and state['shortcuts'] == []
+            and type(state['runningWpf']) is int and state['runningWpf'] == 0
+            and snapshot['oldLaunchWin32Error'] == 2 and snapshot['preflight'] == 21,
+            'Unexpected installed path, WPF process or writer veto after commit')
+    if extended:
+        inventory = read(z, INVENTORY)
+        require(inventory['image'] == STOCK_EXE and inventory['pathStatus'] == 'absent'
+                and inventory['pathError'] is None,
+                'Post-commit executable path status: ' + str(inventory['pathStatus']))
+        require(inventory['processStatus'] == 'enumerated' and inventory['processError'] is None,
+                'Post-commit process inventory status: ' + str(inventory['processStatus']))
+        require(inventory['processes'] == [], 'Post-commit process snapshot did not report zero matching processes')
+    return {'installedProduct': state['product'], 'originalExecutable': STOCK_EXE,
+            'originalLaunchWin32Error': snapshot['oldLaunchWin32Error'], 'originalShortcutCount': len(state['shortcuts']),
+            'observedWpfProcesses': state['runningWpf'],
+            'processObserver': 'Win32_Process and Toolhelp' if extended else 'Get-Process and Toolhelp',
+            'writerPreflightExit': snapshot['preflight']}
 
 
 def replay(guest_zip, compiler_zip, profile_zip, checkout_zip, require_running_veto=False):
@@ -129,6 +155,8 @@ def replay(guest_zip, compiler_zip, profile_zip, checkout_zip, require_running_v
         receipt = {'guestSha256': digest(guest_zip.read_bytes()), 'revision': guest['observerRevision'],
                 'trialMsiSha256': admin['candidateSha256'].lower(), 'exits': admin['exits'],
                 'ordinarySession': own['sessionId'], 'restoredWpfPid': result['restoredWpf']['token']['pid'], 'profileSha256': files}
+        admin_source = subprocess.check_output(['git', 'show', guest['observerRevision'] + ':' + prefix + 'admin.ps1'])
+        receipt['postCommit'] = post_commit(z, result['phases']['committed'], admin_source)
         if require_running_veto or 'util.nupkg' in manifest:
             receipt['activeWpfPid'] = verify_running_veto(z, manifest, admin, result)
         return receipt
