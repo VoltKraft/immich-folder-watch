@@ -50,6 +50,23 @@ reference read the account SID. Old/new cross-session exclusion during
 candidate migration and the ARM64 standard-user trial remain open.
 [Cross-session guard](rust/rw02-cross-session.md#standard-user-console-and-rdp-handover-on-windows-server-2025-x64).
 
+On November 28, the installed 3.0.4 WPF process uploaded a synthetic PNG
+from RDP while Rust held both the endpoint and writer guard in the console.
+When WPF started first, Rust identified the WPF pipe server and refused
+admission. In a separate trial Rust held the existing configuration file
+exclusively. A fresh WPF process remained visible for 12 seconds without an
+upload or SQLite file. After release, a new WPF process uploaded the PNG and
+committed one row. Handling an already active worker, applying settings and
+atomic config replacement remain part of the migration work.
+[Both launch orders and original archives](rust/rw02-cross-session.md#installed-304-worker-in-another-session) ·
+[Held and released configuration](rust/rw02-cross-session.md#an-exclusive-configuration-handle-during-wpf-startup).
+
+The Fedora x64 Rust transport at `51f7bf2` passed 54 loopback scenarios and
+17 unit tests. For an explicitly allowed plaintext connection, HTTP polling,
+REST and the WebSocket CONNECT matched the signed 3.0.4 client's Basic proxy
+challenge. The direct-route control sent no proxy credentials to the origin.
+[Native suites and paired observations](rust/rw02-linux-basic-proxy.md#first-party-linux-transport).
+
 The Windows x64 shipping assemblies passed six proxy wire trials using
 HTTP and HTTPS on the offline guest. The Rust environment adapter at
 `3104009` passed 49 Fedora wire scenarios and 14 unit tests. Windows

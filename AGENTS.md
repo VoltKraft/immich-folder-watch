@@ -213,6 +213,8 @@ to reconcile project decisions, defaults, and recorded state.
   for the Linux platform-verifier trials. For [Linux HTTPS proxy routing](docs/rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime),
   verify the CONNECT authority, the route taken by authenticated origin
   requests, and the direct connection when the endpoint is in `NO_PROXY`.
+  For [authenticated plaintext proxy routes](docs/rust/rw02-linux-basic-proxy.md),
+  compare both ends of the CONNECT with the signed Linux client.
   For a detached FUSE name, check the current grant and follow the
   [reader's original directory handle to the album](docs/rust/rw02-portal-noble.md#walking-the-album-through-the-readers-original-grant).
   Use the [offline Noble guest](tools/rust-qa/portal-noble/installed/README.md)
