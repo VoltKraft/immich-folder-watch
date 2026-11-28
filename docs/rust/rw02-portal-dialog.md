@@ -139,6 +139,12 @@ The Actions archive SHA-256 is
 `8c7ee0e903b2aac2933fe72645b25a330ad97a389b911f860088b034f491b825`.
 [Original Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46119147439/artifacts/15252723875).
 
+The archived 3.0.4 Linux reference test assembly was also run with SDK
+10.0.401 and the `DocumentPortalClientTests` filter. All 12 tests passed
+in its isolated VSTest run, including the D-Bus fallback and timeout.
+The assembly SHA-256 was
+`351baf14b632033244043ed80179fea629bdc148429d0952efff168b6aa1f19c`.
+
 The portal crate uses two existing audited inputs directly for the bounded
 attribute read. The offline build reproduced the preceding receipt's 211
 locked archives and the exact 116 active registry input records.
