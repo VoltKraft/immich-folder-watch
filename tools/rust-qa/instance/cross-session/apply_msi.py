@@ -19,8 +19,11 @@ ENDPOINT_SHA = 'e0f4aa779264f5bb33cf1ab0d8f94c34072765ff8c16af252b5b3233813b330e
 class ApplyPeer(peer.UploadPeer):
     """Answer the shipping access checks while retaining the original multipart observer."""
     def reply(self, status, content):
+        stamp = time.monotonic_ns()
         self.server.requests.append({'phase': self.server.phase, 'method': self.command,
-                                     'path': self.path, 'status': status})
+                                     'path': self.path, 'status': status, 'requestNs': stamp})
+        if self.server.phase == 'released' and self.command == 'GET' and self.path.startswith('/socket.io/?EIO=4&transport=polling'):
+            self.server.worker_started.set()
         super().reply(status, content)
 
     def permission(self):
@@ -59,6 +62,7 @@ def serve(stack, area, cert_dir=None):
         server.socket = context.wrap_socket(server.socket, server_side=True)
     server.phase, server.output = 'held', area
     server.posts, server.uploads, server.requests = [], [], []
+    server.worker_started = threading.Event()
     server.assets = {peer.FILENAME: (peer.IMAGE, peer.ASSET_ID), 'held-canary.png': (peer.IMAGE, peer.ASSET_ID)}
     server.post_lock, server.received, server.release = threading.Lock(), threading.Event(), threading.Event()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -166,7 +170,11 @@ def controller(work, own, other, sid, accounts, certificate_dir):
             result['afterApply'] = config_state(cfg)
             require(saved != pristine and draft_url.encode() in saved and str(media).encode() in saved,
                     'The installed WPF Apply did not persist the expected draft')
+            require(https.worker_started.wait(45) and db.is_file(), 'A released worker did not start its database and realtime client')
+            result['workerReady'] = {'timeNs': time.monotonic_ns(), 'database': config_state(db),
+                                     'requests': [r for r in https.requests if r['phase'] == 'released' and r['path'].startswith('/socket.io/')]}
             (media / peer.FILENAME).write_bytes(peer.IMAGE)
+            result['mediaCreatedNs'] = time.monotonic_ns()
             require(https.received.wait(90) and len(https.uploads) == 1, 'Missing upload after successful Apply')
             result['upload'] = https.uploads[0]
             write(area / 'socket.json', result['upload'])

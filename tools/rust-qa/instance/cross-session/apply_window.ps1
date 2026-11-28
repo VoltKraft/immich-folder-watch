@@ -131,7 +131,17 @@ function EnterFolder($tab,$value) {
 $record = [ordered]@{phase=$Phase;pid=$ProcessId;hwnd=$Hwnd;created=$Created;issued=$false;outcome=$null}
 try {
     if ($Phase -eq 'held') {
+        $loadText = @(Elements ([Windows.Automation.ControlType]::Text) | Where-Object {
+            $_.Current.ProcessId -eq $ProcessId -and !$_.Current.IsOffscreen -and $_.Current.Name -match 'config\.yaml'
+        } | ForEach-Object { $_.Current.Name })
+        if ($loadText.Count -ne 1) { throw 'Missing the original WPF config-load failure' }
+        $record.loadMessage=$loadText[0]
         SelectPage 'UI_Connection'
+        $urlField=FindControl ([Windows.Automation.ControlType]::Edit) $strings['UI_ServerApiUrl']
+        $keyField=FindControl ([Windows.Automation.ControlType]::Edit) $strings['UI_ApiKey']
+        $record.emptyUrl=($urlField.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value -ceq '')
+        $record.emptyKey=(!$keyField.Current.IsPassword -and $keyField.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value -ceq '')
+        if (!$record.emptyUrl -or !$record.emptyKey) {throw 'The initial connection draft was not empty'}
         SetField 'UI_ServerApiUrl' $draft.url
         SetField 'UI_ApiKey' $draft.key
         SelectPage 'UI_Folders'
@@ -162,6 +172,17 @@ try {
     } while (!$record.outcome -and [DateTime]::UtcNow -lt $end)
     if (!$record.outcome) { $record.visibleText=$texts;throw 'No matching shipping Apply outcome on the original WPF window' }
     $record.observedQpc=[Diagnostics.Stopwatch]::GetTimestamp()
+    if ($Phase -eq 'released') {
+        $end=[DateTime]::UtcNow.AddSeconds(15)
+        do {
+            $filter=@{LogName='Immich Folder Watch';ProviderName='Immich Folder Watch';StartTime=(Get-Process -Id $ProcessId).StartTime}
+            $events=@(Get-WinEvent -FilterHashtable $filter -MaxEvents 80 -ErrorAction SilentlyContinue)
+            $record.watcherEvents=@($events | Where-Object { ($_.Message + ($_.Properties.Value -join ' ')).Contains("Watching source $($draft.media) ") } | ForEach-Object {
+                @{id=$_.RecordId;processId=$_.ProcessId;timeUtc=$_.TimeCreated.ToUniversalTime().ToString('o');text=($_.Properties.Value -join ' ')}
+            })
+            if ($record.watcherEvents.Count -eq 0) {Start-Sleep -Milliseconds 200}
+        } while ($record.watcherEvents.Count -eq 0 -and [DateTime]::UtcNow -lt $end)
+    }
 } catch {
     $record.error=$_.Exception.Message
     $r = BoundRoot
