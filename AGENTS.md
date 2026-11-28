@@ -319,6 +319,9 @@ to reconcile project decisions, defaults, and recorded state.
   with the real executable and the original window, bus owner and inventory worker.
   For the [installed test Flatpak](docs/rust/rw02-instance.md#second-launch-through-the-installed-flatpak),
   distinguish the D-Bus proxy PID from the GUI's outer and sandbox PIDs.
+  Verify [tray delivery across watcher replacement](docs/rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak)
+  against the original proxy and reopened window. The [native Plasma menu](docs/rust/rw02-plasma.md#native-ubuntu-tray-menu-and-worker-restart-at-9487dbe)
+  also exercises worker restart on Ubuntu x64 and ARM64.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
   For [Windows WPF-primary activation](tools/rust-qa/windows-msi-interop/reverse/README.md),

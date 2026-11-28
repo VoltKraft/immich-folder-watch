@@ -229,7 +229,7 @@ The reports in `artifacts/rust/plasma/runs/plasma-oyacr1cj/` and
 and `c094cea2e7c1797357077a2221dc4d796f8e45aa1d9f5495bd5afb48f712e728`.
 The second menu bus trace has SHA-256
 `641ecc655075fb3a3849206026aedfbc91fa71bce19f09c72496341a538c990b`.
-The native ARM64 run of this three-command trial is pending.
+The subsequent hosted run below repeated all three selections on ARM64.
 
 In a third x64 session the observer checked the first two inventory
 records after the original worker exited. New worker 300 reported two
@@ -237,6 +237,32 @@ changed files on pass 0 and zero changes among the same two files on
 pass 1. It exited on Quit with the original GUI. The report in
 `artifacts/rust/plasma/runs/plasma-ghqmldfd/` has SHA-256
 `0d9a7bb71e9b863bd1bf1437cdc68c1d818362523dd32203b4ad863c887dfccc`.
+
+### Native Ubuntu tray menu and worker restart at 9487dbe
+
+On both Ubuntu architectures the physical panel reopened the same X11
+window (`0x1a00002`) on two ordinary clicks. On a separate desktop for
+each menu trial, the original KDED released and reacquired the watcher
+and the same GUI registered again. The panel delivered menu IDs 1, 2
+and 3. Open focused the original editor. The German and English labels
+were visible in the panel's popup. Restart waited for the old worker to
+exit. Each new worker found two new files on its first pass and the
+same two files unchanged on its second. Quit drained the GUI and the
+replacement worker, and KDED's final list was empty.
+
+| Native runner and original archive | SHA-256 of the Actions ZIP | Worker PID before and after Restart |
+| --- | --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46114279356/artifacts/15251410283) | `34f94681826182e1656b614b99abfaad01c61d6821867eb54e019be514c692cd` | 102 → 316 |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46114279356/artifacts/15251093019) | `d508aa5b89f6acc1091e7947bf144593dc0ca2880e99a7a12abba237c557cd2c` | 100 → 291 |
+
+Independent readback matched the two original ZIPs to their Actions
+digests and verified the GUI, worker, their compiler inputs, the native
+desktop executables and four loaded libraries per target. It checked the
+six original popup images, the panel's bus calls and the worker exit and
+inventory records. In the separate five-owner trials on both runners,
+the hidden GUI accepted only the two current consenting watchers.
+The per-target readbacks, original job logs and archives are under
+`artifacts/rust/plasma/hosted-46114279356/`.
 
 ### Panel activation and artwork
 

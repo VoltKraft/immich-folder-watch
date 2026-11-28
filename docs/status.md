@@ -29,9 +29,8 @@ watcher owners. Only the two current accepting owners made its tray
 available. The GUI stayed hidden through both late replies and drained on
 desktop Quit. On two isolated Plasma desktops the x64 GUI registered
 again after a KDED module reload. Physical Open, Restart and Quit worked.
-The English editor button updated the visible menu. The three-command
-trial on native Linux ARM64 is pending. All 31 GUI compiler inputs in
-these Plasma runs match `c1171b9`. The native Linux GUI suite passed
+The English editor button updated the visible menu. All 31 GUI compiler
+inputs in these local Plasma runs match `c1171b9`. The native Linux GUI suite passed
 39 tests. Clippy passed on native Linux x64 and for both Windows targets,
 including the separate Windows worker allocation adjustment.
 [Five watcher owners](rust/rw02-linux-services.md#watcher-handover-in-the-original-background-gui) ·
@@ -63,12 +62,21 @@ The opposite start order still allows a legacy writer to run.
 [Orderly handover](rust/rw02-cross-session.md#ordinary-wpf-shutdown-before-rust-writer-admission) ·
 [Rust-first result](rust/rw02-cross-session.md#installed-304-worker-in-another-session).
 
-A third private x64 Plasma session verified that the replacement worker
-first found two new files and then two unchanged files. The new native
-Linux workflow runs the panel and the five-owner D-Bus trial on each
-architecture independently of the full desktop assessment queue.
-[Panel observations](rust/rw02-plasma.md#native-linux-x64-menu-and-watcher-reload) ·
-[Ubuntu x64 and ARM64 jobs](../.github/workflows/rust-linux-plasma.yaml).
+Both native Ubuntu runners at `9487dbe` passed the five-owner D-Bus trial,
+two ordinary panel activations and all three physical menu selections
+after KDED reloaded its watcher. Each replacement worker found two new
+files then two unchanged files. Quit left KDED's tray list empty.
+Independent readback matched both original Actions ZIPs and the six popup
+images. On Fedora the same-host Avalonia budget repeat stopped before
+the first scan when inotify refused the first synthetic directory watch.
+[Ubuntu x64 and ARM64 results](rust/rw02-plasma.md#native-ubuntu-tray-menu-and-worker-restart-at-9487dbe) ·
+[Fedora scan preflight](rust/rw02-native-gui.md#fedora-reference-measurement-after-the-tray-worker-change).
+
+On Fedora x64 the installed Rust test Flatpak re-registered with the new
+watcher through the original bus proxy. A separate peer opened the same
+X11 window through the exported menu and Quit ended all four original
+processes. Both installed second launches and the final uninstall passed.
+[Installed Flatpak menu and native identities](rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak).
 
 On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
 GUI from a background start and reopened its original window after close.

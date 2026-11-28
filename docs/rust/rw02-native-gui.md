@@ -908,6 +908,23 @@ the 110 Documents-portal operations per host. The joint readback at
 `artifacts/rust/hosted-desktop-storage/45565563795/ubuntu-four-target-run-linux-desktop-readback.json`
 has SHA-256 `50394b535af8da80aca7e2cfc649ea46f689f4b8cf2bc7c43f9fa33df2e18c5e`.
 
+### Fedora reference measurement after the tray worker change
+
+At `9487dbe` the shipping Avalonia reference reached the first idle
+measurement on Fedora x64 (kernel `7.3.6-300.fc45.x86_64`). Before the
+first scan, the observer received `ENOSPC` from `inotify_add_watch`.
+A separate preflight could open an inotify descriptor but could register
+zero of the 100 synthetic leaf directories. The effective per-user
+watch limit was 259,403. This attempt yielded no paired scan or resource
+budget for the updated Rust worker. The same-host three-trial comparison
+is also part of the [native desktop assessment](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46114279314).
+
+The retained files under `artifacts/rust/performance/` are
+`dotnet-linux-x64-menu-9487dbe.log` (SHA-256
+`58564d661a3ba0d92c4612dba2b90f7051d375b576b6e097cd061d86b3678b6f`)
+and `menu-9487dbe-inotify-preflight.json` (SHA-256
+`e3d8955169aecf9d0bc8f020551df0bc09a38862e4743bb004b0555f87ef8ddf`).
+
 ## First-frame regression
 
 The original `with_visible(false)` prototype created its eframe event loop
