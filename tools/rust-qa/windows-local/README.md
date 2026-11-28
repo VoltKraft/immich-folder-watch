@@ -81,6 +81,39 @@ upload cases. The guest report binds these observations to the original
 compiler archive. The same report directory is an input to
 [`sbom.py`](../combined-profile/sbom.py) for the Windows x64 target.
 
+### Combined profile on Server 2025 at 36190f1
+
+The standard user on the offline 4 GiB Windows Server 2025 VM ran
+`36190f153aa8aee50ec1d9b471cd3b44df5f0522` in console session 1.
+The compiler ZIP matched its published SHA-256
+`a7a5b052b65fbbc0d87e38d59adf2594047907ad304edcfe5dc9c299a6c746ac`.
+The guest restored the same Git revision from the read-only input DVD and
+verified the 82 source witnesses, lockfile and native executable. The executable
+SHA-256 was `dec5ce6416b1513077738a2b69f3973c70d5b1eb70ce85b903788034fe4eb253`.
+[Original x64 compiler artifact](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46101078394/artifacts/15245916256).
+
+The smoke test read back the pinned SQLite source with extension loading
+omitted, the YAML timestamp including its seventh fractional digit, one
+tessellated GUI primitive and the WebSocket ping payload. It also resolved
+the native eframe entry point and checked the Windows Shell notification
+icon layout. In all five shipping upload cases, Windows permitted a rename
+and a replacement at the original path. Each retry started at byte zero and
+returned the original held file's identity and body digest.
+
+The guest generated an SPDX 2.3 inventory covering 250 compiled Cargo
+packages in 281 compiler units. Its 258 SPDX packages and 615 relationships
+passed the pinned SPDX schema and target-specific checks on the host. A
+second generation from the restored source and original guest files
+produced identical bytes, SHA-256
+`13319a30cd53aee23cc4b6fb5c6e11518587fa6ed7912eb1445f14c834cec777`.
+The guest exited zero and shut down normally. Its 653,680-byte original
+result ZIP matched the serial SHA-256
+`75d63e781abe2b2d080c4de415f75048d8afa3e2cce26a046e3a1081da0f4888`.
+All 28 member CRCs and all 23 output digests passed readback. The original
+compiler ZIP, guest archive, native logs, SPDX documents and readback
+receipt are retained in
+`artifacts/rust/local-windows-server-2025-x64/20261128/combined-36190f1/`.
+
 ## Shipping .NET solution and installer checks
 
 In a fresh guest checkout, select the x64 SDK from `global.json`, Git for
