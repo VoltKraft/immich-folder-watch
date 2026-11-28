@@ -92,6 +92,12 @@ def prepare(work, homes, fetch):
     if hyper["archiveSha256"] != hyper_util_source.ARCHIVE_SHA:
         raise ValueError("The realtime archive review differs from its source reconstruction")
     allowed[HYPER_KEY] = hyper["archiveSha256"]
+    vendor, inputs = prepare_registry(work, homes, fetch, allowed)
+    return vendor, inputs, approved_text
+
+
+def prepare_registry(work, homes, fetch, allowed, *, jobs=4):
+    """Authenticate and filter the selected original crates using the combined compiler rules."""
     yaml = {(row["name"], row["version"]): row for row in read(QA / "yaml/inputs.json")["packages"]}
     cache = work / "registry/cache/reviewed"
     vendor = work / "registry/src/reviewed"
@@ -144,9 +150,9 @@ def prepare(work, homes, fetch):
         return prefix, {"originalSha256": checksum, "compilerTreeSha256": filtered, "files": len(files),
                         "transformations": changes}
 
-    with ThreadPoolExecutor(max_workers=4) as workers:
+    with ThreadPoolExecutor(max_workers=jobs) as workers:
         inputs = dict(workers.map(one, sorted(allowed.items())))
-    return vendor, inputs, approved_text
+    return vendor, inputs
 
 
 def source_config(vendor):

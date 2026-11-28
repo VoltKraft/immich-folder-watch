@@ -1,0 +1,105 @@
+# Linux editor and tray startup language
+
+The assessment reconstructs the GUI and the complete read-only settings library
+at `c63d91c42eae9f71f07a2d1816214a1e16609ef8`. The staged application reads
+the standard XDG configuration after winning the instance election. It uses
+that selection for the first editor and the initial tray menu, including a
+watcher that appears later. A secondary exits through the existing activation
+path. The source change is in [language.patch](language.patch). The signed
+3.0.4 comparison covers configuration decoding and the system fallback.
+[Startup settings reader](../../yaml/startup/README.md).
+
+## Offline inputs
+
+The standalone renderer lock and YAML lock contain the 385 original registry
+archives used by this candidate. Their compiler trees contain 20,517 files. The combined review authenticates their
+original archives and compiler trees. Its existing YAML filter removes the
+approved promotional asset and block in `base64 0.23.1`. The source receipt
+has SHA-256
+`1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3`.
+The [vendor builder](vendor.py) reproduced these bytes from the normal local
+crate archive caches in a fresh output directory. An empty builder can use
+`--fetch` for missing checksum-pinned original archives.
+
+The [assessment](qualify.py) snapshots the first-party source bytes from
+the specified Git revision and reproduces the lock with the pinned Cargo.
+Each target's normal and build packages equal the expected platform-specific
+selection, and every feature group has an original GUI, YAML or combined
+witness. The readback also checks each original registry archive and the bytes
+of every compiler source file. The Windows x64 and ARM64 renderer selections
+retain their respective 135-package feature graphs. Linux x64 resolves 251
+packages and Linux ARM64 resolves 250. These four observations qualify Cargo
+resolution. The native build and desktop measurements below cover Fedora x64.
+
+Use the existing checked GUI font and text-source materialization, the pinned
+Rust toolchain and a combined-profile result directory that contains the
+original four feature maps and `source-trees.json`. All example output
+directories should be fresh.
+
+```sh
+area=artifacts/rust/combined-profile
+python3 -B tools/rust-qa/gui/startup/vendor.py --output "$area/startup-vendor"
+python3 -B tools/rust-qa/gui/startup/qualify.py \
+  --vendor "$area/startup-vendor/registry/src/reviewed" \
+  --combined-receipt "$area/runs/digest-native-2f63c15" \
+  --output "$area/startup-build" --native
+python3 -B tools/rust-qa/gui/startup/observe.py \
+  --gui "$area/startup-build/native-build/release/native-gui-assessment" \
+  --compiler-receipt "$area/startup-build/native.json" \
+  --worker artifacts/rust/performance/subjects/startup-language-worker-20261128 \
+  --sdk artifacts/flatpak-local-2.11.2/sdk \
+  --signed-repo artifacts/rust/yaml-assessment/signed-flatpak-3.0.4-folders/ostree \
+  --output "$area/startup-desktop"
+```
+
+The example worker directory is the local output of
+[build_worker.py](../../performance/build_worker.py). Any supplied worker must
+match its native receipt and accept the optional synthetic localization
+section. The verified worker has SHA-256
+`20df28770221c4f31a2729d54a138af165845b6ca5d2b14a869a37f0b6bf64f9`.
+When using the optional `--build-cache` on the compiler, use its
+`release/native-gui-assessment` as the observer's `--gui` input.
+
+The original compiler run is under
+`artifacts/rust/combined-profile/editor-language-replay-verified/`.
+The pinned rustc 1.100.0 compiled 310 units matching the 251 Linux x64 package
+and feature groups. All 22 native GUI binary unit tests passed. The GUI
+executable has SHA-256
+`2b751a662a093ed7e30b629e66c62654caf3d818d317f00c999b28e18471b76f`.
+The source and compiler receipt `native.json` has SHA-256
+`bfde3d81b0948a70d55221591ec3b57d3a7707a497d889d3758ccbdfbfd1fac0`.
+
+## Fedora desktop readback
+
+Four ordinary launches on four private Fedora X11 desktops opened the editor
+before any StatusNotifierWatcher existed. AT-SPI exposed the two fields, the
+language button and Quit in the expected language. The new watcher then
+observed the existing primary registering. Its first menu revision had the
+following native IDs and labels.
+
+| System UI culture | Saved language | Filename field | 1 | 2 | 3 |
+| --- | --- | --- | --- | --- | --- |
+| de_DE.UTF-8 | en | Filename | Open GUI | Restart | Quit |
+| en_US.UTF-8 | de | Dateiname | GUI öffnen | Neustart | Beenden |
+| de_DE.UTF-8 | absent | Dateiname | GUI öffnen | Neustart | Beenden |
+| en_US.UTF-8 | absent | Filename | Open GUI | Restart | Quit |
+
+In each namespace the GUI process owned the original X11 window and bus name.
+Its original child completed passes zero and one, then detected the newly
+added synthetic file on pass two. Activating menu ID 3 exited the GUI and
+worker, released the window and preserved the configuration bytes. The
+[observer](observe.py) uses the application's exported dbusmenu directly.
+The [Plasma test](../../../../docs/rust/rw02-plasma.md) covers physical shell
+menu selections separately.
+
+The signed 3.0.4 Linux assemblies then read each original synthetic file
+from the same path with the corresponding system UI culture. They loaded
+all four configurations and produced the same selection shown in the table.
+The native observations and signed readbacks are in
+`artifacts/rust/combined-profile/editor-language-shipping-readback/results.json`,
+SHA-256 `5653a5c8e5ae73a7fca73dfcc3d3d5c193cebe713a2d1019ab90c13ad0be7be0`.
+
+This staged integration leaves adoption by the ordinary cross-platform
+compiler entry points open. The current normal renderer profile, retained
+Windows variants and Linux headless renderer each have their own compiler
+and source-reconstruction contracts.

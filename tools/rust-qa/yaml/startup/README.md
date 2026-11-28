@@ -37,6 +37,12 @@ fallback. The original report is
 SHA-256 `5bae02b555da6cb602a7b26b7ebc50ad6c9cda4e59bcdcd52284ac081e2bf03e`.
 The native Rust executable has SHA-256
 `bab69981e66ab1bb704d986d985db6cf39769cb7bdd5e9d9d1425570fc840241`.
+After the complete typed parser was committed at `d9b9e72`, all 22 process
+comparisons, the separate FIFO trial and the 14 Rust tests passed again.
+Its `d9b9e72/result.json` in the same directory has SHA-256
+`cb3b178111094691229db636e6519fbb9b0b2c126b7e23d6c5392b29cbb5ed02`.
+The matching executable has SHA-256
+`259c9adf236154d999c9f2a8f9d7385448bdd9352bf561cca42ccf30d01a70db`.
 
 The [comparison](compare.py) checks out the original Linux x64 3.0.4
 Flatpak commit, verifies the Core, App.Shared and YamlDotNet assemblies and
@@ -63,4 +69,7 @@ The ordinary RW-02 GUI still initializes its editor and tray in German. To
 use the reader on that path, its compiler and offline reconstruction must
 consume the same reviewed, filtered YAML sources. The four YAML dependency
 graphs and all 1,601 files in the filtered source bundle were checked for
-this library extraction. Native runtime evidence here covers Fedora x64.
+this library extraction. The [staged Linux GUI](../../gui/startup/README.md)
+combines the two original locks and exercises the first editor and late tray
+registration with the real inventory child. Native runtime evidence here
+covers Fedora x64.
