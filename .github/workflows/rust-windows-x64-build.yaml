@@ -8,6 +8,7 @@ on:
       - 'rust/**'
       - 'tools/rust-qa/windows-local/workspace.py'
       - 'tools/rust-qa/instance/cross-session/build_msi_endpoint.py'
+      - 'tools/rust-qa/instance/cross-session/atomic_config.rs'
       - 'tools/rust-qa/instance/cross-session/msi_endpoint.rs'
       - 'tools/rust-qa/gui/src/win32_instance.rs'
       - 'tools/rust-qa/realtime/**'
