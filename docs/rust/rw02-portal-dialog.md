@@ -127,6 +127,18 @@ for `x11-flatpak-8r8044ee` and
 for `wayland-flatpak-fxzz3xmb`. Both used ELF SHA-256
 `aee073300e00c7cf47c02ada88754f47402c23196db6f80f38759ed0750e12e4`.
 
+At `3116139` the installed ARM64 client on Ubuntu used Documents version 4.
+On both X11 and Wayland it displayed the grant path for `Grüße #2 %2F`.
+The observer read the synthetic backing path from Documents.Info. Each fresh
+client received `ENOENT` after revocation and read the other grant on the
+same mount. The archive contains the ARM64 ELF with SHA-256
+`656601bd42599766d3bcefe639747ddbccfe2cf0ff64cd0f6a354659d746a817`.
+Host replay verified the ELF architecture, 14 compiler inputs, 14 observer
+inputs, the native parent of both dialogs and the original client logs.
+The Actions archive SHA-256 is
+`8c7ee0e903b2aac2933fe72645b25a330ad97a389b911f860088b034f491b825`.
+[Original Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46119147439/artifacts/15252723875).
+
 The portal crate uses two existing audited inputs directly for the bounded
 attribute read. The offline build reproduced the preceding receipt's 211
 locked archives and the exact 116 active registry input records.

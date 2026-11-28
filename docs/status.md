@@ -15,7 +15,9 @@ grant remained readable. Both native host chooser trials also passed.
 Both installed trials passed again on Ubuntu ARM64 at the same revision.
 On Fedora the installed client then resolved the exact host label through
 the portal attribute and the v5 interface while accessing the selected
-directory through its grant.
+directory through its grant. At `3116139` the Ubuntu ARM64 client displayed
+the grant path under Documents v4 on both X11 and Wayland. Both fresh
+clients verified revocation and read the surviving control grant.
 [Display-name readback](rust/rw02-portal-dialog.md#resolving-the-display-name-inside-the-installed-flatpak).
 The editor at `b71b573` retained its focused field, backwards selection
 and first keystroke after reopening on Mutter and X11.
