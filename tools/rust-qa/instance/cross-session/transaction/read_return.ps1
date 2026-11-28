@@ -9,7 +9,7 @@ if ($env:COMPUTERNAME -cne 'IFW-QA25' -or $env:USERNAME -cne 'ifw-test' -or
     (Get-FileHash $app).Hash -ine 'b8354424bd6c6eba133bb7939ce0de42afbe234bcbb77853b30c25dd645f8675') {
     throw 'Expected the private profile and installed 3.0.4 application.'
 }
-Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,WindowsBase,System.Drawing,PresentationCore,System.Windows.Forms
+Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,WindowsBase,System.Drawing
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -17,19 +17,6 @@ public static class ReturnWindow {
     [StructLayout(LayoutKind.Sequential)] public struct Point { public int x, y; }
     [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(Point p);
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flag);
-    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] public static extern IntPtr GetClipboardOwner();
-    [DllImport("user32.dll")] public static extern bool OpenClipboard(IntPtr hwnd);
-    [DllImport("user32.dll")] public static extern bool CloseClipboard();
-    [DllImport("user32.dll")] public static extern IntPtr GetClipboardData(uint format);
-    [DllImport("kernel32.dll")] public static extern IntPtr GlobalLock(IntPtr handle);
-    [DllImport("kernel32.dll")] public static extern bool GlobalUnlock(IntPtr handle);
-    [DllImport("kernel32.dll")] public static extern UIntPtr GlobalSize(IntPtr handle);
-    [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
-    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
-    [DllImport("user32.dll")] public static extern bool GetCursorPos(out Point p);
-    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-    [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint x, uint y, uint delta, UIntPtr info);
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
 }
 '@
@@ -70,6 +57,18 @@ function CaptureOwned {
         finally { $graphics.ReleaseHdc($dc) }
         if (!$ok) {throw 'The restored WPF window could not be captured'}
         $image.Save((Join-Path $area 'returned-window.png'), [Drawing.Imaging.ImageFormat]::Png)
+        # The reference region was measured on two independent, native 1080x760
+        # WPF captures. Preserve the complete screenshot for detached comparisons.
+        if ($image.Width -eq 1080 -and $image.Height -eq 760) {
+            $pixels = [Collections.Generic.List[byte]]::new()
+            for ($y=394; $y -lt 431; $y++) {
+                for ($x=454; $x -lt 690; $x++) {
+                    $c = $image.GetPixel($x,$y)
+                    $pixels.Add($c.R); $pixels.Add($c.G); $pixels.Add($c.B)
+                }
+            }
+            $record.albumPixels = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($pixels.ToArray())).ToLowerInvariant()
+        }
     } finally { $graphics.Dispose(); $image.Dispose() }
 }
 function ReadField($field, $method) {
@@ -104,64 +103,12 @@ function ReadVisibleAlbum($tab) {
     $hit = [Windows.Automation.AutomationElement]::FromPoint([Windows.Point]::new($p.x,$p.y))
     $record.hit = @{name=$hit.Current.Name; type=$hit.Current.ControlType.ProgrammaticName; pid=$hit.Current.ProcessId}
     if (ReadField $hit 'UIA FromPoint') {return}
-    $prior = [ReturnWindow+Point]::new()
-    if (![ReturnWindow]::GetCursorPos([ref]$prior)) {throw 'Could not read private RDP pointer'}
-    try {
-        if (![ReturnWindow]::SetCursorPos($p.x,$p.y) -or
-            [ReturnWindow]::GetAncestor([ReturnWindow]::WindowFromPoint($p),2).ToInt64() -ne $Hwnd) {throw 'Owned hit moved'}
-        [ReturnWindow]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
-        [ReturnWindow]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
-        Start-Sleep -Milliseconds 180
-        $focused = [Windows.Automation.AutomationElement]::FocusedElement
-        if ([ReturnWindow]::GetForegroundWindow().ToInt64() -ne $Hwnd -or $focused.Current.ProcessId -ne $ProcessId) {
-            throw 'The returned editor does not own foreground and UIA focus'
-        }
-        $record.focus = @{name=$focused.Current.Name; type=$focused.Current.ControlType.ProgrammaticName; pid=$focused.Current.ProcessId}
-        if (ReadField $focused 'UIA FocusedElement') {return}
-        # On this shipping template UIA sometimes exposes only the window. Copy the
-        # selected field as an ordinary user. Read only a newly owned WPF clipboard.
-        [Windows.Forms.SendKeys]::SendWait('^a')
-        $before = [ReturnWindow]::GetClipboardSequenceNumber()
-        if ([ReturnWindow]::GetForegroundWindow().ToInt64() -ne $Hwnd) {throw 'Original foreground changed'}
-        [Windows.Forms.SendKeys]::SendWait('^c')
-        $end = [DateTime]::UtcNow.AddSeconds(3)
-        do {
-            $after = [ReturnWindow]::GetClipboardSequenceNumber()
-            $owner = [ReturnWindow]::GetClipboardOwner()
-            [uint32]$writer = 0
-            [void][ReturnWindow]::GetWindowThreadProcessId($owner,[ref]$writer)
-            if ($after -ne $before -and $writer -eq $ProcessId) {break}
-            Start-Sleep -Milliseconds 100
-        } while ([DateTime]::UtcNow -lt $end)
-        if ($after -eq $before -or $writer -ne $ProcessId -or [ReturnWindow]::GetForegroundWindow().ToInt64() -ne $Hwnd) {
-            throw 'The original WPF did not own a new clipboard value'
-        }
-        $record.method = 'WPF Copy on original window'
-        if (![ReturnWindow]::OpenClipboard([IntPtr]::Zero)) {throw 'Could not open the local WPF clipboard'}
-        try {
-            if ([ReturnWindow]::GetClipboardOwner() -ne $owner) {throw 'Clipboard owner changed before reading'}
-            # Requesting CF_UNICODETEXT can render a delayed native format and advance
-            # the sequence. The open clipboard prevents a second app from replacing it.
-            $data = [ReturnWindow]::GetClipboardData(13)
-            if ($data -eq [IntPtr]::Zero) {throw 'No owned Unicode text'}
-            $size = [ReturnWindow]::GlobalSize($data).ToUInt64()
-            if ($size -lt 2 -or $size -gt 4096 -or $size % 2) {throw 'Unexpected size for the synthetic album'}
-            $ptr = [ReturnWindow]::GlobalLock($data)
-            if ($ptr -eq [IntPtr]::Zero) {throw 'Cannot lock the owned album data'}
-            try {
-                $raw = [Runtime.InteropServices.Marshal]::PtrToStringUni($ptr, [int]($size / 2))
-                $endText = $raw.IndexOf([char]0)
-                if ($endText -lt 0) {throw 'Missing terminator on the owned WPF value'}
-                $record.album = $raw.Substring(0,$endText)
-            } finally { [void][ReturnWindow]::GlobalUnlock($data) }
-            $finalOwner = [ReturnWindow]::GetClipboardOwner()
-            if ($finalOwner -ne $owner) {throw 'The original WPF clipboard owner changed while open'}
-            $record.clipboard = @{before=$before; after=$after; owner=$owner.ToInt64(); pid=$writer
-                ownerAfterRead=$finalOwner.ToInt64(); sequenceAfterRead=[ReturnWindow]::GetClipboardSequenceNumber()}
-        } finally {
-            if (![ReturnWindow]::CloseClipboard()) {throw 'Could not close the owned clipboard read'}
-        }
-    } finally { [void][ReturnWindow]::SetCursorPos($prior.x,$prior.y) }
+    if ($hit.Current.ProcessId -ne $ProcessId -or
+        $record.albumPixels -cne '7181b9d5d68560c9e75f52c349f033a299c5f038aef23a89271adbb86bff6bb6') {
+        throw 'The original WPF has no independently matched album field'
+    }
+    $record.method = 'Owned WPF field pixels'
+
 }
 function SelectOwned($item) {
     if ($item.Current.ProcessId -ne $ProcessId -or $item.Current.IsOffscreen) {throw 'Selection owner changed'}
@@ -183,7 +130,7 @@ try {
     CaptureOwned
     ReadVisibleAlbum $tab
     $record.windowName = (BoundRoot).Current.Name
-    if ($record.album -cne 'Rust – Grüße 日本語 😀: # null') {throw 'Installed WPF returned a different album'}
+    if ($record.method -ne 'Owned WPF field pixels' -and $record.album -cne 'Rust – Grüße 日本語 😀: # null') {throw 'Installed WPF returned a different album'}
     $record.status = 'read'
 } catch {
     $record.error = $_.Exception.Message

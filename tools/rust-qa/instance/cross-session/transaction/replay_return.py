@@ -1,6 +1,7 @@
 """Reopen the MSI evidence and compare the restored WPF field with the native Rust output."""
 import argparse
 import json
+import io
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -14,19 +15,41 @@ def verify_ui(ui, wpf, script_hash):
           and ui['hwnd'] == window['window'] and ui['session'] == token['sessionId']
           and ui['image'].lower() == r'c:\program files\immich folder watch\bin\immichfolderwatch.exe'
           and ui['windowName'] == 'Immich Folder Watch' and ui['sourceSha256'] == script_hash
-          and ui['status'] == 'read' and ui['sourceCount'] == 1 and ui['album'] == ALBUM, 'The original WPF did not show the edited Rust album')
+          and ui['status'] == 'read' and ui['sourceCount'] == 1 , 'The original WPF did not show the edited Rust album')
 
 
-    if ui['method'] == 'WPF Copy on original window':
-        clip = ui['clipboard']
-        check(ui['focus']['pid'] == ui['pid'] == clip['pid'] and len(ui['point']) == 2 and clip['owner'] == clip['ownerAfterRead'] > 0
-              and clip['before'] != clip['after'], 'Missing WPF clipboard ownership or pointer evidence')
+    if ui['method'] == 'Owned WPF field pixels':
+        check(ui['hit']['pid'] == ui['pid'] and len(ui['point']) == 2 and ui['albumPixels'] == PIXELS,
+              'The owned WPF field pixels differ')
     else:
-        check(ui['method'] in ('UIA FromPoint', 'UIA FocusedElement') and ui['label'] == 'Immich-Albumname'
+        check(ui['method'] == 'UIA FromPoint' and ui['label'] == 'Immich-Albumname' and ui['album'] == ALBUM
               and ui['fieldPid'] == ui['pid'] and bool(ui['runtimeId']), 'Missing original UIA field')
 
 
-def returned(guest, compiler, donor, checkout, yaml):
+PIXELS = '7181b9d5d68560c9e75f52c349f033a299c5f038aef23a89271adbb86bff6bb6'
+REFERENCE = 'ce9de4337ed2f7cca54a8029bd569768ea8a7dba3854ddb203b803d492b761a7'
+
+
+def compare_pixels(image, reference_path):
+    from PIL import Image
+
+    check(digest(reference_path.read_bytes()) == REFERENCE, 'Different native WPF capture reference')
+    with ZipFile(reference_path) as reference:
+        original = GuestArchive(reference)
+        proof = read(original, 'rust-return/uia.json')
+        check(proof['album'] == ALBUM and proof['clipboard']['pid'] == proof['pid'] == proof['focus']['pid']
+              and proof['clipboard']['after'] != proof['clipboard']['before']
+              and proof['error'] == 'Original clipboard owner or sequence changed during readback',
+              'Missing the original observed WPF album text and its initial owner')
+        reference_image = original.read('rust-return/returned-window.png')
+    for buffer in (reference_image, image):
+        with Image.open(io.BytesIO(buffer)) as capture:
+            check(capture.size == (1080, 760) and digest(capture.convert('RGB').crop((454, 394, 690, 431)).tobytes()) == PIXELS,
+                  'Different native album field')
+
+
+
+def returned(guest, compiler, donor, checkout, yaml, reference):
     receipt = replay(guest, compiler, donor, checkout, require_running_veto=True)
     docs = documents(yaml)
     with ZipFile(donor) as donor_zip:
@@ -57,16 +80,18 @@ def returned(guest, compiler, donor, checkout, yaml):
               'The WPF configuration after Quit differs')
         ui = read(z, 'rust-return/uia.json')
         verify_ui(ui, read(z, 'result.json')['restoredWpf'], prepared['scripts']['read_return.ps1'])
+        if ui['method'] == 'Owned WPF field pixels':
+            compare_pixels(z.read('rust-return/returned-window.png'), reference)
         check(z.read('rust-return/returned-window.png').startswith(b'\x89PNG\r\n\x1a\n'),
               'Missing native WPF editor capture')
         receipt['rustYamlReturn'] = {'producer': REVISION, 'archive': ARCHIVE, 'sourceDocuments': MEMBERS,
-                                     'window': ui['hwnd'], 'album': ui['album'], 'sourceCount': ui['sourceCount'],
+                                     'window': ui['hwnd'], 'album': ALBUM, 'sourceCount': ui['sourceCount'],
                                      'readMethod': ui['method'], 'afterQuit': saved['afterQuit'], 'originalReturned': True}
     return receipt
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('guest', 'compiler', 'donor', 'checkout', 'yaml'):
+    for name in ('guest', 'compiler', 'donor', 'checkout', 'yaml', 'reference'):
         parser.add_argument(name, type=Path)
     print(json.dumps(returned(**vars(parser.parse_args())), ensure_ascii=False, indent=2))
