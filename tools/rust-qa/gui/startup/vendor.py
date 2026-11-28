@@ -14,10 +14,11 @@ from sources import local_caches, locked, prepare_registry, read, sha256, write,
 
 # Measured from the two locks against the original complete combined compiler-tree receipt.
 RECEIPT_SHA256 = "1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3"
+CORRECTED_RECEIPT_SHA256 = "6a169a3b2c15a259d24ee23f10fc4625876808ae121e2edd15469ab1e96d0478"
 GUI_RECEIPT_SHA256 = "0a4cc8dc3db5daee67b22898a0b4b3ca09a15fd157691e3d19eb72c134f885fe"
 GUI_LOCK_RECEIPTS = {
     "6716b1cc5835c1fbec9c9485773bdacfd63c4f5d01568a9aa94a8839c2e81d25": GUI_RECEIPT_SHA256,
-    "bdda6dc843f34b90bbe9efd99c84e994fd293a5d6ad88c52f6c70ceb8ea97679": RECEIPT_SHA256,
+    "bdda6dc843f34b90bbe9efd99c84e994fd293a5d6ad88c52f6c70ceb8ea97679": CORRECTED_RECEIPT_SHA256,
 }
 
 
@@ -30,7 +31,10 @@ def selected_inputs():
 
 
 def prepare(output, registries, fetch, *, selected=None, receipt_sha=RECEIPT_SHA256):
-    vendor, inputs = prepare_registry(output, registries, fetch, selected_inputs() if selected is None else selected, jobs=2)
+    if receipt_sha not in {RECEIPT_SHA256, GUI_RECEIPT_SHA256, CORRECTED_RECEIPT_SHA256}:
+        raise ValueError("The requested directory source has no reviewed receipt")
+    vendor, inputs = prepare_registry(output, registries, fetch, selected_inputs() if selected is None else selected,
+                                      jobs=2, stock=receipt_sha != CORRECTED_RECEIPT_SHA256)
     receipt = output / "registry-sources.json"
     write(receipt, inputs)
     if sha256(receipt) != receipt_sha:
@@ -63,19 +67,23 @@ def verify_sources(vendor, selected, catalog):
     return projection
 
 
-def compiler_directory(registry, gui=QA / "gui"):
+def compiler_directory(registry, gui=QA / "gui", *, stock=False):
     """Materialize the pinned registry once, then authenticate the actual compiler inputs on each use."""
     lock = sha256(gui / "Cargo.lock")
     if lock not in GUI_LOCK_RECEIPTS:
         raise ValueError("The GUI lock has no reviewed compiler source inventory")
     expected = GUI_LOCK_RECEIPTS[lock]
+    if stock and expected == CORRECTED_RECEIPT_SHA256:
+        expected = RECEIPT_SHA256
     selected = locked(gui)
     cache = ROOT / "artifacts/rust/gui-registry" / expected
     if not cache.exists():
         cache.parent.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=cache.parent) as scratch:
             fresh = Path(scratch) / "prepared"
-            prepare(fresh, [registry], False, selected=selected, receipt_sha=expected)
+            # The ordinary offline inputs may be split between the GUI and YAML acquisition caches.
+            registries = [registry, *(home / "registry" for home in local_caches())]
+            prepare(fresh, registries, False, selected=selected, receipt_sha=expected)
             try:
                 fresh.rename(cache)
             except OSError as error:
@@ -105,8 +113,10 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--cache", action="append", type=Path, help="Cargo home with original registry/cache archives")
     parser.add_argument("--fetch", action="store_true", help="Fetch missing checksum-pinned public original crates")
+    parser.add_argument("--corrected", action="store_true", help="Prepare the ordinary Flatpak-capable compiler sources")
     args = parser.parse_args()
     output = args.output.resolve()
     if output.exists() or not output.is_relative_to(ROOT / "artifacts/rust"):
         parser.error("Use a new output directory below artifacts/rust")
-    print(prepare(output, [home / "registry" for home in args.cache or local_caches()], args.fetch))
+    print(prepare(output, [home / "registry" for home in args.cache or local_caches()], args.fetch,
+                  receipt_sha=CORRECTED_RECEIPT_SHA256 if args.corrected else RECEIPT_SHA256))

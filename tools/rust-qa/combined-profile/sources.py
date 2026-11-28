@@ -22,6 +22,7 @@ sys.path.insert(0, str(QA))
 from gui import source_profile
 from realtime import hyper_util_source
 from storage.evidence import sha256
+accesskit_source = importlib.import_module("gui.flatpak-accessibility.accesskit_source")
 spec = importlib.util.spec_from_file_location("rw02_yaml_prepare", QA / "yaml/prepare.py")
 yaml_prepare = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(yaml_prepare)
@@ -81,7 +82,7 @@ def public_archive(name, archive, expected):
         raise ValueError(f"Wrong published bytes for {archive.name}")
 
 
-def prepare(work, homes, fetch):
+def prepare(work, homes, fetch, *, stock=False):
     approved_text = source_profile.validate()
     supplements = read(ROOT / "rust/audit/gui-inputs.json")["files"]
     for item in supplements:
@@ -92,11 +93,11 @@ def prepare(work, homes, fetch):
     if hyper["archiveSha256"] != hyper_util_source.ARCHIVE_SHA:
         raise ValueError("The realtime archive review differs from its source reconstruction")
     allowed[HYPER_KEY] = hyper["archiveSha256"]
-    vendor, inputs = prepare_registry(work, [home / "registry" for home in homes], fetch, allowed)
+    vendor, inputs = prepare_registry(work, [home / "registry" for home in homes], fetch, allowed, stock=stock)
     return vendor, inputs, approved_text
 
 
-def prepare_registry(work, registries, fetch, allowed, *, jobs=4):
+def prepare_registry(work, registries, fetch, allowed, *, jobs=4, stock=False):
     """Authenticate and filter the selected original crates using the combined compiler rules."""
     yaml = {(row["name"], row["version"]): row for row in read(QA / "yaml/inputs.json")["packages"]}
     cache = work / "registry/cache/reviewed"
@@ -123,13 +124,15 @@ def prepare_registry(work, registries, fetch, allowed, *, jobs=4):
             # Keep the authenticated original available to the standalone notice generator.
             hyper_util_source.original(work)
             return prefix, hyper_tree(receipt)
-        # This shared filter authenticates the original and rejects links and duplicate members.
-        # Only base64-0.23.1 has an approved transformed README and promotional asset removal.
-        files, changes = yaml_prepare.source_files(archive, prefix, checksum)
+        corrected_adapter = (name, version) == accesskit_source.KEY and not stock
+        if corrected_adapter:
+            files, changes = accesskit_source.registry_files(archive, checksum)
+        else:
+            files, changes = yaml_prepare.source_files(archive, prefix, checksum)
         hashes = {path: yaml_prepare.digest(data) for path, data in files.items()}
         filtered = yaml_prepare.digest(yaml_prepare.canonical(hashes))
         review = yaml.get((name, version))
-        if changes and not review:
+        if changes and not (review or corrected_adapter):
             raise ValueError(f"Unreviewed transformed input {prefix}")
         if review and (checksum != review["archive_sha256"] or filtered != review["filtered_tree_sha256"]
                        or changes != review["source_filter"]):

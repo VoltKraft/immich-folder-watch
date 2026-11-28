@@ -98,6 +98,41 @@ SHA-256 `f1e5dd1c830e4ad66292f22c9c6fdc061c9cb4eead40c017331d512a40d6d08c`.
 Its compiler receipt is `artifacts/rust/flatpak-accessibility/current-a4d967d/native.json`,
 SHA-256 `68d808ae984b4e8684df87ce8048b479fe795eed14506300d7354b392eabb3e9`.
 
+## Cargo directory source for the normal compiler
+
+The normal GUI and combined source builders use the same reviewed
+two-file adapter change. Cargo still identifies `accesskit_unix 0.24.1`
+by its original registry URL and archive SHA-256. The offline directory
+contains the 28 reconstructed files. Its Cargo checksum manifest records
+the original package checksum and the actual per-file hashes, with
+SHA-256 `ea3d9c955078b75c4a9b05b35407eb8ab10b2373c61525a1fc2a1e4214954f9b`.
+The original and corrected directories use separate receipt-keyed locations.
+[Directory builder](../startup/vendor.py) · [Combined source preparation](../../combined-profile/sources.py).
+
+| Local source comparison | Result |
+| --- | --- |
+| Registry compiler-tree digest for 28 files | `38ba18df2c350eee1ad11b89bad7f79f281a50e93bc3d30f19f14d62057662c8` |
+| Corrected 385-package GUI receipt file | `6a169a3b2c15a259d24ee23f10fc4625876808ae121e2edd15469ab1e96d0478` |
+| Corrected 473-record combined receipt file | `50bdb77fbcefac1077463f8c0444a2a7ccc13b7629c94c6df0ee876c0c51bdf4` |
+| Combined canonical source-inventory digest | `99e9d56cfa775b763633986e90691589d23bbedacc7e5539f4c056f1f74f2be0` |
+
+The registry compiler-tree digest hashes the canonical filename-to-digest
+JSON used by Cargo source preparation. The historical private path build
+above hashes sorted path names and binary digests. Each calculation covered
+the same source bytes. Fresh archive reconstruction reproduced all 384
+other GUI rows and all 472 other combined rows. The source comparison
+also verified every GUI row against the combined inventory. Its record
+is `artifacts/rust/combined-profile/accesskit-source-registry-01/comparison.json`,
+SHA-256 `3de85efeb78c21a08bf11b83468c650f8a1c47ac7cfd2aa0f4e4d5c7bef1d2ca`.
+
+For the historical control, `compiler_directory(registry, gui, stock=True)`
+selects the original adapter. The standalone startup vendor CLI retains its
+historical default and accepts `--corrected` for the normal source selection.
+The [registry check](test_registry.py) accepts the original `.crate` as
+its sole argument. It compares both Cargo trees and rejects each swapped
+profile. A third modified file also failed verification after the test
+updated its local Cargo checksum manifest.
+
 ## Installed observations on Fedora x64
 
 The private stock and candidate Flatpaks used the same runtime, permissions,
