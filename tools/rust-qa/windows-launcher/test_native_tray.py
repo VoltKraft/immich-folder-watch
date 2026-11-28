@@ -43,6 +43,19 @@ def callback(queued="22", dispatched=23, code=0x401, counter=None):
 
 
 class TrayProofTests(unittest.TestCase):
+    def test_projected_local_button_needs_the_same_native_flyout_and_separate_root_and_item(self):
+        point = dict(SURFACE, rootClass="TopLevelWindowForOverflowXamlIsland", hit=78, root=78,
+                     overflow=78, pane={"hwnd": 78})
+        provider = dict(ELEMENT, method="UIA.Invoke.ProjectedOverflowButton", root=78,
+                        hitDepth=None, rootRuntimeId=ELEMENT["hitRuntimeId"])
+        self.assertEqual(tray.confirm_provider({"provider": provider}, point, TOKEN), provider)
+        for change in ({"hit": 79}, {"overflow": 0}, {"pane": None}, {"rootClass": "Shell_TrayWnd"}):
+            with self.assertRaises(ValueError):
+                tray.confirm_provider({"provider": provider}, point | change, TOKEN)
+        for change in ({"hitDepth": 0}, {"rootRuntimeId": provider["runtimeId"]}, {"hitRuntimeId": "other"}):
+            with self.assertRaises(ValueError):
+                tray.confirm_provider({"provider": provider | change}, point, TOKEN)
+
     def test_consumed_open_must_identify_the_held_gui_thread_root_and_callback_ordinal(self):
         root = dict(pid=18, tid=8, hwnd=99)
         delivered = dict(pid=18, ordinal=1, dispatchMs=23)

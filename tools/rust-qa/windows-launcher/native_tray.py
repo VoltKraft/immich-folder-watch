@@ -576,6 +576,9 @@ def provider(api, desk, trial, env, out, key, creation, result, original):
             baseline, opened = provider_route(events, original, result)
             if item and "surface" in item:
                 verify_marker_route(item["surface"], baseline, opened)
+                if (item.get("provider", {}).get("method") == "UIA.Invoke.ProjectedOverflowButton"
+                        and env.get("IFW_QA_LOCAL_WINDOWS") != "1"):
+                    raise ValueError("A projected overflow button requires the original local Explorer")
                 if item.get("provider", {}).get("method") == "MSAA.accDoDefaultAction":
                     verify_msaa_route(events, item, env.get("IFW_QA_MSAA_ICON") == "1")
             return item
@@ -650,10 +653,21 @@ def confirm_provider(event, surface, token):
                 or any(type(v) is not int or v < 0 for v in ids) or len({v for v in ids if v}) > 1
                 or not 1 <= provider["childCount"] <= 128):
             raise ValueError("The original MSAA toolbar button, hit, or child identity differs")
-    elif (provider.get("method", "UIA.Invoke") != "UIA.Invoke" or not provider["runtimeId"]
-            or not (provider["nameMatches"] is True or provider["helpMatches"] is True)
-            or provider["enabled"] is not True or provider["offscreen"] is not False or not 0 <= provider["hitDepth"] < 12):
-        raise ValueError("The UI Automation provider was unavailable at the marker")
+    else:
+        method = provider.get("method", "UIA.Invoke")
+        if (not provider["runtimeId"] or not (provider["nameMatches"] is True or provider["helpMatches"] is True)
+                or provider["enabled"] is not True or provider["offscreen"] is not False):
+            raise ValueError("The UI Automation provider was unavailable at the marker")
+        if method == "UIA.Invoke.ProjectedOverflowButton":
+            pane = surface.get("pane") or {}
+            if (provider["hitDepth"] is not None or not provider["hitRuntimeId"]
+                    or provider["rootRuntimeId"] != provider["hitRuntimeId"]
+                    or provider["rootRuntimeId"] == provider["runtimeId"]
+                    or surface["rootClass"] != "TopLevelWindowForOverflowXamlIsland"
+                    or not (surface["hit"] == surface["root"] == surface["overflow"] == pane.get("hwnd"))):
+                raise ValueError("The original native flyout did not project its root at the unique button")
+        elif method != "UIA.Invoke" or not 0 <= provider["hitDepth"] < 12:
+            raise ValueError("The UI Automation provider was unavailable at the marker")
     return provider
 
 

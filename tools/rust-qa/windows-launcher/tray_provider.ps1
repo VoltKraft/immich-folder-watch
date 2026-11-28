@@ -424,6 +424,18 @@ function Get-Marker($Guard, [int[]]$Expected, $First) {
     throw $reason
 }
 
+function Get-ButtonsAtPoint($Root,$Point,[uint32]$Owner) {
+    $buttons=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::Button)
+    foreach ($candidate in $Root.FindAll([Windows.Automation.TreeScope]::Descendants,$buttons)) {
+        $item=$candidate.Current
+        $bounds=$item.BoundingRectangle
+        if ($item.ProcessId -eq $Owner -and $item.IsEnabled -and !$item.IsOffscreen -and !$bounds.IsEmpty -and
+            $bounds.Left -le $Point.X -and $Point.X -lt $bounds.Right -and $bounds.Top -le $Point.Y -and $Point.Y -lt $bounds.Bottom) {
+            $candidate
+        }
+    }
+}
+
 function Get-ExactProvider($Surface, [string]$Label) {
     $byName = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, $Label)
     $byHelp = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::HelpTextProperty, $Label)
@@ -459,6 +471,7 @@ function Get-ExactProvider($Surface, [string]$Label) {
     }
     $runtime = $item.GetRuntimeId() -join ','
     $hit = [Windows.Automation.AutomationElement]::FromPoint($point)
+    $initialHit=$hit
     $hitId = if ($null -ne $hit) { $hit.GetRuntimeId() -join ',' }
     $depth = 0
     while ($null -ne $hit -and $depth -lt 12 -and $hit.Current.ProcessId -eq $Surface.shellPid) {
@@ -468,13 +481,33 @@ function Get-ExactProvider($Surface, [string]$Label) {
         $depth++
     }
     $pattern = $null
-    if (-not $runtime -or $null -eq $hit -or -not [Windows.Automation.Automation]::Compare($item, $hit) -or
-        -not $item.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    $hasInvoke=$item.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)
+    $method='UIA.Invoke'; $rootRuntime=$null
+    $direct=$null -ne $hit -and [Windows.Automation.Automation]::Compare($item,$hit)
+    if (!$direct -and $localVm -and $Surface.rootClass -ceq 'TopLevelWindowForOverflowXamlIsland' -and
+        $Surface.hit -eq $Surface.root -and $Surface.root -eq $Surface.overflow -and $null -ne $lease.pane -and
+        $null -ne $initialHit -and [Windows.Automation.Automation]::Compare($initialHit,$root)) {
+        $overlap=@(Get-ButtonsAtPoint $root $point $Surface.shellPid)
+        $unique=$overlap.Count -eq 1 -and [Windows.Automation.Automation]::Compare($overlap[0],$item)
+        Write-Event 'icon-projection' @{rootAtPoint=$true;matchingButtons=$overlap.Count;original=$unique;invoke=$hasInvoke}
+        if ($unique -and [Windows.Automation.Automation]::Compare([Windows.Automation.AutomationElement]::FromPoint($point),$root)) {
+            $direct=$true
+            $method='UIA.Invoke.ProjectedOverflowButton'
+            $rootRuntime=$root.GetRuntimeId() -join ','
+            $depth=$null
+        }
+    }
+    if (-not $runtime -or !$direct -or !$hasInvoke) {
+        if ($localVm) {
+            Write-Event 'icon-point-diagnostic' @{runtimeId=$runtime;hitRuntimeId=$hitId;rootRuntimeId=($root.GetRuntimeId() -join ',');
+                enabled=$current.IsEnabled;type=$current.ControlType.ProgrammaticName;nativeHit=$Surface.hit;root=$Surface.root;
+                pointBound=$direct;invoke=$hasInvoke;rootAtPoint=($null -ne $initialHit -and [Windows.Automation.Automation]::Compare($initialHit,$root))}
+        }
         throw [InvalidOperationException]::new('The visible point did not belong to an exact invokable item')
     }
     return @{ pattern = $pattern; descriptor = [ordered]@{
-        method='UIA.Invoke'
-        runtimeId = $runtime; hitRuntimeId = $hitId; root=$Surface.root; pid = $current.ProcessId; matchCount = $visible; matchedLabel = $Label
+        method=$method
+        runtimeId = $runtime; hitRuntimeId = $hitId; rootRuntimeId=$rootRuntime; root=$Surface.root; pid = $current.ProcessId; matchCount = $visible; matchedLabel = $Label
         nameMatches = $nameMatches; helpMatches = $helpMatches
         enabled = $current.IsEnabled; offscreen = $current.IsOffscreen; hitDepth = $depth
         bounds = @($bounds.Left, $bounds.Top, $bounds.Right, $bounds.Bottom)
@@ -583,17 +616,7 @@ function Get-OverflowButton($State) {
         $pointElement=[Windows.Automation.AutomationElement]::FromPoint($point)
         $rootPoint=$null -ne $pointElement -and [Windows.Automation.Automation]::Compare($pointElement,$root)
         $overlappingButtons=@()
-        if ($rootPoint) {
-            $buttons=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty,[Windows.Automation.ControlType]::Button)
-            foreach ($candidate in $root.FindAll([Windows.Automation.TreeScope]::Descendants,$buttons)) {
-                $item=$candidate.Current
-                $box=$item.BoundingRectangle
-                if ($item.ProcessId -eq $ShellPid -and $item.IsEnabled -and !$item.IsOffscreen -and !$box.IsEmpty -and
-                    $box.Left -le $point.X -and $point.X -lt $box.Right -and $box.Top -le $point.Y -and $point.Y -lt $box.Bottom) {
-                    $overlappingButtons+= $candidate
-                }
-            }
-        }
+        if ($rootPoint) { $overlappingButtons=@(Get-ButtonsAtPoint $root $point $ShellPid) }
         $unique=$overlappingButtons.Count -eq 1 -and [Windows.Automation.Automation]::Compare($button,$overlappingButtons[0])
         Write-Event 'chevron-projection' @{rootAtPoint=$rootPoint;matchingButtons=$overlappingButtons.Count;original=$unique;
             point=@([int]$point.X,[int]$point.Y);bounds=@($bounds.Left,$bounds.Top,$bounds.Right,$bounds.Bottom);nativeHit=$hit}
@@ -666,7 +689,16 @@ function Restore-OpenedPane($Guard,$Lease,$Record) {
         if ($live.runtimeId -cne $Lease.button.runtimeId -or -not (& $restoreGuard $Lease.state.bar $Lease.state.explorer)) {
             throw 'The original flyout or its bound restoration provider changed'
         }
-        try { Restore-IfwTrayOverflow $Lease.state $Record $restoreGuard $authorizeClose }
+        try {
+            if ($localVm -and $Lease.pane.windowClass -ceq 'TopLevelWindowForOverflowXamlIsland' -and $Lease.state.action.method -ceq 'Invoke') {
+                # The first window found by class can be a hidden island. Recheck the actual
+                # enumerated visible pane before asking its original chevron to dismiss it.
+                if (& $authorizeClose $Lease.state.bar $Lease.state.explorer) {
+                    Write-Event 'closing-original-pane' @{pane=$Lease.pane;button=$live}
+                    $Lease.state.action.provider.Invoke()
+                }
+            } else { Restore-IfwTrayOverflow $Lease.state $Record $restoreGuard $authorizeClose }
+        }
         catch {
             if ($Lease.identityLost) { throw }
             $Record.restoreProviderError=$_.Exception.GetBaseException().Message
