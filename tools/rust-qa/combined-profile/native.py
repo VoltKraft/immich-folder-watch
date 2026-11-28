@@ -55,16 +55,42 @@ def linux_renderer_symbols(binary, output, env):
     return {"eframeEntrySymbols": len(entry), "vulkanSymbols": len(vulkan), "sampleSha256": sha256(output)}
 
 
-def run_native(target, toolchain, vendor, build, output, env, jobs):
+def exercise(target, prefix, subject, fixture, env, output, sqlite):
+    with (output / "smoke.json").open("xb") as log:
+        subprocess.run([*prefix, *subject], env=env, cwd=HERE, check=True,
+                       stdout=log, stderr=subprocess.STDOUT, timeout=60)
+    observed = read(output / "smoke.json")
+    if (observed["marker"] != "combined-profile-v1" or observed["sqliteSourceId"] != sqlite["source_id"]
+            or not observed["sqliteExtensionLoadingOmitted"] or observed["tessellatedPrimitives"] <= 0
+            or observed["roundTrip"] != {"file": "sample.txt", "utc": "2026-11-21T00:00:00.0000001+00:00"}
+            or observed["websocketPing"] != "abc"):
+        raise ValueError("Unexpected combined native smoke evidence")
+    renderer = "winit-refused-missing-display" if "linux" in target else "native-eframe-function-pointer"
+    if observed["nativeRenderer"] != renderer:
+        raise ValueError("Missing native eframe entry witness")
+    platform = observed["platform"]
+    if ("linux" in target and platform != {"binding": "wayland-interface-and-portal-name", "kdeBlurManagerVersion": 1}
+            or "windows" in target and platform != {"binding": "windows-shell-notifyicon-layout"}):
+        raise ValueError("Combined platform binding witness differs")
+    return {"smokeSha256": sha256(output / "smoke.json"),
+            "legacyUploadSha256": upload_trial.run(prefix, subject, fixture, env, output)}
+
+
+def run_native(target, toolchain, vendor, build, output, env, jobs, *, vm_inputs=False):
+    if target == "x86_64-pc-windows-msvc" and not vm_inputs:
+        raise ValueError("Compile with --x64-vm-inputs and execute the subject on the local Windows x64 VM")
+    if vm_inputs and (target != "x86_64-pc-windows-msvc" or os.name != "nt"):
+        raise ValueError("Windows x64 compiler required for VM inputs")
     sqlite = read(QA / "storage/inputs.json")["sqlite"]
     subprocess.run([sys.executable, str(QA / "check-toolchain.py"), target, "--rustc",
                     str(toolchain / "bin" / ("rustc.exe" if os.name == "nt" else "rustc"))],
                    env=env, check=True, stdout=subprocess.DEVNULL)
     build.mkdir(exist_ok=True)
     fixture = output / "synthetic-root"
-    fixture.mkdir()
     sample = fixture / "sample.txt"
-    sample.write_bytes(b"combined fixture\n")
+    if not vm_inputs:
+        fixture.mkdir()
+        sample.write_bytes(b"combined fixture\n")
     binary_name = "ifw-combined-assessment" + (".exe" if os.name == "nt" else "")
     binary = build / target / "release" / binary_name
     if sys.platform == "linux":
@@ -97,24 +123,13 @@ def run_native(target, toolchain, vendor, build, output, env, jobs):
     common = ["--release", "--frozen", "--target", target, "--jobs", str(jobs), *config]
     step("build.log", [cargo, "build", *common, "--message-format=json-render-diagnostics"])
     step("clippy.log", [cargo, "clippy", *common, "--all-targets", "--", "-D", "warnings"])
-    step("smoke.json", subject)
-    observed = read(output / "smoke.json")
-    if (observed["marker"] != "combined-profile-v1" or observed["sqliteSourceId"] != sqlite["source_id"]
-            or not observed["sqliteExtensionLoadingOmitted"] or observed["tessellatedPrimitives"] <= 0
-            or observed["roundTrip"] != {"file": "sample.txt", "utc": "2026-11-21T00:00:00.0000001+00:00"}
-            or observed["websocketPing"] != "abc"):
-        raise ValueError("Unexpected combined native smoke evidence")
-    renderer = "winit-refused-missing-display" if "linux" in target else "native-eframe-function-pointer"
-    if observed["nativeRenderer"] != renderer:
-        raise ValueError("Missing native eframe entry witness")
-    platform = observed["platform"]
-    if ("linux" in target and platform != {"binding": "wayland-interface-and-portal-name", "kdeBlurManagerVersion": 1}
-            or "windows" in target and platform != {"binding": "windows-shell-notifyicon-layout"}):
-        raise ValueError("Combined platform binding witness differs")
-    answer = {"target": target, "isolation": isolation, "binarySha256": sha256(binary),
+    answer = {"target": target, "binarySha256": sha256(binary),
               "buildLogSha256": sha256(output / "build.log"), "clippyLogSha256": sha256(output / "clippy.log"),
-              "smokeSha256": sha256(output / "smoke.json"), "sqliteFlags": sqlite["flags"]}
-    answer["legacyUploadSha256"] = upload_trial.run(prefix, subject, fixture, env, output)
+              "sqliteFlags": sqlite["flags"]}
+    if vm_inputs:
+        shutil.copyfile(binary, output / binary_name)
+    else:
+        answer.update(isolation=isolation, **exercise(target, prefix, subject, fixture, env, output, sqlite))
     if sys.platform == "linux":
         answer["sampleMtimeNs"] = mtime_ns
         answer["nativeRendererSymbols"] = linux_renderer_symbols(binary, output / "renderer-symbols.txt", env)

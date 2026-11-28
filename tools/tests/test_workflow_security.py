@@ -99,17 +99,21 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         for name in ("rust-windows-msi-interop.yaml", "rust-windows-installed-upload.yaml"):
             with self.subTest(workflow=name):
                 self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
-        for name in ("rust-windows-x64-build.yaml", "rust-windows-x64-gui-build.yaml"):
+        for name in ("rust-windows-x64-build.yaml", "rust-windows-x64-gui-build.yaml",
+                     "rust-windows-x64-combined-build.yaml", "rust-windows-x64-tray-build.yaml"):
             self.check_rust_workflow(name, {"actions/checkout", "actions/upload-artifact"})
 
     def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):
         compiler = "rust-windows-x64-build.yaml"
         gui_compiler = "rust-windows-x64-gui-build.yaml"
+        combined_compiler = "rust-windows-x64-combined-build.yaml"
+        tray_compiler = "rust-windows-x64-tray-build.yaml"
         for path in WORKFLOWS.glob("rust-*.yaml"):
             source = path.read_text()
             # Look at runner selections, including inline matrix rows.
             windows = re.findall(r"(?:runs-on|runner|os):\s*['\"]?(windows-[\w.-]+)", source)
-            allowed = {"windows-2025"} if path.name in (compiler, gui_compiler) else {"windows-11-arm"}
+            allowed = {"windows-2025"} if path.name in (
+                compiler, gui_compiler, combined_compiler, tray_compiler) else {"windows-11-arm"}
             self.assertLessEqual(set(windows), allowed, path.name)
         source = (WORKFLOWS / compiler).read_text()
         commands = re.findall(r"^          python -B (.+)$", source, re.M)
@@ -121,6 +125,15 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         gui = (WORKFLOWS / gui_compiler).read_text()
         self.assertEqual(re.findall(r"^          python -B (.+)$", gui, re.M), [
             "tools/rust-qa/build-gui-probe.py $env:NATIVE_TARGET --local-x64-inputs artifacts/rust/local-vm-inputs/gui",
+        ])
+        combined = (WORKFLOWS / combined_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", combined, re.M), [
+            "tools/rust-qa/combined-profile/run.py --x64-vm-inputs --fetch "
+            "--output artifacts/rust/combined-profile/runs/local-x64-inputs",
+        ])
+        tray = (WORKFLOWS / tray_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", tray, re.M), [
+            "tools/rust-qa/windows-launcher/local_build.py $env:NATIVE_TARGET",
         ])
         ci = (WORKFLOWS / "ci.yaml").read_text().split("  build-windows:\n", 1)[1].split("    steps:", 1)[0]
         self.assertIn("github.ref != 'refs/heads/rewrite/rust'", ci)

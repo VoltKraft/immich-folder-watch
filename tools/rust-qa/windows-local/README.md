@@ -62,6 +62,25 @@ log matched the guest report. Real Explorer interactions have separate
 | [Ordinary GUI and compiler receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46099044960/artifacts/15244358084) | `f6d7f5e21b9b723f5582ebb5a131356dbeeacb5bb463401da467c448e865021d` |
 | Guest output in `artifacts/rust/local-windows-server-2025-x64/20261128/gui-1660aeb/original-guest-results.zip` | `c14401996f4afb3af1c7b13120e18e46089e194a57229ce818b77f31b69b49d0` |
 
+## Combined native profile
+
+The [x64 profile compiler](../../../.github/workflows/rust-windows-x64-combined-build.yaml)
+reconstructs the locked sources, links the executable, captures the compiler
+units, and records the Clippy diagnostics and native imports. It saves these
+with `compiler.json` in `rust-combined-windows-x64-<revision>`. Check out
+that revision in the local guest and supply the original Actions ZIP and
+its SHA-256. Choose a new output directory.
+
+```powershell
+python -B tools/rust-qa/windows-local/combined.py C:\QA\combined.zip $digest C:\QA\results\combined
+```
+
+The guest checks the original compiler inputs and executable, then exercises
+the SQLite, YAML, GUI mesh, Shell and WebSocket paths and all five legacy
+upload cases. The guest report binds these observations to the original
+compiler archive. The same report directory is an input to
+[`sbom.py`](../combined-profile/sbom.py) for the Windows x64 target.
+
 ## Shipping .NET solution and installer checks
 
 In a fresh guest checkout, select the x64 SDK from `global.json`, Git for

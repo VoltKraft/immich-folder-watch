@@ -229,7 +229,9 @@ to reconcile project decisions, defaults, and recorded state.
   use the tested native writer and its identity oracle in two sessions of
   the same account. Verify the Actions digest before reusing a hosted build.
   Run every feasible Windows x64 rewrite test on the [local disposable
-  VM](tools/rust-qa/windows-local/README.md). The x64 Actions job compiles inputs.
+  VM](tools/rust-qa/windows-local/README.md). The x64 Actions jobs compile inputs.
+  Run the [combined Windows x64 profile](tools/rust-qa/windows-local/README.md#combined-native-profile)
+  from its original compiler archive in that guest.
   Use the [GUI compiler and guest harnesses](tools/rust-qa/windows-local/README.md#ordinary-gui-and-native-gui-test-executables)
   for the ordinary x64 GUI.
   The [native feasibility workflow](.github/workflows/rust-feasibility.yaml) owns

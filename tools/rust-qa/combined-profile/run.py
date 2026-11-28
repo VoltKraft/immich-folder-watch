@@ -39,7 +39,7 @@ def source_witness():
              ROOT / "rust/tests/fixtures/behavior/legacy-upload.json", QA / "audit-graph.py",
              QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "gui/source_profile.py",
              QA / "gui/src/fonts.rs", QA / "yaml/prepare.py", QA / "realtime/hyper_util_source.py",
-             QA / "realtime/hyper-util-connect.patch"]
+             QA / "realtime/hyper-util-connect.patch", QA / "windows-local/combined.py", QA / "realtime/guest.py"]
     files += list((ROOT / "rust/audit").glob("*.json"))
     files += [p for d in SPIKES for p in [QA / d / "Cargo.toml", QA / d / "Cargo.lock"]]
     files += [QA / d / "inputs.json" for d in ("storage", "yaml", "realtime")]
@@ -53,13 +53,19 @@ def source_witness():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--native", choices=TARGETS, help="also link and exercise the selected native host")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--x64-vm-inputs", action="store_true", help="compile the Windows x64 inputs for the local VM")
+    mode.add_argument("--native", choices=TARGETS, help="also link and exercise the selected native host")
     parser.add_argument("--fetch", action="store_true", help="acquire missing checksum-pinned archival inputs")
     parser.add_argument("--output", type=Path, help="new receipt directory below artifacts/rust/combined-profile/runs")
     parser.add_argument("--jobs", type=int, choices=range(1, 9), default=3)
     parser.add_argument("--relink", action="store_true", help="also rebuild an edited LGPL binding on native Linux")
     parser.add_argument("--check-imports", action="store_true", help="also compare both Microsoft import archives to the cached upstream revision")
     args = parser.parse_args()
+    if args.x64_vm_inputs:
+        if os.name != "nt":
+            parser.error("--x64-vm-inputs requires the native Windows x64 compiler")
+        args.native = "x86_64-pc-windows-msvc"
     if args.relink and (not args.native or "linux" not in args.native):
         parser.error("--relink requires --native with a Linux target")
     runs = SCOPE / "runs"
@@ -91,6 +97,8 @@ def main():
                 raise ValueError("Expected the pinned rustc and Cargo binaries")
             record.update(rustc=compiler.splitlines(), cargo=cargo.splitlines(), lock=sha256(HERE / "Cargo.lock"))
             print("Preparing and authenticating the private directory sources", flush=True)
+            if args.x64_vm_inputs:
+                source_profile.prepare(fetch=args.fetch)
             vendor, staged, text = prepare(work, local_caches(), args.fetch)
             print("Checking the four normal/build graphs and the original substrate reviews", flush=True)
             record["emptyLockReplaySha256"] = reproduce_lock(vendor, work, env, toolchain)
@@ -108,12 +116,15 @@ def main():
                 original = ROOT / "artifacts/rust/windows-imports/input/windows-rs-db06b51.tar.gz"
                 record["microsoftImports"] = compare(original, vendor)
             record["profileSha256"] = sha256(output / "profile.json")
-            subprocess.run(["rustfmt", "--edition", "2024", "--config", "skip_children=true", "--check",
-                            *sorted((HERE / "src").glob("*.rs"))], env=env, check=True)
+            if not args.x64_vm_inputs:
+                subprocess.run(["rustfmt", "--edition", "2024", "--config", "skip_children=true", "--check",
+                                *sorted((HERE / "src").glob("*.rs"))], env=env, check=True)
             if args.native:
-                print(f"Linking and exercising {args.native}", flush=True)
-                record["native"] = run_native(args.native, toolchain, vendor, work / "build", output, env, args.jobs)
-                record["native"]["compilerUnits"] = compiler_units(output, args.native)
+                section = "compiler" if args.x64_vm_inputs else "native"
+                print(f"Building {args.native} for {section} evidence", flush=True)
+                record[section] = run_native(args.native, toolchain, vendor, work / "build", output, env, args.jobs,
+                                             vm_inputs=args.x64_vm_inputs)
+                record[section]["compilerUnits"] = compiler_units(output, args.native)
                 if args.relink:
                     record["relink"] = relink.run(toolchain, vendor, work / "build", output, env, args.jobs,
                                                   args.native, record["native"])
@@ -124,8 +135,9 @@ def main():
     finally:
         record["outputs"] = {p.name: sha256(p) for p in sorted(output.iterdir())
                              if p.is_file() and p.name != "result.json"}
-        write(output / "result.json", record)
-        print(output / "result.json", flush=True)
+        receipt = output / ("compiler.json" if args.x64_vm_inputs else "result.json")
+        write(receipt, record)
+        print(receipt, flush=True)
 
 
 if __name__ == "__main__":

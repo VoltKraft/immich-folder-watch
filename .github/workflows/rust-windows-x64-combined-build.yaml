@@ -1,0 +1,58 @@
+name: Compile Windows x64 combined profile for the local VM
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-x64-combined-build.yaml'
+      - '.gitattributes'
+      - 'rust/**'
+      - 'tools/rust-qa/combined-profile/**'
+      - 'tools/rust-qa/windows-local/combined.py'
+      - 'tools/rust-qa/gui/**'
+      - 'tools/rust-qa/realtime/**'
+      - 'tools/rust-qa/storage/**'
+      - 'tools/rust-qa/yaml/**'
+      - 'tools/rust-qa/linux-services/Cargo.*'
+      - 'tools/rust-qa/windows-services/Cargo.*'
+      - 'tools/rust-qa/portal-dialog/Cargo.*'
+      - 'tools/rust-qa/performance/worker/Cargo.*'
+      - 'tools/rust-qa/audit-graph.py'
+      - 'tools/rust-qa/install-toolchain.sh'
+      - 'tools/rust-qa/enter-windows-build.ps1'
+      - 'tools/rust-qa/check-toolchain.py'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-2025
+    timeout-minutes: 70
+    env:
+      NATIVE_TARGET: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Compile the native executable from the reviewed profile
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture x64
+          python -B tools/rust-qa/combined-profile/run.py --x64-vm-inputs --fetch --output artifacts/rust/combined-profile/runs/local-x64-inputs
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-combined-windows-x64-${{ github.sha }}
+          path: artifacts/rust/combined-profile/runs/local-x64-inputs/
+          if-no-files-found: error
+          retention-days: 14
