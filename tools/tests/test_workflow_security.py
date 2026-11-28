@@ -109,13 +109,16 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertEqual(re.findall(r"runs-on: (\S+)", source), ["windows-11-arm"])
         self.assertIn("NATIVE_TARGET: aarch64-pc-windows-msvc", source)
         steps = source.split("      - name: ")
-        canonical, retained, archive = steps[-3:]
+        canonical, retained, private, private_retained, archive = steps[-5:]
         self.assertIn("windows-display/run.py $env:NATIVE_TARGET --require source-frame", canonical)
         self.assertIn("windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame", retained)
-        for step in (retained, archive):
+        self.assertIn("windows-display/private_source.py\n", private)
+        self.assertIn("windows-display/private_source.py --retained", private_retained)
+        for step in (retained, private, private_retained, archive):
             self.assertIn("!cancelled() && steps.inputs.outcome == 'success'", step)
-        self.assertIn("windows-display/archive_pair.py", steps[-4])
-        for path in ("windows-display-inputs/", "windows-display-runs/", "windows-display-retained-runs/"):
+        self.assertIn("windows-display/archive_pair.py", steps[-6])
+        for path in ("windows-display-inputs/", "windows-display-runs/", "windows-display-retained-runs/",
+                     "windows-display-private/", "windows-display-retained-private/"):
             self.assertIn(path, archive)
 
     def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):

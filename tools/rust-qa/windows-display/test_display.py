@@ -283,7 +283,8 @@ $png = $env:IFW_SAMPLE_PNG
         assess = DRIVER["assess"]
         records = []
 
-        def observe(_target, build_dir, output, profile, report, *, require_interactive, retained, cpu_archive):
+        def observe(_target, build_dir, output, profile, report, *, require_interactive, retained, cpu_archive, private):
+            self.assertIsNone(private)
             self.assertTrue(require_interactive)
             self.assertFalse(retained)
             self.assertIsNone(cpu_archive)

@@ -145,7 +145,8 @@ class RetainedDisplayTests(unittest.TestCase):
 
     def test_requested_rdp_on_retained_subject_keeps_unavailable_result_and_distinct_output(self):
         assess = test_display.DRIVER["assess"]
-        def observe(_target, _build, _output, _profile, report, *, require_interactive, retained, cpu_archive):
+        def observe(_target, _build, _output, _profile, report, *, require_interactive, retained, cpu_archive, private):
+            self.assertIsNone(private)
             self.assertTrue(require_interactive and retained)
             self.assertIsNone(cpu_archive)
             report.update(inventoryPassed=True, sourceFrameObserved=True, rdpRenderingObserved=False)

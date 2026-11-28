@@ -21,8 +21,8 @@ QA, ROOT = HERE.parent, HERE.parents[2]
 sys.path[:0] = [str(QA / "windows-text"), str(QA / "windows-desktop"), str(QA / "windows-performance"), str(QA)]
 from native import Win32, pin_path, start_owned_subject
 from storage.evidence import sha256, write_json
-from win32 import Desktop, GA_ROOT, GWL_EXSTYLE, WS_EX_TOPMOST, check, rect_values
-from worker import hosted, powershell, shared_windows
+from win32 import Desktop, GA_ROOT, GWL_EXSTYLE, WS_EX_TOPMOST, check, ordinary_console, rect_values
+from worker import hosted, named_desktop, powershell, shared_windows
 from windows_observer import private_gui_environment as environment, private_profile, select_powershell
 from topology import Topology, active_input, contains, physical_coordinates, protocol
 
@@ -221,7 +221,27 @@ def archived_subject(archive, profile, processes, resources, target, report):
     return binary
 
 
-def measure(target, build_dir, output, profile, report, *, require_interactive, retained=False, cpu_archive=None):
+def eligible_input(context, transport, private):
+    if private is None:
+        return active_input(context, transport)
+    return (named_desktop(private) and transport.get("status") == "observed" and transport.get("code") == 0
+            and ordinary_console(context, private))
+
+
+def private_membership(api, private, window, pid, witness):
+    desktop = api.thread_desktop(api.thread())
+    owner = w.DWORD()
+    tid = api.owner(window, c.byref(owner))
+    if not tid or owner.value != pid or api.name(desktop) != private or not ordinary_console(api.context(), private):
+        raise RuntimeError("The source frame requires the original GUI and active private input desktop")
+    counts = dict(window=api.count_top_level_window(desktop, window), witness=api.count_top_level_window(desktop, witness))
+    if (counts != {"window": 1, "witness": 1} or api.visible(witness)
+            or api.owner(window, c.byref(owner)) != tid or owner.value != pid or not ordinary_console(api.context(), private)):
+        raise RuntimeError("The private desktop did not enumerate the hidden witness and the same owned GUI")
+    return dict(pid=pid, tid=tid, hwnd=window, witness=hex(witness), counts=counts, desktop=private)
+
+
+def measure(target, build_dir, output, profile, report, *, require_interactive, retained=False, cpu_archive=None, private=None):
     api, display, processes = Desktop(), Topology(), Win32()
     env = environment(profile)
     held_window = retained or cpu_archive is not None
@@ -243,10 +263,14 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
             if sha256(binary) != report["retainedBuild"]["binary"]:
                 raise ValueError("The selected retained executable changed before launch")
         context = api.context()
-        report["desktop"] = {**context, **{key: (context[key] if context[key] in ("Default", "WinSta0") else "other")
+        report["desktop"] = {**context, **{key: (context[key] if context[key] in ("Default", "WinSta0", private) else "other")
                                            for key in ("inputDesktop", "threadDesktop", "windowStation")}}
         transport = report["protocol"] = protocol(api, context["session"])
         report["rdpSessionObserved"] = None if transport["status"] != "observed" else transport["code"] == 2
+        if private is not None:
+            if not eligible_input(context, transport, private):
+                raise RuntimeError("The child requires the selected unlocked private console desktop")
+            resources.enter_context(api.enumeration_witness(private, report))
         if require_interactive and not active_input(context, transport):
             raise RuntimeError("The selected test VM must already have an active, unlocked console or RDP input desktop")
         inventory = report["topology"] = display.inventory(api)
@@ -293,9 +317,14 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
             if report["rdpSessionObserved"]:
                 report["rdpRenderer"] = {"session": base["session"], "hwnd": hwnd, "adapter": adapter, "dpi": base["dpi"]}
             source, destination = choose_monitor(inventory, base["monitor"])
+            if private is not None:
+                destination = None
+                witness = int(report["hiddenEnumerationWindow"], 16)
+                report["privateWindowBefore"] = private_membership(api, private, hwnd, child.pid, witness)
             def input_available():
                 now = api.context()
-                return now["session"] == context["session"] and protocol(api, now["session"]) == transport and active_input(now, transport)
+                return (now["session"] == context["session"] and protocol(api, now["session"]) == transport
+                        and eligible_input(now, transport, private))
             def stage(name, layout, monitor, expected):
                 if visible() != hwnd or (name != "Read" and not input_available()):
                     raise RuntimeError("The owned HWND, input desktop or WTS transport changed")
@@ -318,7 +347,9 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
                 raise RuntimeError("The different-DPI destination has no matching active DisplayConfig path")
             report["inventoryPassed"] = True
             rdp = report["rdpSessionObserved"]
-            if not destination:
+            if private is not None:
+                report["mixedDpiReason"] = "The private desktop trial observes only the stationary source frame"
+            elif not destination:
                 report["mixedDpiReason"] = "Only one active monitor" if len(inventory["monitors"]) == 1 else "All active monitors have the same window DPI"
             if not rdp:
                 report["rdpReason"] = "The current WTS protocol did not report RDP"
@@ -353,6 +384,10 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
                     on_source = record_frame("SourceFrame", base, source)
                     if on_source.get("textRestored") != FIRST:
                         raise ValueError("The frame control did not restore the fixed filename")
+                    if private is not None:
+                        report["privateWindowAfter"] = private_membership(api, private, hwnd, child.pid, witness)
+                        if report["privateWindowAfter"] != report["privateWindowBefore"]:
+                            raise RuntimeError("The private GUI or desktop changed during the source frame")
                     report["sourceFrameObserved"] = True
                     if rdp:
                         report["rdpRenderingObserved"] = True
@@ -405,10 +440,16 @@ def unmet_qualifications(report, required):
     return [name for name in required if report.get(QUALIFICATIONS[name]) is not True]
 
 
-def assess(target, build_dir, required, *, require_interactive, retained=False, cpu_archive=None):
+def assess(target, build_dir, required, *, require_interactive, retained=False, cpu_archive=None, private=None):
     subject = "archived-cpu" if cpu_archive is not None else "retained" if retained else "canonical"
     name = "windows-display" if subject == "canonical" else "windows-display-" + subject
-    if required:
+    if private is not None:
+        if (target != "aarch64-pc-windows-msvc" or not named_desktop(private) or required != ["source-frame"]
+                or cpu_archive or require_interactive):
+            raise ValueError("The named ARM64 trial supports only the stationary source frame")
+        output = build_dir / (name + "-private") / "observation"
+        output.mkdir(exist_ok=False)
+    elif required:
         runs = build_dir / (name + "-runs")
         runs.mkdir(exist_ok=True)
         output = Path(tempfile.mkdtemp(prefix="-".join(required) + "-", dir=runs))
@@ -419,6 +460,8 @@ def assess(target, build_dir, required, *, require_interactive, retained=False, 
               QA / "windows-text/Pointer.cs", QA / "windows-performance/native.py", QA / "observe-windows-gui.py",
               QA / "observe-windows-input.ps1", QA / "windows_observer.py", QA / "windows-desktop/run.py",
               QA / "windows-desktop/win32.py", QA / "windows-desktop/worker.py"]
+    if private is not None:
+        inputs.append(QA / "windows-desktop/job.py")
     if retained or cpu_archive is not None:
         inputs.extend(QA / p for p in ("windows-launcher/retained_subject.py", "windows-services/service_sources.py",
             "windows-warm-window/inputs.py", "windows-warm-window/frame_latency.py", "windows-warm-window/window_lifetime.py",
@@ -431,10 +474,12 @@ def assess(target, build_dir, required, *, require_interactive, retained=False, 
               "inventoryPassed": False, "sourceFrameObserved": None, "mixedDpiPassed": None, "rdpRenderingObserved": None,
               "inputs": {p.relative_to(ROOT).as_posix(): sha256(p) for p in inputs}}
     report["profileRemoved"] = None
+    if private is not None:
+        report.update(requestedPrivateDesktop=private, privateWorkerPid=os.getpid())
     try:
         with private_profile(output, "ifw-display-", report) as profile:
             measure(target, build_dir, output, profile, report, require_interactive=require_interactive, retained=retained,
-                    cpu_archive=cpu_archive)
+                    cpu_archive=cpu_archive, private=private)
         report["status"] = "observed"
     except Exception:
         report["error"] = traceback.format_exc()

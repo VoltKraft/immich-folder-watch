@@ -59,6 +59,16 @@ jobs:
         shell: pwsh
         run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame
 
+      - name: Measure the canonical source frame on a private input desktop
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/private_source.py
+
+      - name: Measure the retained source frame on a private input desktop
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/private_source.py --retained
+
       - name: Retain both measurements and the original compiler outputs
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -68,5 +78,7 @@ jobs:
             artifacts/rust/windows-display-inputs/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-runs/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-retained-runs/
+            artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-private/
+            artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-retained-private/
           if-no-files-found: error
           retention-days: 14

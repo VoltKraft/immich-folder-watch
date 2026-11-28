@@ -144,6 +144,28 @@ winit sources, and the paired native inventory worker. The filename edit
 exercises the GUI on its synthetic profile. The worker is a compiler
 artifact in this trial. [Native ARM64 display workflow](../../.github/workflows/rust-windows-arm64-display.yaml).
 
+At `60ea5e2`, the original ARM64 console supplied one 1024 × 768 display
+at 96 DPI in WTS session 2, protocol 0. The canonical window's field
+center at (234, 149) and the retained window's at (260, 175) both belonged
+to another window, including after the topmost request. Both original
+windows returned to their previous non-topmost band. The guard stopped
+before sending input or recording a frame. Both processes closed to their
+supervisors, drained and exited with code 0. Their temporary profiles were
+removed. The original 43,174,065-byte ZIP has SHA-256
+`b2724277b5d7806d00e4748fd5ba86797dd284432c880d1830e8055d795703cc`.
+Independent replay verified both raw reports, their manifests, three ARM64
+PE images, the retained native compiler stream and libraries, and 86 source
+files against the recorded revision. [Original ARM64 display and compiler evidence](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103890970/artifacts/15247316470).
+
+For the separate private-desktop measurement, the supervisor switches
+from the original unlocked console to a newly created input desktop.
+The child verifies its desktop and enumerates the owned GUI and its
+hidden witness before and after capturing the actual filename edit.
+The supervisor checks restoration of the original input desktop and
+session after the worker exits. This trial requires a stationary source
+frame and leaves the mixed-DPI and RDP results unset.
+[Private source-frame supervisor](../../tools/rust-qa/windows-display/private_source.py).
+
 The local Intel x64 KVM host has a Windows Server x64 guest. For native
 Windows ARM64 mixed-DPI and RDP measurements, Microsoft documents local
 Windows 11 guests on Arm hardware and Windows Arm64 VMs on Azure that
