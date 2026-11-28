@@ -2,7 +2,7 @@ param([Parameter(Mandatory)][string]$Disc)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
-if ($env:COMPUTERNAME -cne 'IFW-QA25' -or -not $principal.IsInRole('Administrator') -or
+if ($env:COMPUTERNAME -cne 'IFW-QA25' -or -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -or
     -not (Get-CimInstance Win32_ComputerSystem).HypervisorPresent -or
     ([IO.DriveInfo]::new([IO.Path]::GetPathRoot($Disc))).DriveType -ne 'CDRom') {
     throw 'Use the private x64 test VM, its elevated local account and read-only DVD.'

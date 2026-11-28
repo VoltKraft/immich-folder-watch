@@ -61,8 +61,9 @@ def run(disc, work):
     require(instance.sha(disc / 'handover.zip') == PROFILE_ARCHIVE, 'Unexpected profile archive')
     profile.mkdir()
     with ZipFile(disc / 'handover.zip') as archive:
+        files = {name.replace('\\', '/'): name for name in archive.namelist()}
         for name in PROFILE_FILES:
-            (profile / name).write_bytes(archive.read('wpf-handover\\finished-profile\\' + name))
+            (profile / name).write_bytes(archive.read(files['wpf-handover/finished-profile/' + name]))
     original = {name: instance.sha(profile / name) for name in PROFILE_FILES}
     result = {'identity': own, 'desktop': desktop, 'profileInput': PROFILE_ARCHIVE, 'files': original, 'phases': {}}
     for phase in PHASES:
