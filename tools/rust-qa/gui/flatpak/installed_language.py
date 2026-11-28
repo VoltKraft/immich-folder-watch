@@ -157,7 +157,7 @@ def readback(language, before, xid, bus, dbus_call, out, *, screen_reader=False)
     stat = seen.stat()
     return {'saved': language, 'environment': env, 'configPath': str(path), 'configSha256': sha(seen),
             'configDevice': stat.st_dev, 'configInode': stat.st_ino,
-            **({} if screen_reader else {'accessibility': accessible_editor(language, proc, gui)}),
+            **({} if screen_reader else {'accessibility': accessible_editor(language, proc, before['proxy']['pid'])}),
             'guiPid': gui, 'xid': xid, 'editor': editor, 'tray': menu}
 
 
@@ -214,7 +214,7 @@ def sandbox_accessibility(commit, out):
             'queries': {name: {'exit': int(status), 'reply': body.strip()} for name, body, status in matches}}
 
 
-def accessible_editor(language, proc, gui):
+def accessible_editor(language, proc, proxy):
     from desktop_input import Atspi, GLib, nodes
     deadline = time.monotonic() + 2
     apps = {}
@@ -227,13 +227,15 @@ def accessible_editor(language, proc, gui):
             app = desktop.get_child_at_index(index)
             if app and app.get_role() == Atspi.Role.APPLICATION:
                 pid = app.get_process_id()
-                labels = sorted({n.get_name() for n in nodes(pid) if n.get_name() in EDITOR[language]})
-                apps[pid] = {'name': app.get_name(), 'labels': labels}
-        if gui in apps and set(apps[gui]['labels']) == set(EDITOR[language]):
+                bus_name = app.app.bus_name
+                labels = sorted({n.get_name() for n in nodes(pid) if n.app and n.app.bus_name == bus_name
+                                 and n.get_name() in EDITOR[language]})
+                apps[pid] = {'name': app.get_name(), 'busName': bus_name, 'root': app.path, 'labels': labels}
+        if proxy in apps and set(apps[proxy]['labels']) == set(EDITOR[language]):
             break
         time.sleep(.1)
-    return {'observedApplications': apps,
-            'allEditorLabelsObserved': gui in apps and set(apps[gui]['labels']) == set(EDITOR[language]),
+    return {'observedApplications': apps, 'proxyPid': proxy,
+            'allEditorLabelsObserved': proxy in apps and set(apps[proxy]['labels']) == set(EDITOR[language]),
             'sandboxAtspiSocketPresent': (proc / 'root/run/flatpak/at-spi-bus').is_socket()}
 
 

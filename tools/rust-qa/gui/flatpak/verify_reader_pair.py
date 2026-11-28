@@ -67,26 +67,42 @@ def capture(folder, mode):
     return inputs, result, summaries
 
 
-def compare(stock, candidate):
+def compare(stock, candidate, *, ordinary=False):
     a, control, first = capture(stock, 'stock')
-    b, fixed, second = capture(candidate, 'candidate')
+    mode = 'ordinary' if ordinary else 'candidate'
+    b, fixed, second = capture(candidate, mode)
     compiler = json.loads((candidate / 'gui-build.json').read_bytes())
     original, changed = a['compilerSources'], b['compilerSources']
-    manifests = {'tools/rust-qa/gui/Cargo.toml', 'tools/rust-qa/gui/Cargo.lock'}
-    if (compiler['originalReceiptSha256'] != a['buildReceiptSha256'] or original.keys() != changed.keys()
-            or {k for k in changed if changed[k] != original[k]} != manifests
-            or any(a[k] != b[k] for k in ('architecture', 'platform', 'gl', 'testFinishArgs', 'driverInputs'))
+    if ordinary:
+        from ordinary_reader import STOCK_RECEIPT
+        proof = json.loads((candidate / 'ordinary-reader.json').read_bytes())
+        prior = json.loads((stock / 'gui-build.json').read_bytes())
+        if (a['buildReceiptSha256'] != STOCK_RECEIPT or compiler['registryReceiptSha256'] == prior['registryReceiptSha256']
+                or any(compiler[k] != v for k, v in proof['compiler'].items())
+                or compiler['compilerUnits'] != prior['compilerUnits'] or compiler['target'] != prior['target']
+                or proof['guiSha256'] != compiler['binary_sha256'] or b['guiSha256'] != proof['guiSha256']
+                or proof['resultSha256'] != sha(candidate / 'result.json') or proof['languages'] != second
+                or original != changed):
+            raise ValueError('The ordinary editor must use the stock application sources and the same installed observer')
+    else:
+        manifests = {'tools/rust-qa/gui/Cargo.toml', 'tools/rust-qa/gui/Cargo.lock'}
+        if (compiler['originalReceiptSha256'] != a['buildReceiptSha256'] or original.keys() != changed.keys()
+                or {k for k in changed if changed[k] != original[k]} != manifests):
+            raise ValueError('The paired installations have different original sources or observer')
+    if (not a['driverInputs'].items() <= b['driverInputs'].items()
+            or any(a[k] != b[k] for k in ('architecture', 'platform', 'gl', 'testFinishArgs'))
             or control['installation']['installed_ref'] != fixed['installation']['installed_ref']
             or any(first[lang]['referenceSha256'] != second[lang]['referenceSha256'] for lang in EDITOR)):
-        raise ValueError('The paired installations have different original sources, runtime, observer or display references')
+        raise ValueError('The paired installations have different runtime, permissions, ref or display references')
     return {'stock': {'resultSha256': sha(stock / 'result.json'), 'languages': first},
-            'candidate': {'resultSha256': sha(candidate / 'result.json'), 'languages': second},
-            'stockBuildReceiptSha256': a['buildReceiptSha256'], 'candidateBuildReceiptSha256': b['buildReceiptSha256']}
+            mode: {'resultSha256': sha(candidate / 'result.json'), 'languages': second},
+            'stockBuildReceiptSha256': a['buildReceiptSha256'], mode + 'BuildReceiptSha256': b['buildReceiptSha256']}
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('stock', type=Path)
     parser.add_argument('candidate', type=Path)
+    parser.add_argument('--ordinary', action='store_true', help='compare the archived stock with the normal corrected build')
     args = parser.parse_args()
-    print(json.dumps(compare(args.stock, args.candidate), ensure_ascii=False, indent=2))
+    print(json.dumps(compare(args.stock, args.candidate, ordinary=args.ordinary), ensure_ascii=False, indent=2))

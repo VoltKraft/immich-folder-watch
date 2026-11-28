@@ -214,9 +214,11 @@ and observer before accepting the pair. From the repository root:
 ```sh
 area=artifacts/rust
 pixels="$area/egui-cpu-assessment/headless-e94nfyhl/pixels"
+stock="$area/flatpak-accessibility/stock-b01ed1b"
 candidate="$area/flatpak-accessibility/current-a4d967d"
 fixture=tools/rust-qa/gui/flatpak
-python3 -B "$fixture/run.py" --gui-build "$area/gui-build" \
+python3 -B "$fixture/run.py" --startup-gui "$stock/release/native-gui-assessment" \
+  --startup-receipt "$stock/release/native-gui-assessment.inputs.json" \
   --startup-pixels "$pixels" --tray-menu --screen-reader stock
 python3 -B "$fixture/run.py" --startup-gui "$candidate/target/release/native-gui-assessment" \
   --startup-receipt "$candidate/native.json" --startup-pixels "$pixels" --tray-menu --screen-reader candidate
@@ -283,6 +285,41 @@ control, empty application roots before Orca and only Tab echoes during
 each traversal. Both primaries exited through Quit and the private
 installation was empty. The replay report `x11-tl5qsy5w/result.json` has
 SHA-256 `a4c44d142b8c2cb618ce180aa53a8a099c04b171a34fb616ec2629b7dc186117`.
+
+The ordinary corrected Fedora executable has SHA-256
+`8701338776267200c277de2dc7a7f73969716509e0dcc6f9524770531524aeaa`.
+Its native receipt `a47f684efaf5791e54ebda2e3c9b5b98a6d7de3bf2c8a5a1668444bd0acc90ad`
+binds the verified registry and 310 compiler units. In a paired install
+with the archived stock binary, all 40 first-party compiler inputs matched
+byte for byte, including both Cargo files. Both installations ran the same
+session, window, keyboard and screen-reader observer code.
+
+| Fedora installed executable | English traversal | German traversal | Original result SHA-256 |
+| --- | --- | --- | --- |
+| Archived stock, `x11-1rf4dfnq` | Tab echoes | Tab echoes | `c52a2dc38e145ffbd43c907a5cd1826264b767e770905a285842a65ecd1f0898` |
+| Ordinary corrected GUI, `x11-jbfxei3q` | Filename, Password, Deutsch, Quit | Dateiname, Kennwort, English, Beenden | `2a01269553197b136d2a495ad3a34655ec8a4176f953374bbc65f2923b7c22d5` |
+
+The captured English and German PCM spans contained 396,134 and 400,568
+bytes. The restored stock installation again showed both languages while
+its own accessibility proxy had no application root. Both private
+installations were empty at exit. Replay the pair directly from the originals:
+
+```sh
+out=artifacts/rust/flatpak-gui-launch-assessment
+python3 -B tools/rust-qa/gui/flatpak/verify_reader_pair.py --ordinary \
+  "$out/x11-1rf4dfnq" "$out/x11-jbfxei3q"
+```
+
+The retained `reader-pair-b01ed1b-a47f684.json` has SHA-256
+`6f8021a0aab253a64f029a847fb8b231559d8b84a0a109d37d0a911e1cbcd2f7`.
+
+In a separate ordinary start without Orca, the default AT-SPI observer
+matched the root's bus name and reported process ID to each primary's
+actual Flatpak proxy. It read all four controls behind proxy PID 80
+(`:1.5`) for English and PID 419 (`:1.6`) for German. The GTK positive
+control, both ordinary exits and the empty installation also passed.
+`x11-xlt31ojj/result.json` has SHA-256
+`7091f8c06fedcdbb5fc71ebba35e8bb0342630c2a528b489c95de6909f4df35b`.
 
 ### Native Ubuntu packages on both architectures
 
