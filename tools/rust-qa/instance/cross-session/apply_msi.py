@@ -1,5 +1,6 @@
 """Exercise Save and Apply on the installed WPF window across a real config-handle release."""
 from contextlib import ExitStack
+import json
 import os
 from pathlib import Path
 import ssl
@@ -14,6 +15,7 @@ from msi_sessions import (ADMIN, APP, APP_SHA, MARKER, Accounts, Server, await_r
 
 HERE = Path(__file__).resolve().parent
 ENDPOINT_SHA = 'e0f4aa779264f5bb33cf1ab0d8f94c34072765ff8c16af252b5b3233813b330e'
+ALBUM_ID = '9220734a-c70e-490e-9c79-c79c96d42000'
 
 
 class ApplyPeer(peer.UploadPeer):
@@ -30,7 +32,10 @@ class ApplyPeer(peer.UploadPeer):
         self.reply(400, {'message': 'Invalid synthetic permission-check identifier'})
 
     def do_GET(self):
-        if self.path == '/api/assets/not-a-valid-id/original':
+        if self.path == '/api/albums' and self.server.uploads and self.server.release.is_set():
+            # WPF fills the initially empty album from the first typed path component.
+            self.reply(200, [{'id': ALBUM_ID, 'albumName': 'C'}])
+        elif self.path == '/api/assets/not-a-valid-id/original':
             self.permission()
         else:
             super().do_GET()
@@ -51,7 +56,22 @@ class ApplyPeer(peer.UploadPeer):
         self.permission() if self.path == '/api/albums/not-a-valid-id' else self.reply(404, {})
 
     def do_PUT(self):
-        self.permission() if self.path == '/api/albums/not-a-valid-id/assets' else self.reply(404, {})
+        if self.path == '/api/albums/not-a-valid-id/assets':
+            self.permission()
+        elif self.path == f'/api/albums/{ALBUM_ID}/assets':
+            length = self.headers.get('Content-Length', '')
+            if (self.server.phase != 'released' or self.headers.get('x-api-key') != peer.TEST_KEY
+                    or not length.isascii() or not length.isdigit() or not 0 < int(length) <= 256):
+                self.reply(400, {})
+                return
+            data = self.rfile.read(int(length))
+            if json.loads(data) != {'ids': [peer.ASSET_ID]}:
+                self.reply(400, {})
+                return
+            (self.server.output / 'album-membership.json').write_bytes(data)
+            self.reply(200, [{'id': peer.ASSET_ID, 'success': True}])
+        else:
+            self.reply(404, {})
 
 
 def serve(stack, area, cert_dir=None):
