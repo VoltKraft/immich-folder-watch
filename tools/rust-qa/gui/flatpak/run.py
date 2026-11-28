@@ -100,7 +100,8 @@ def main(args):
     if args.startup_gui:
         from installed_language import compiler_input, reference_images
         references = reference_images(args.startup_pixels.resolve(strict=True), art)
-        binary, receipt, sources = compiler_input(args.startup_gui, args.startup_receipt, art, arch)
+        binary, receipt, sources = compiler_input(args.startup_gui, args.startup_receipt, art, arch,
+                                                   candidate=args.screen_reader == 'candidate')
     else:
         if args.gui_build:
             subject = args.gui_build.resolve(strict=True)
@@ -138,6 +139,11 @@ def main(args):
     if args.startup_gui:
         drivers += [HERE / 'installed_language.py', HERE / 'accessibility-readback.sh',
                     qa / 'gui/desktop_input.py', qa / 'gui/native.py']
+    if args.screen_reader:
+        drivers += [HERE / 'reader.py', qa / 'gui/screen_reader.py']
+    if args.screen_reader == 'candidate':
+        drivers += [qa / 'gui/source_profile.py', qa / 'gui/flatpak-accessibility/application-bus.patch',
+                    qa / 'gui/flatpak-accessibility/build.py']
     drivers += [qa / 'gui/watcher.py', *(qa / 'performance' / n for n in
                 ('linux.py', 'session.py', 'observations.py', 'x11.py', 'worker/second_launch.py')),
                 qa / 'portal-dialog/flatpak_fixture.py', qa / 'portal-dialog/runtime_pin.py',
@@ -147,12 +153,16 @@ def main(args):
     out = Path(tempfile.mkdtemp(prefix='x11-', dir=dest))
     print(out, flush=True)
     shutil.copyfile(receipt, out / 'gui-build.json')
+    if args.screen_reader == 'candidate':
+        shutil.copyfile(receipt.parent / 'adapter.json', out / 'adapter.json')
     archive = out / 'observer-source.zip'
     with ZipFile(archive, 'x', ZIP_DEFLATED) as bundle:
         for p in [*drivers, manifest]:
             bundle.write(p, p.relative_to(root))
     receipts = archive_deployments(out, runtime, platform_receipt, gl, graphics, work)
     commands = ('bwrap', 'dbus-daemon', 'flatpak', 'ostree', 'xprop', 'xdg-dbus-proxy')
+    if args.screen_reader:
+        commands += ('orca', 'speech-dispatcher')
     if args.tray_menu:
         commands += ('dbus-monitor', 'stdbuf')
     save(out / 'inputs.json', {'sourceRevision': revision, 'guiPath': str(binary), 'guiSha256': sha(binary),
@@ -165,6 +175,7 @@ def main(args):
          'gl': {**graphics, 'path': str(gl), **mesa},
          'shipping': {'file': manifest.relative_to(root).as_posix(), 'sha256': sha(manifest), 'finishArgs': shipping},
          'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu, 'savedLanguageCases': bool(args.startup_gui),
+         'screenReader': args.screen_reader,
          'outerNamespaces': {n: os.readlink('/proc/self/ns/' + n) for n in NS}})
     cmd = namespace(out, qa / 'gui', None)
     (out / 'etc/passwd').write_text('root:x:0:0:Synthetic user:/tmp/home:/bin/false\n')
@@ -268,9 +279,13 @@ if __name__ == '__main__':
         parser.add_argument('--startup-pixels', type=Path, metavar='PIXELS',
                             help='directory containing the reviewed German and English 640 by 400 headless GPU frames')
         parser.add_argument('--tray-menu', action='store_true')
+        parser.add_argument('--screen-reader', choices=['stock', 'candidate'],
+                            help='compare the installed stock or qualified candidate editor with native Orca')
         parser.add_argument('--hosted-runtime', type=Path, metavar='DEPLOYMENT',
                             help='verified native Platform deployment on a disposable hosted runner')
         args = parser.parse_args()
         if bool(args.startup_gui) != bool(args.startup_receipt) or bool(args.startup_gui) != bool(args.startup_pixels):
             parser.error('--startup-gui, --startup-receipt and --startup-pixels must be used together')
+        if args.screen_reader and not args.startup_gui:
+            parser.error('--screen-reader requires the source-bound installed startup GUI')
         main(args)

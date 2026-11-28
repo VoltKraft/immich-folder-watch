@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import os
 import re
+import runpy
 import subprocess
 import sys
 import time
@@ -12,13 +13,17 @@ SYSTEM = {'en': 'de_DE.UTF-8', 'de': 'en_US.UTF-8'}
 MENU = {'en': ('Open GUI', 'Restart', 'Quit'), 'de': ('GUI öffnen', 'Neustart', 'Beenden')}
 EDITOR = {'en': ('Filename', 'Password', 'Deutsch', 'Quit'), 'de': ('Dateiname', 'Kennwort', 'English', 'Beenden')}
 COMPILER_RECEIPT = 'bfde3d81b0948a70d55221591ec3b57d3a7707a497d889d3758ccbdfbfd1fac0'
+CANDIDATE_RECEIPT = 'c21f6d98033b6574cc887bc393bf0e7ea77a4845630c9be721acc21194d1d909'
 
 
-def compiler_input(binary, receipt, area, arch):
+def compiler_input(binary, receipt, area, arch, *, candidate=False):
     from run import sha
     binary, receipt = binary.resolve(strict=True), receipt.resolve(strict=True)
     if arch != 'x86_64' or not all(p.is_relative_to(area) for p in (binary, receipt)):
         raise ValueError('Use the original source-bound Fedora x64 GUI under artifacts/rust')
+    if candidate:
+        builder = Path(__file__).resolve().parents[1] / 'flatpak-accessibility/build.py'
+        return runpy.run_path(str(builder))['verify_candidate'](binary, receipt, CANDIDATE_RECEIPT)
     if sha(receipt) != COMPILER_RECEIPT:
         raise ValueError('The native receipt differs from the reviewed startup compiler')
     evidence = receipt.parent
@@ -115,7 +120,7 @@ def editor_pixels(xid, language, out):
     return wait_for(sample, 5, 'Installed editor glyphs do not match the expected original frames')
 
 
-def readback(language, before, xid, bus, dbus_call, out):
+def readback(language, before, xid, bus, dbus_call, out, *, screen_reader=False):
     from run import sha
     import tray_menu
     gui = before['gui']['pid']
@@ -139,22 +144,27 @@ def readback(language, before, xid, bus, dbus_call, out):
     tray_menu.read_layout(bus, dbus_call, menu, MENU[language])
     if menu['revision'] != 1:
         raise ValueError('The installed primary changed languages before its first tray readback')
-    accessibility = accessible_editor(language, proc, gui)
     stat = seen.stat()
     return {'saved': language, 'environment': env, 'configPath': str(path), 'configSha256': sha(seen),
-            'configDevice': stat.st_dev, 'configInode': stat.st_ino, 'accessibility': accessibility,
+            'configDevice': stat.st_dev, 'configInode': stat.st_ino,
+            **({} if screen_reader else {'accessibility': accessible_editor(language, proc, gui)}),
             'guiPid': gui, 'xid': xid, 'editor': editor, 'tray': menu}
 
 
-def accessibility_control(stack, bus, dbus_call, out):
-    from desktop_input import Atspi, Gio, GLib, nodes, start_accessibility
-    from session import checked_start, stop, wait_for
+def registry_connection(stack, bus):
+    from desktop_input import Gio, GLib, start_accessibility
     enabled = start_accessibility(stack)
     address, = bus.call_sync('org.a11y.Bus', '/org/a11y/bus', 'org.a11y.Bus', 'GetAddress', None,
                              GLib.VariantType.new('(s)'), Gio.DBusCallFlags.NONE, 3000, None).unpack()
     flags = Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION
     peer = Gio.DBusConnection.new_for_address_sync(address, flags, None, None)
     stack.callback(peer.close_sync, None)
+    return enabled, address, peer
+
+
+def accessibility_control(stack, dbus_call, out, enabled, address, peer):
+    from desktop_input import Atspi, nodes
+    from session import checked_start, stop, wait_for
     # A native GTK button establishes whether this same private bus delivers real accessible controls.
     control = checked_start(stack, [sys.executable, '-B', '/app/flatpak/installed_language.py', '--accessibility-peer'],
                             out / 'accessibility-control.log')

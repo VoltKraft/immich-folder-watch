@@ -132,7 +132,23 @@ def run(report, inputs, out):
         import installed_language as startup
         sys.path.insert(0, '/app')
         os.environ['GSETTINGS_BACKEND'] = 'memory'
-        report['accessibilityControl'] = startup.accessibility_control(stack, bus, dbus_call, out)
+        reader = None
+        mode = inputs.get('screenReader')
+        def isolated_start(name, probe):
+            case = report[name] = {'installation': report['installation']}
+            directory = out / name
+            directory.mkdir()
+            run_primary(case, inputs, directory, display, bus, startup_probe=probe)
+
+        if mode:
+            from reader import InstalledReader, without_bus, without_reader
+            isolated_start('withoutBus', without_bus)
+        enabled, address, registry = startup.registry_connection(stack, bus)
+        if mode:
+            isolated_start('beforeReader', lambda primary: without_reader(registry, primary))
+        report['accessibilityControl'] = startup.accessibility_control(stack, dbus_call, out, enabled, address, registry)
+        if mode:
+            reader = InstalledReader(stack, registry, display, mode)
         cases = report['startupLanguages'] = {}
         previous = None
         for language in ('en', 'de'):
@@ -140,7 +156,7 @@ def run(report, inputs, out):
             case_dir.mkdir()
             case = cases[language] = {'installation': report['installation']}
             previous = startup.seed(language, previous)
-            run_primary(case, inputs, case_dir, display, bus, language)
+            run_primary(case, inputs, case_dir, display, bus, language, reader=reader)
             current = sha(previous[0])
             case['language']['configSha256AfterExit'] = current
             if current != previous[1]:
@@ -151,7 +167,7 @@ def run(report, inputs, out):
         wait_for(lambda: not flatpak_ps(), 8, 'The accessibility probe survived the runtime readback')
 
 
-def run_primary(report, inputs, out, display, bus, language=None):
+def run_primary(report, inputs, out, display, bus, language=None, *, reader=None, startup_probe=None):
     with ExitStack() as stack:
         if inputs['trayMenu']:
             trace = tray_menu.monitor(stack, out)
@@ -209,8 +225,18 @@ def run_primary(report, inputs, out, display, bus, language=None):
             except Exception as error:
                 cleanup['error'] = str(error)
         stack.callback(quit_primary)
+        if startup_probe is not None:
+            report['registry'] = startup_probe(before)
+            quit_primary()
+            if not report['cleanup']['passed']:
+                raise RuntimeError('The installed editor did not drain before opening the reader')
+            return
         if language:
-            report['language'] = startup.readback(language, before, xid, bus, dbus_call, out)
+            report['language'] = startup.readback(language, before, xid, bus, dbus_call, out,
+                                                  screen_reader=reader is not None)
+            if reader is not None:
+                report['screenReader'] = {}
+                reader.measure(report['screenReader'], language, before, xid)
         instances = {marker['instance']}
         report['secondary'] = []
         for index, arguments in enumerate(([], ['--background']), start=1):

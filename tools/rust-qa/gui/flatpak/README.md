@@ -75,8 +75,7 @@ The advertised `AT_SPI_BUS_ADDRESS` points to the mounted
 `org.freedesktop.DBus.Error.AccessDenied`. Through the same socket,
 `org.a11y.atspi.Registry.GetRegisteredEvents` returned an empty event list with
 exit status 0. Flatpak 1.18.4 permits this latter application-side call. The
-registry was therefore reachable from the ref. Screen-reader access to the
-installed editor remains open. The installed observation ends at AT-SPI
+registry was therefore reachable from the ref. The stock installed editor did not expose a tree on this desktop. The installed observation ends at AT-SPI
 discovery. Orca speech and audio were captured in the separate native Ubuntu
 editor trial. [Ubuntu ARM64 Orca results](../../../../docs/rust/rw02-native-gui.md#ubuntu-arm64-selection-and-quit-focus-at-245a921)
 and [Flatpak's accessibility proxy rules](https://github.com/flatpak/flatpak/blob/1.18.4/common/flatpak-run-dbus.c#L417-L425).
@@ -96,3 +95,75 @@ had PID 2. All eight masks matched their corresponding GPU references exactly.
 Overlap with the opposite language ranged from 19.5% to 41.6%. Both primaries
 exited with status 0 and the app list was empty after uninstall. The original
 second-launch and watcher replacement regression also passed in `x11-8yewtd3e`.
+
+## Screen reader comparison on installed refs
+
+The optional `--screen-reader stock` runs the original compiler receipt above.
+`--screen-reader candidate` selects the separate source-bound AccessKit
+test executable and receipt. Each run installs a fresh application from just one
+binary. Both use the same ref, Flatpak entry point, permissions, runtime,
+GPU reference frames and synthetic German and English profiles.
+
+Each trial first opens the ordinary editor without a desktop accessibility bus.
+The observer checks that the live sandbox received neither an accessibility
+address nor a socket and follows the window through Quit. A second start uses a
+working private registry before Orca or the GTK control exists. The observer
+reads the registry's application roots and event listeners three times during that
+start. It then verifies the native GTK button, starts Orca with Speech Dispatcher,
+eSpeak NG and a private ALSA file, and launches the two saved-language cases.
+For each installed editor it compares the visible pixels with both language
+references, focuses the original XID and sends physical XTest Tab events.
+The AT-SPI client's root path and bus name identify the app behind the original
+Flatpak proxy. Its outer PID, sandbox PID 2, mapped executable and original XID
+are recorded separately in the process witness.
+
+In the stock control, Orca 51.2 registered on the Fedora 2.62.2 AT-SPI bus.
+Before Orca started, three samples had empty listener and application lists.
+After it started, both languages rendered on screen and each set of four Tab
+presses produced only key echoes. Orca's own application was the only registry
+root. Both editors reopened on their original XIDs and exited successfully.
+The control report in `x11-cbgjya4t/result.json` has SHA-256
+`5a398c4ccb75f482164934785428a823aeba783053fc3e8a687b009ab700ba89`.
+
+To run the candidate with the original source-bound compiler output, use the
+same pixel directory and its separate native receipt. The tested executable has
+SHA-256 `b8938d364a916aea5c862e0da670071a353089176e9716facadf0471df80d438`.
+The [private adapter compiler](../flatpak-accessibility/build.py) verifies the
+source tree, notices and compiler units.
+
+```sh
+python3 -B tools/rust-qa/gui/flatpak/run.py \
+  --startup-gui artifacts/rust/flatpak-accessibility/second/target/release/native-gui-assessment \
+  --startup-receipt artifacts/rust/flatpak-accessibility/second/native.json \
+  --startup-pixels artifacts/rust/egui-cpu-assessment/headless-ycr1rvcu/pixels \
+  --tray-menu --screen-reader candidate
+```
+
+On Fedora x64 the corrected editor launched and quit normally without an
+accessibility socket. With the socket present and zero registered event
+listeners, three samples saw its root through proxy PID 572. After Orca
+started, the external AT-SPI client found toolkit `AccessKit`, application
+`native-gui-assessment`, a named entry, a password field and two buttons in
+both languages. Each physical Tab focused the named control at the original
+XID and yielded a corresponding Orca speech request.
+
+| Saved | GUI / proxy PID | AT-SPI bus owner | Spoken focus sequence | Non-silent PCM span |
+| --- | --- | --- | --- | ---: |
+| English | 1103 / 1099 | `:1.8` | Filename, Password, Deutsch, Quit | 474,010 bytes |
+| German | 1497 / 1493 | `:1.9` | Dateiname, Kennwort, English, Beenden | 477,576 bytes |
+
+The reported accessible application PID matched the corresponding proxy.
+The ordinary launch, background launch and restored tray all reopened each
+original window. Both primary processes exited with status 0. The private
+app list was empty after uninstall. The full report in
+`x11-ue6d30bk/result.json` has SHA-256
+`e88062ad400bffe5b5df93f6be4eb74707d4c8eb1be41dce93729bf5cd087b51`.
+Each `reader.json` records the byte offset, length and digest of the spoken
+traversal's span in `orca-audio.raw`. The exact speech request is in
+`orca-debug.log`. This comparison covers the private corrected x64
+executable on X11. The canonical editor and shipping application have
+separate build and qualification records.
+
+The original command without the Orca option also completed with the final
+observer in `x11-uyqg87yr`. It reproduced both stock pixel and menu results,
+the GTK control and the empty AT-SPI discovery intervals.
