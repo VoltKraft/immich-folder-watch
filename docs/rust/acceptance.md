@@ -68,7 +68,12 @@ acquired. The reverse launch order still permits a WPF upload with Rust
 already admitted, leaving RI-AC05 open.
 On x64, a read-only preflight identified the still-installed shipping
 MSI and returned the same veto both before WPF first launched and while
-its editor was open. The installation transaction remains outstanding.
+its editor was open. With WPF already stopped, a private major upgrade
+removed the ordinary installed launch paths. Its failure path restored
+the original executable through Windows Installer rollback. After reinstall,
+the original WPF started and quit normally in RDP using the unchanged
+profile. A competing launch during the transaction remains unverified.
+[Native MSI transaction and limits](../../tools/rust-qa/instance/cross-session/installed-writer.md#server-2025-x64-result-at-2ba4006) ·
 [Installed MSI preflight](rw02-cross-session.md#identifying-a-still-installed-wpf-before-the-next-launch) ·
 [WPF-first handover](../../tools/rust-qa/instance/cross-session/wpf-handover.md#local-server-2025-handover-at-bfd99b2) ·
 [Both launch orders](rw02-cross-session.md#installed-304-worker-in-another-session).

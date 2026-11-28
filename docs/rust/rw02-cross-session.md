@@ -650,6 +650,13 @@ and three modules read from the same guest checkout afterwards.
 
 ### Identifying a still-installed WPF before the next launch
 
+The subsequent x64 private MSI transaction took place after the WPF
+process had drained. Windows Installer restored the original WPF executable
+on rollback and removed the old launch paths on successful upgrade.
+Reinstall restored the original 3.0.4 launch and ordinary tray Quit.
+Exclusion during a concurrent launch and after candidate writes remains open.
+[Standard-user trial and retained profile](../../tools/rust-qa/instance/cross-session/installed-writer.md#server-2025-x64-result-at-2ba4006).
+
 On the local Server 2025 x64 guest the Rust preflight at `3913061`
 identified the original machine MSI from a standard user's RDP session
 before WPF had ever launched. The profile was still absent after the

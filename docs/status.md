@@ -84,8 +84,13 @@ a standard user in RDP. Both before first launch and while the WPF
 editor was visible, it returned exit 20 for the exact installed 3.0.4
 machine package. Independent replay matched both raw outputs, the
 installer log and the ordinary WPF Quit. The VM shut down and its
-temporary disks were removed. RI-AC05 still requires the transaction
-that keeps the old application from restarting during cutover.
+temporary disks were removed. A later x64 MSI trial on the 3584 MiB guest
+replaced the installed launch paths after WPF had stopped. Forced failure
+restored the original executable. Success removed its shortcut and executable,
+and reinstall restored both. The returning WPF opened and quit in RDP
+session 2. The YAML, SQLite database and its two sidecars stayed byte-identical.
+RI-AC05 still requires a competing ordinary launch during the transaction.
+[MSI rollback and return to WPF](../tools/rust-qa/instance/cross-session/installed-writer.md#server-2025-x64-result-at-2ba4006) ·
 [Installed MSI preflight and guest archive](../tools/rust-qa/instance/cross-session/installed-writer.md).
 
 Both native Ubuntu runners at `9487dbe` passed the five-owner D-Bus trial,
