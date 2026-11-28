@@ -300,3 +300,37 @@ The observer leaves the foreground window and its process alone.
 The dedicated ZIP is named `rust-after-quiet-app-arm64-<revision>`. Use the
 same offline CLI commands to replay it. `requestedStateObserved` refers to
 the selected comparison and `eligible` specifically to state 5.
+
+On November 28, 2026, the [native app-state job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46113460191/job/140881921736)
+at `a47dc9c7af0793111ed954f8fafa183d11aab866` recorded 95 quiet-time
+queries and then state 7 at 2,850.423 seconds. Notifications were On and
+Do not disturb was Off. In the same unlocked session 2, sender PID 3764
+issued one ordinary WinRT `Show` with popup suppression disabled. The
+call returned `S_OK` after 5.4269 ms. The nearest completed Shell queries
+returned state 7 at 1.8656 ms before and 24.1467 ms after the call.
+
+The foreground readbacks at the transition and either side of the send
+identified HWND `0x10204`, class `Windows.UI.Core.CoreWindow`, owned by
+`WWAHost.exe` PID 7600, thread 8588. Its bounds covered the 1024 × 768
+display. The Shell desktop belonged to `explorer.exe` PID 1304.
+Both window observations were read-only. The cause of the unavailable
+presentation remains open.
+
+Notification history acquired both exact tags, then removed each in turn
+and returned to empty. The independent physical observer sampled 90 times
+over 9.936 seconds. Its point and enumerated-window checks reached zero
+verified Shell notification windows and zero matching toast views. The
+visible-label requirement failed. The separate foreground readback still
+identified the CoreWindow above; Microsoft limits `EnumWindows` to
+top-level desktop-app windows on current Windows. Settings restored Do
+not disturb to On and an independent read confirmed both switches On.
+[Windows enumeration scope](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindows)
+
+The [original ZIP](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46113460191/artifacts/15252680904)
+contained 50 entries, 228,318 bytes, with SHA-256
+`b7be562bb6c0254b70031a4deede47e8a4169679f43aff2f309796ffdd2385fe`.
+Offline replay verified all 54 source hashes, the native compiler receipt,
+the sender binary (`b0b4e2f27c315cd9ee076b4cd04488050134162c0cd388bf46ad3cb49f405d39`),
+both observation streams and the independent Settings readback. The
+archive and replay are under
+`artifacts/rust/hosted-toast-history/app-state-trial/46113460191/`.
