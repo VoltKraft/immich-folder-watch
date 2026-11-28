@@ -58,6 +58,39 @@ and `grant-permissions` rights. The directory trial complements the separate
 shared media-lock tests. Fedora's shipped portal still refuses the required
 media `flock`. [Documents capability comparison](rw02-linux-services.md)
 
+### Opening and revoking a directory with an escaped name
+
+At `c7c614f` GTK selected both `album` and `Grüße #2 %2F` on private
+Fedora x64 desktops. The chooser returned the latter basename as
+`Gr%C3%BC%C3%9Fe%20%232%20%252F`. The Rust client previously stripped the
+scheme and passed the encoded spelling to the filesystem. It now decodes
+each component once into Unix filename bytes, checks the application's
+Documents mount and opens the returned directory with `safe_fs`. The literal
+`%2F` remains part of the name. [FileChooser response](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.FileChooser.html#org-freedesktop-portal-filechooser-openfile) ·
+[File URI specification](https://www.rfc-editor.org/rfc/rfc8089.html#section-4) ·
+[Rust decoder and tests](../../tools/rust-qa/portal-dialog/src/document_uri.rs).
+
+On both X11 and Wayland, the installed client listed the distinct marker in
+each directory. The external observer verified each ID, backing path and
+permission set through `Documents.Info`. It then revoked the escaped grant.
+A fresh process of the same Flatpak verified the FUSE mount, listed the
+ordinary control directory and received `ENOENT` when opening the original
+escaped URI. The service returned an empty permission set for that ID and
+app. The ordinary grant was revoked and checked separately. The native host
+chooser on both backends returned the corresponding encoded producer URI.
+
+The native executable SHA-256 was
+`c867688e16be62ef59a93e24796fbf15ce9aa67e474009bed11a5cb451854d90`.
+Readback bound each run's 13 compiler inputs and 14 observer inputs to the
+Git revision. Results are under `artifacts/rust/portal-dialog/`.
+
+| Fedora x64 trial | Result directory | SHA-256 of `results.json` |
+| --- | --- | --- |
+| Installed X11 | `x11-flatpak-pmngdc01` | `cc338bab6a0514b784c08c7107a835a9a7145d5d195d2b605954970fab119132` |
+| Installed Wayland | `wayland-flatpak-m7p_qubc` | `c99c1b974571c27c23545e45d459583d4f8fccc9875d0f4a05fbfffda3b9b5f9` |
+| Host X11 | `x11-chooser-only-felfrzjz` | `8178d7f7f4535e791a7c774926f78b78a6e915f1b1e2cfa8401a6d8be6655d70` |
+| Host Wayland | `wayland-chooser-only-vcdm_skm` | `5169f0f0c49ed6f6b25ed591d0dfa7542eda6765b1184c8bf36a2b31604b770f` |
+
 ## Notifications and autostart
 
 On Fedora x64 the private notification observer now publishes each complete

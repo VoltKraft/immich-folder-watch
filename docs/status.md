@@ -8,6 +8,22 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+The Fedora x64 portal client now decodes a selected directory URI into
+the original Unix filename bytes. At `c7c614f` two installed Flatpak trials
+opened `Grüße #2 %2F` and lost access after revocation while the control
+grant remained readable. Both native host chooser trials also passed.
+The editor at `b71b573` retained its focused field, backwards selection
+and first keystroke after reopening on Mutter and X11.
+[Folder results](rust/rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·
+[Editor results](rust/rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch).
+
+Both Ubuntu worker-budget trials at `d118426` passed all eleven limits
+using the native pairs from `9487dbe`. The ordinary Windows ARM64 sender
+posted successfully in Shell application mode. The visible banner and
+the sender's banner preference remain unverified.
+[Ubuntu budgets](rust/rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
+[ARM64 original archive](../tools/rust-qa/windows-services/toast-history.md#ordinary-notification-in-app-state-after-quiet-time).
+
 Two offline builds on native Ubuntu ARM64 at `378b36a` produced identical
 executables and identical modified Wayland relinks. Both passed all five
 held-file upload cases. Independent reconstruction reproduced the 446-package

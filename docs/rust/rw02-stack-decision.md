@@ -23,6 +23,15 @@ second session of the same account.
 [Installed cross-session launches](rw02-cross-session.md#installed-304-worker-in-another-session) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
+The native Ubuntu worker restart builds also passed all eleven paired
+resource limits. On Fedora x64 the canonical GUI now restores focus and
+backwards text selection when Mutter recreates the window. The newer
+Windows ARM64 application-mode trial confirmed the ordinary send and
+history cleanup. No visible Shell banner was verified.
+[Ubuntu budget repeat](rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
+[Reopened editor](rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch) ·
+[ARM64 original sender](../../tools/rust-qa/windows-services/toast-history.md#ordinary-notification-in-app-state-after-quiet-time).
+
 On Windows Server 2022 x64 at `47fe26d`, Explorer drew the registered
 Rust tray icon and its changed color at the same point. The accessibility
 lookup found no eligible item to invoke, and the GUI received no Shell

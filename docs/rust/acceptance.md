@@ -44,6 +44,22 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+On Fedora x64 the installed portal client at `c7c614f` opened both selected
+directory grants and retained the literal percent escape in the second
+folder name. After its revocation, a new process read the control grant
+and observed `ENOENT` for the revoked URI on both X11 and Wayland.
+The editor at `b71b573` also retained keyboard focus and its directional
+Unicode selection after an ordinary reopen on both backends.
+[Selected grants and revocation](rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·
+[Native editor measurements](rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch).
+
+Ubuntu x64 and ARM64 passed all eleven paired resource limits during the
+native three-trial inventory with the GUI and worker from `9487dbe`.
+On Windows ARM64 a normal WinRT send succeeded in application mode and
+the Shell retained the notification. Its visible banner remains unverified.
+[Ubuntu resource measurements](rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
+[ARM64 sender and desktop observations](../../tools/rust-qa/windows-services/toast-history.md#ordinary-notification-in-app-state-after-quiet-time).
+
 The local standard user's x64 RDP and console sessions verified a
 WPF-to-Rust handover after one committed upload. The original WPF process
 exited through tray Quit before the Rust endpoint and writer guard were

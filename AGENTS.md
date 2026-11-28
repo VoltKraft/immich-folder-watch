@@ -316,6 +316,8 @@ to reconcile project decisions, defaults, and recorded state.
   [reviewed worker sources](tools/rust-qa/performance/worker-inputs.json). The
   [portal dialog and Flatpak fixture](docs/rust/rw02-portal-dialog.md) controls
   a private desktop and installs only into its disposable test repository.
+  For [escaped directory names](docs/rust/rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name),
+  verify the returned grant and a surviving control grant in the same fresh process after revocation.
   Verify [visible GNOME notifications on ARM64](docs/rust/rw02-portal-dialog.md#visible-gnome-notifications-on-linux-arm64)
   against the installed sender, Shell owner and original screen captures.
   Verify [ordinary Linux second launches](docs/rust/rw02-instance.md#ordinary-second-launch-of-the-linux-gui)
