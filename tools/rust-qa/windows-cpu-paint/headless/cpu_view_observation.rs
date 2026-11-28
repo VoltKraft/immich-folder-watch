@@ -84,9 +84,9 @@ fn actual_view_mesh_and_texture_requests() {
             }
             assert_eq!(jobs.len(), 5);
             let expected_geometry = if index == 1 {
-                (414, 396, [104, 224, 86, 0])
+                (528, 484, [138, 296, 94, 0])
             } else {
-                (426, 420, [104, 224, 98, 0])
+                (546, 520, [138, 296, 112, 0])
             };
             assert_eq!((triangles, vertices, classes), expected_geometry);
             assert_eq!(ids, BTreeSet::from([TextureId::Managed(0)]));
@@ -114,8 +114,8 @@ fn actual_view_mesh_and_texture_requests() {
             }
             let expected_updates = match index {
                 0 => vec![(None, [2048, 32])],
-                1 if scale == 1.0 => vec![(Some([359, 0]), [183, 14])],
-                1 => vec![(Some([455, 0]), [249, 19])],
+                1 if scale == 1.0 => vec![(Some([391, 0]), [203, 14])],
+                1 => vec![(Some([490, 0]), [264, 19])],
                 _ => Vec::new(),
             };
             assert_eq!(updates, expected_updates);
