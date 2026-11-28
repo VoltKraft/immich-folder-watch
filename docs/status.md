@@ -76,6 +76,10 @@ The ordinary binary subsequently passed all 40 Fedora tests, the four
 signed language comparisons and both installed Flatpak startup cases.
 Mutter retained the selected filename range after a normal second launch.
 [Ordinary editor and installed Flatpak](rust/rw02-native-gui.md#ordinary-linux-startup-language-at-c361c69).
+Both native Ubuntu architectures repeated all four language starts at
+`17437d0`. Each first editor and first tray menu used the expected
+language and all eight sessions exited normally.
+[Ubuntu x64 and ARM64 jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46139648505).
 An independent review matched the GUI and compiler sources to `446fc1f`,
 traced the single Linux primary's language read to both the editor and the
 first menu, and checked the four Fedora settings against the signed reader.
