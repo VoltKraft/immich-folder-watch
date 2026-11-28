@@ -1,4 +1,9 @@
 from copy import deepcopy
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 from private_selection import verify_selection
@@ -6,6 +11,21 @@ from test_private_source import NAME, console
 
 
 class PrivateSelectionTests(unittest.TestCase):
+    def test_powershell_file_with_implicit_qa_root_reaches_the_host_guard(self):
+        shell = shutil.which("powershell.exe") if os.name == "nt" else shutil.which("pwsh")
+        if not shell:
+            self.skipTest("PowerShell is required for the direct observer entry point")
+        script = Path(__file__).resolve().parents[1] / "windows-text/reopen-selection.ps1"
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "absent"
+            child = subprocess.run([shell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                                    "-File", str(script), "-Binary", "unused.exe", "-OutputDirectory", str(output)],
+                                   cwd=temp, capture_output=True, text=True, timeout=30,
+                                   env={**os.environ, "COMPUTERNAME": "outside-fixture", "NO_COLOR": "1"})
+            self.assertNotEqual(child.returncode, 0)
+            self.assertIn("Select the local disposable x64 Windows console", child.stderr)
+            self.assertFalse(output.exists())
+
     def test_focus_direction_origin_and_return_desktop_are_required(self):
         session = dict(workerPid=10, workerExit=0, jobClosed=True, beforeSwitch=console("Default"),
                        returnedDesktop=console("Default"), created=dict(requested=NAME, actual=NAME),

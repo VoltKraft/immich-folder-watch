@@ -1,11 +1,12 @@
 param(
     [Parameter(Mandatory)][string]$Binary,
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [string]$QaRoot = (Split-Path $PSScriptRoot),
+    [string]$QaRoot,
     [ValidatePattern('^IfwQa_[a-f0-9]{32}$')][string]$HostedDesktop
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $QaRoot) { $QaRoot = Split-Path $PSScriptRoot }
 if ($HostedDesktop) {
     if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or
         $env:RUNNER_OS -cne 'Windows' -or $env:RUNNER_ARCH -cne 'ARM64' -or $env:IFW_QA_LOCAL_WINDOWS -or
@@ -23,7 +24,11 @@ $parent = if ($HostedDesktop) { (Resolve-Path $env:RUNNER_TEMP).Path } else { $o
 $trial = (New-Item -ItemType Directory -Path (Join-Path $parent "ifw-rw02-$token")).FullName
 [IO.File]::WriteAllText((Join-Path $trial 'inventory.owner'), $token, [Text.Encoding]::ASCII)
 [IO.File]::WriteAllBytes((Join-Path $trial 'launcher.pid'), [byte[]]@())
-$report = [ordered]@{ status='failed'; binarySha256=(Get-FileHash $binaryPath).Hash; stages=[ordered]@{} }
+$image = [IO.File]::OpenRead($binaryPath)
+$sha = [Security.Cryptography.SHA256]::Create()
+try { $imageHash = [BitConverter]::ToString($sha.ComputeHash($image)).Replace('-', '') }
+finally { $sha.Dispose(); $image.Dispose() }
+$report = [ordered]@{ status='failed'; binarySha256=$imageHash; stages=[ordered]@{} }
 $primary = $null
 $secondary = $null
 $handle = [IntPtr]::Zero
@@ -203,7 +208,7 @@ public static class IfwSelectionDesktop {
     $secondary.process.StandardInput.Close()
     Save-Process $secondary 'secondary'
     if ($report.secondaryExit -ne 0) { throw 'Second launch failed.' }
-    $handle = Wait-Observation { $h = Get-SubjectWindow; if ($h -ne [IntPtr]::Zero) { $h } } 'reopened original primary'
+    $handle = Wait-Stage { $h = Get-SubjectWindow; if ($h -ne [IntPtr]::Zero) { $h } } 'reopened original primary'
     $report.reopenedHwnd = $handle.ToInt64()
     # No focus, foreground, pointer or ValuePattern requests after the normal close.
     Expect-Stage afterReopen $initial 2 $initial.Substring(2,3)

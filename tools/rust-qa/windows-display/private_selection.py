@@ -57,10 +57,11 @@ def observe_worker(api, name, binary):
             for key in ("RUNNER_OS", "RUNNER_ARCH", "RUNNER_ENVIRONMENT", "RUNNER_TEMP", "GITHUB_ACTIONS",
                         "GITHUB_REPOSITORY", "GITHUB_REF"):
                 env[key] = os.environ[key]
-            program, record["observerHosts"] = DISPLAY["select_powershell"](OUTPUT, "accessibility", env)
+            env["PSModuleAnalysisCachePath"] = str(profile / "ModuleAnalysisCache")
+            program, record["observerHosts"] = DISPLAY["select_powershell"](profile, "accessibility", env)
             if not program:
                 raise RuntimeError("No local PowerShell host can load UI Automation")
-            args = ["-Binary", binary, "-OutputDirectory", OUTPUT / "field", "-HostedDesktop", name]
+            args = ["-Binary", binary, "-OutputDirectory", OUTPUT / "field", "-HostedDesktop", name, "-QaRoot", QA]
             record["exit"] = DISPLAY["powershell"](program, QA / "windows-text/reopen-selection.ps1",
                                                    args, env, profile, OUTPUT / "observer.log", 150)
         record["after"] = api.context()
@@ -98,6 +99,8 @@ def main():
             DESKTOP["run_worker"](Path(__file__).resolve(), [*flags, "--worker-desktop", name], name, ROOT, session,
                                   timeout_seconds=220)
         session["returnedDesktop"] = api.context()
+        if session["workerExit"]:
+            raise RuntimeError(f"The native selection worker exited {session['workerExit']}. See observer.log and worker.json.")
         verify_selection(session, READ(OUTPUT / "worker.json"), READ(OUTPUT / "field/selection.json"), name)
         session["verified"] = True
         return 0

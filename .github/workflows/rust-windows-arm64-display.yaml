@@ -58,30 +58,6 @@ jobs:
           python -B tools/rust-qa/windows-display/archive_pair.py
           exit $LASTEXITCODE
 
-      - name: Read the existing Remote Desktop settings and aggregate WTS session states
-        shell: pwsh
-        run: python -B tools/rust-qa/windows-display/venue.py
-
-      - name: Observe the canonical source-monitor edit
-        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
-        shell: pwsh
-        run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --require source-frame
-
-      - name: Observe the retained source-monitor edit
-        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
-        shell: pwsh
-        run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame
-
-      - name: Measure the canonical source frame on a private input desktop
-        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
-        shell: pwsh
-        run: python -B tools/rust-qa/windows-display/private_source.py
-
-      - name: Measure the retained source frame on a private input desktop
-        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
-        shell: pwsh
-        run: python -B tools/rust-qa/windows-display/private_source.py --retained
-
       - name: Select the current or requested original ARM64 selection subject
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
         id: selection
@@ -116,6 +92,31 @@ jobs:
             python -B tools/rust-qa/windows-display/private_selection.py
           }
           exit $LASTEXITCODE
+
+      - name: Read the existing Remote Desktop settings and aggregate WTS session states
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/venue.py
+
+      - name: Observe the canonical source-monitor edit
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --require source-frame
+
+      - name: Observe the retained source-monitor edit
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame
+
+      - name: Measure the canonical source frame on a private input desktop
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/private_source.py
+
+      - name: Measure the retained source frame on a private input desktop
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/private_source.py --retained
 
       - name: Retain both measurements and the original compiler outputs
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
