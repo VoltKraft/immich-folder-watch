@@ -1487,7 +1487,7 @@ The resulting `windows-quit-keyboard-private/` directory contains the
 button evidence, GUI log, worker and desktop receipts. The supervisor
 checks the staged profile cleanup and return to the original unlocked
 console. The separate `windows-quit-private/` trial retains the UIA
-invocation evidence. The keyboard case awaits its native result.
+invocation evidence.
 
 The first ARM64 attempt at `82b8530` compiled both GUI executables.
 Worker staging stopped before the keyboard step. The shared review had
@@ -1506,4 +1506,27 @@ Removing the 313 bytes added at `f2202ee` reproduces the compiled-source
 digest `35a0153c419e3b12a8a0e1b5cc0a4ccc5168dc97f991a78eee36f66cbc891be3`
 from the earlier native `07c0d70` archive. The local staging test also
 checks rejection of a missing or changed digest for each file.
+
+Windows 11 ARM64 at `e610d61` passed the keyboard trial. After the Shell
+refused initial tray registration, the original inventory worker (PID 4852)
+read the synthetic file twice. Three Tab presses moved focus through
+`Dateiname`, protected `Kennwort`, `English` and `Beenden`. All four
+controls had distinct UI Automation runtime IDs and belonged to GUI PID
+7972. At each step HWND 1048672 held the native foreground and keyboard
+focus. The last focused ID matched the visible 70 × 22 Quit button.
+Windows accepted the down and up events for Space. The worker exited
+with reason `quit`, the control reader stopped and the GUI exited zero
+after 23 passes. The supervisor removed the profile, closed its job and
+returned to the original unlocked `Default` desktop in console session 2.
+[Native ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46137194724/job/140955014110)
+
+The same job independently passed the UI Automation invocation on GUI PID
+2088 and HWND 524786. The two source-monitor edit steps on the default
+desktop failed, giving the overall job a failure status. The original
+43,277,752-byte archive matched Actions SHA-256
+`f1327dad22ee9e53070ebe6786809b7fb6c92fa510fc32faa062a88f9f08f021`.
+The local replay checked the six keyboard observer files against the
+revision, all 47 files in the compiler pair receipt, all 18 worker source
+files, both ARM64 PE images, both button records and their shutdown logs.
+[Original artifact 15261255202](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46137194724/artifacts/15261255202)
 [ARM64 workflow](../../.github/workflows/rust-windows-arm64-display.yaml).
