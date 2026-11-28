@@ -11,6 +11,40 @@ use tokio::{
 
 use crate::{Error, transport::validate_upgrade};
 
+/// Credentials belong to the selected plaintext relay. Each request first
+/// reaches it without proxy authorization, including WebSocket CONNECT.
+pub(crate) struct Credentials {
+    pub basic: HeaderValue,
+    #[cfg(target_os = "linux")]
+    pub url: Url,
+    #[cfg(target_os = "linux")]
+    pub digest: crate::digest_proxy::DigestState,
+}
+
+impl Credentials {
+    pub fn challenged(
+        &self,
+        headers: &HeaderMap,
+        _method: &reqwest::Method,
+        _target: &str,
+        _entity: &[u8],
+    ) -> Result<Option<HeaderValue>, Error> {
+        #[cfg(target_os = "linux")]
+        {
+            use crate::digest_proxy::{DigestRequest, authorization};
+            let request = DigestRequest {
+                method: _method,
+                target: _target,
+                entity: _entity,
+            };
+            if let Some(value) = authorization(headers, &self.url, &request, &self.digest)? {
+                return Ok(Some(value));
+            }
+        }
+        Ok(offers_basic(headers).then(|| self.basic.clone()))
+    }
+}
+
 fn relay_address(proxy: &Url) -> Result<(&str, u16), Error> {
     // URL serialization brackets IPv6 literals; Tokio expects the host by
     // itself when resolving a (host, port) pair.
@@ -34,22 +68,25 @@ fn relay_address(proxy: &Url) -> Result<(&str, u16), Error> {
     Ok((host, port))
 }
 
-fn requests(request: reqwest::Request) -> Result<(Uri, Request<Body>), Error> {
-    let url = request.url();
-    if url.scheme() != "http" || !url.username().is_empty() || url.password().is_some() {
-        return Err(Error::Origin);
-    }
+pub(crate) fn connect_authority(url: &Url) -> Result<Uri, Error> {
     let host = url.host_str().ok_or(Error::Origin)?;
     // CONNECT uses authority-form, including the port even for the default 80.
     let destination = format!(
         "{host}:{}",
         url.port_or_known_default().ok_or(Error::Origin)?
     );
-    let authority = Uri::builder()
+    Uri::builder()
         .authority(destination.as_str())
         .build()
-        .map_err(|_| Error::Origin)?;
+        .map_err(|_| Error::Origin)
+}
 
+fn requests(request: reqwest::Request) -> Result<(Uri, Request<Body>), Error> {
+    let url = request.url();
+    if url.scheme() != "http" || !url.username().is_empty() || url.password().is_some() {
+        return Err(Error::Origin);
+    }
+    let authority = connect_authority(url)?;
     let mut inner: Request<Body> = request.try_into()?;
     inner.headers_mut().remove(header::PROXY_AUTHORIZATION);
     let host = inner
@@ -153,6 +190,7 @@ async fn open_tunnel(
     address: (&str, u16),
     authority: &Uri,
     authorization: Option<&HeaderValue>,
+    challenge: impl FnOnce(&HeaderMap) -> Result<(), Error>,
 ) -> Result<Upgraded, Error> {
     let request = connect_request(authority, authorization)?;
     let stream = TcpStream::connect(address)
@@ -161,12 +199,10 @@ async fn open_tunnel(
     upgrade(stream, request, |status, headers| {
         if status.is_success() {
             Ok(())
-        } else if authorization.is_none()
-            && status == StatusCode::PROXY_AUTHENTICATION_REQUIRED
-            && offers_basic(headers)
-        {
-            Err(Error::BasicProxyChallenge)
         } else {
+            if status == StatusCode::PROXY_AUTHENTICATION_REQUIRED {
+                challenge(headers)?;
+            }
             Err(Error::Status(status.as_u16()))
         }
     })
@@ -175,18 +211,26 @@ async fn open_tunnel(
 
 pub(crate) async fn websocket(
     relay: &Url,
-    authorization: Option<&HeaderValue>,
+    credentials: Option<&Credentials>,
     request: reqwest::Request,
     accept: &str,
 ) -> Result<Upgraded, Error> {
     let (authority, inner) = requests(request)?;
     let address = relay_address(relay)?;
-    let tunnel = match open_tunnel(address, &authority, None).await {
-        Err(Error::BasicProxyChallenge) => {
-            let authorization = authorization.ok_or(Error::Status(407))?;
-            open_tunnel(address, &authority, Some(authorization)).await?
+    let mut retry = None;
+    let first = open_tunnel(address, &authority, None, |headers| {
+        if let Some(credentials) = credentials {
+            let target = authority.authority().ok_or(Error::Origin)?.as_str();
+            retry = credentials.challenged(headers, &reqwest::Method::CONNECT, target, &[])?;
         }
-        result => result?,
+        Ok(())
+    })
+    .await;
+    let tunnel = match (first, retry) {
+        (Err(Error::Status(407)), Some(value)) => {
+            open_tunnel(address, &authority, Some(&value), |_| Ok(())).await?
+        }
+        (result, _) => result?,
     };
     upgrade(tunnel, inner, |status, headers| {
         validate_upgrade(status, headers, accept)
@@ -197,6 +241,56 @@ pub(crate) async fn websocket(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn forward_requests_and_connect_share_nonce_counts_and_prefer_an_offered_digest() {
+        let credentials = Credentials {
+            url: Url::parse("http://fixture:kit-password@proxy.example/").unwrap(),
+            basic: HeaderValue::from_static("Basic synthetic"),
+            digest: Default::default(),
+        };
+        let mut headers = HeaderMap::new();
+        headers.append(
+            header::PROXY_AUTHENTICATE,
+            HeaderValue::from_static("Digest realm=r, nonce=n, algorithm=unknown"),
+        );
+        assert!(
+            credentials
+                .challenged(&headers, &reqwest::Method::GET, "http://example.test/", &[])
+                .unwrap()
+                .is_none()
+        );
+        headers.clear();
+        headers.append(
+            header::PROXY_AUTHENTICATE,
+            HeaderValue::from_static("Basic realm=r"),
+        );
+        headers.append(
+            header::PROXY_AUTHENTICATE,
+            HeaderValue::from_static("Digest realm=r, nonce=n, qop=auth"),
+        );
+        for (count, (method, target)) in [
+            (reqwest::Method::GET, "http://example.test/api/albums"),
+            (
+                reqwest::Method::POST,
+                "http://example.test/socket.io/?sid=s",
+            ),
+            (reqwest::Method::CONNECT, "example.test:80"),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let value = credentials
+                .challenged(&headers, method, target, &[])
+                .unwrap()
+                .unwrap();
+            let text = value.to_str().unwrap();
+            assert!(text.starts_with("Digest "));
+            assert!(text.contains(&format!("nc={:08x}", count + 1)));
+            assert!(text.contains(&format!("uri=\"{target}\"")));
+        }
+    }
 
     #[test]
     fn only_an_offered_basic_scheme_triggers_the_retry() {

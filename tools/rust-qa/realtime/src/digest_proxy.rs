@@ -1,4 +1,4 @@
-//! Digest authentication of the selected Linux HTTP proxy for one CONNECT retry.
+//! Digest authentication for a challenged request to the selected Linux HTTP proxy.
 use md5::{Digest, Md5};
 use percent_encoding::percent_decode_str;
 use reqwest::{Url, header};
@@ -16,7 +16,7 @@ enum Algorithm {
 }
 
 impl Algorithm {
-    fn hash(self, value: &str) -> String {
+    fn hash(self, value: &[u8]) -> String {
         fn hex(bytes: &[u8]) -> String {
             let mut result = String::with_capacity(bytes.len() * 2);
             for byte in bytes {
@@ -89,6 +89,13 @@ struct Challenge {
     algorithm: Algorithm,
     session: bool,
     qop: Option<&'static str>,
+}
+
+/// The method, request-target and entity bytes in the proxy's HTTP exchange.
+pub(super) struct DigestRequest<'a> {
+    pub method: &'a reqwest::Method,
+    pub target: &'a str,
+    pub entity: &'a [u8],
 }
 
 fn quoted(value: &str) -> String {
@@ -180,22 +187,23 @@ impl Challenge {
         &self,
         user: &str,
         password: &str,
-        authority: &str,
+        request: &DigestRequest<'_>,
         cnonce: &str,
         count: u32,
     ) -> Option<header::HeaderValue> {
         let realm = self.fields.get("realm")?;
         let nonce = self.fields.get("nonce")?;
-        let hash = |v: &str| self.algorithm.hash(v);
+        let hash = |v: &str| self.algorithm.hash(v.as_bytes());
         let mut ha1 = hash(&format!("{user}:{realm}:{password}"));
         if self.session {
             ha1 = hash(&format!("{ha1}:{nonce}:{cnonce}"));
         }
-        let ha2 = if self.qop == Some("auth-int") {
-            hash(&format!("CONNECT:{authority}:{}", hash("")))
-        } else {
-            hash(&format!("CONNECT:{authority}"))
-        };
+        let mut a2 = format!("{}:{}", request.method, request.target);
+        if self.qop == Some("auth-int") {
+            a2.push(':');
+            a2.push_str(&self.algorithm.hash(request.entity));
+        }
+        let ha2 = hash(&a2);
         let response = if let Some(qop) = self.qop {
             hash(&format!("{ha1}:{nonce}:{count:08x}:{cnonce}:{qop}:{ha2}"))
         } else {
@@ -225,7 +233,7 @@ impl Challenge {
         parts.extend([
             format!("realm={}", quoted(realm)),
             format!("nonce={}", quoted(nonce)),
-            format!("uri={}", quoted(authority)),
+            format!("uri={}", quoted(request.target)),
             format!("response={}", quoted(&response)),
             format!("algorithm={}{suffix}", self.algorithm.name()),
         ]);
@@ -297,7 +305,7 @@ fn challenges(value: &str) -> Vec<Challenge> {
 pub(super) fn authorization(
     headers: &header::HeaderMap,
     proxy: &Url,
-    api: &Url,
+    request: &DigestRequest<'_>,
     state: &DigestState,
 ) -> Result<Option<header::HeaderValue>, Error> {
     let selected = headers
@@ -315,14 +323,9 @@ pub(super) fn authorization(
     let password = percent_decode_str(proxy.password().unwrap_or(""))
         .decode_utf8()
         .map_err(|_| Error::Origin)?;
-    let authority = format!(
-        "{}:{}",
-        api.host_str().ok_or(Error::Origin)?,
-        api.port_or_known_default().ok_or(Error::Origin)?
-    );
     let (cnonce, count) = state.next(selected.fields.get("nonce").ok_or(Error::Protocol)?)?;
     selected
-        .header(&user, &password, &authority, &cnonce, count)
+        .header(&user, &password, request, &cnonce, count)
         .map(Some)
         .ok_or(Error::Protocol)
 }
@@ -348,7 +351,11 @@ mod tests {
                 .header(
                     "fixture",
                     "kit-password",
-                    "127.0.0.1:28431",
+                    &DigestRequest {
+                        method: &reqwest::Method::CONNECT,
+                        target: "127.0.0.1:28431",
+                        entity: &[],
+                    },
                     "fixture-cnonce",
                     1,
                 )
@@ -357,6 +364,52 @@ mod tests {
             assert!(value.is_sensitive());
             assert!(text.contains(&format!("response=\"{expected}\"")));
             assert!(text.contains("uri=\"127.0.0.1:28431\""));
+        }
+    }
+
+    #[test]
+    fn forward_digest_binds_absolute_targets_and_the_original_entity_bytes() {
+        let post = "http://[::1]:8080/socket.io/?sid=a%26b";
+        for (method, target, body, algorithm, qop, expected) in [
+            (
+                reqwest::Method::GET,
+                "http://[::1]:8080/a%2Fb?q=x%20y",
+                &[][..],
+                "MD5",
+                "auth",
+                "3dbf3a68e683e9cf7a81b067042e4eef",
+            ),
+            (
+                reqwest::Method::POST,
+                post,
+                &b"\x0040/collection,\xff"[..],
+                "SHA-256",
+                "auth-int",
+                "710528f880dad3bc8fe9763b1b6dc3222c3af0853d76adc0fdfc873818132b34",
+            ),
+            (
+                reqwest::Method::POST,
+                post,
+                &[][..],
+                "SHA-256",
+                "auth-int",
+                "2359f2c934f82c95ffbcf326f1b0023aa8947a45326c8a3fd4831d400354fcb6",
+            ),
+        ] {
+            let challenge = format!("Digest realm=r, nonce=n, algorithm={algorithm}, qop={qop}");
+            let parsed = challenges(&challenge).pop().unwrap();
+            let request = DigestRequest {
+                method: &method,
+                target,
+                entity: body,
+            };
+            let value = parsed
+                .header("fixture", "kit-password", &request, "seat", 1)
+                .unwrap();
+            assert!(value.is_sensitive());
+            let text = value.to_str().unwrap();
+            assert!(text.contains(&format!("response=\"{expected}\"")));
+            assert!(text.contains(&format!("uri=\"{target}\"")));
         }
     }
 

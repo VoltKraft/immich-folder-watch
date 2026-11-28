@@ -28,7 +28,6 @@ enum Error {
     Transport,
     Status(u16),
     Protocol,
-    BasicProxyChallenge,
     Limit,
     Timeout,
     #[cfg(any(windows, test))]

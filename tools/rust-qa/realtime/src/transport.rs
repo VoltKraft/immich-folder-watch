@@ -26,7 +26,7 @@ pub(crate) struct Transport {
     client: Client,
     tls_proxy: Option<TunnelProxy>,
     plaintext_proxy: Option<Url>,
-    proxy_authorization: Option<header::HeaderValue>,
+    plaintext_credentials: Option<crate::plaintext_proxy::Credentials>,
     header: header::HeaderValue,
     pub namespace: String,
 }
@@ -258,16 +258,28 @@ impl TunnelProxy {
             return Ok(None);
         };
         #[cfg(target_os = "linux")]
-        if let Some(credential) =
-            crate::digest_proxy::authorization(headers, &self.credentials, _api, &self.digest)?
         {
-            let proxy = reqwest::Proxy::https(self.endpoint.clone())?.custom_http_auth(credential);
-            return Ok(Some(
-                http_client(self.allow_http, self.roots.as_deref())
-                    .pool_max_idle_per_host(0)
-                    .proxy(proxy)
-                    .build()?,
-            ));
+            let authority = crate::plaintext_proxy::connect_authority(_api)?;
+            let exchange = crate::digest_proxy::DigestRequest {
+                method: &Method::CONNECT,
+                target: authority.authority().ok_or(Error::Origin)?.as_str(),
+                entity: &[],
+            };
+            if let Some(credential) = crate::digest_proxy::authorization(
+                headers,
+                &self.credentials,
+                &exchange,
+                &self.digest,
+            )? {
+                let proxy =
+                    reqwest::Proxy::https(self.endpoint.clone())?.custom_http_auth(credential);
+                return Ok(Some(
+                    http_client(self.allow_http, self.roots.as_deref())
+                        .pool_max_idle_per_host(0)
+                        .proxy(proxy)
+                        .build()?,
+                ));
+            }
         }
         Ok(crate::plaintext_proxy::offers_basic(headers).then(|| self.basic.clone()))
     }
@@ -352,14 +364,21 @@ impl Transport {
         let client = primary.build()?;
         // Reqwest decodes URL userinfo and builds a sensitive Basic header. This
         // request is never sent. Only a challenged proxy receives its header.
-        let proxy_authorization = credentials
+        let plaintext_credentials = credentials
             .map(|url| {
-                client
-                    .get(url)
+                let basic = client
+                    .get(url.clone())
                     .build()?
                     .headers_mut()
                     .remove(header::AUTHORIZATION)
-                    .ok_or(Error::Origin)
+                    .ok_or(Error::Origin)?;
+                Ok::<_, Error>(crate::plaintext_proxy::Credentials {
+                    basic,
+                    #[cfg(target_os = "linux")]
+                    url,
+                    #[cfg(target_os = "linux")]
+                    digest: crate::digest_proxy::DigestState::default(),
+                })
             })
             .transpose()?;
         Ok(Self {
@@ -369,7 +388,7 @@ impl Transport {
             header,
             client,
             tls_proxy,
-            proxy_authorization,
+            plaintext_credentials,
             plaintext_proxy,
         })
     }
@@ -419,23 +438,46 @@ impl Transport {
                 Ok(response) => Ok(response),
             };
         }
-        let Some(auth) = &self.proxy_authorization else {
+        let Some(credentials) = &self.plaintext_credentials else {
             return Ok(request.send().await?);
         };
         // The adapter's GET/POST bodies are bounded and replayable. Redirects
         // remain disabled, so the fixed proxy and origin do not change.
-        let retry = request.try_clone().ok_or(Error::Protocol)?;
+        let mut retry = request.try_clone().ok_or(Error::Protocol)?.build()?;
+        let deadline = tokio::time::Instant::now() + REQUEST_TIMEOUT;
         let response = request.send().await?;
-        if response.status() == StatusCode::PROXY_AUTHENTICATION_REQUIRED
-            && crate::plaintext_proxy::offers_basic(response.headers())
-        {
-            drop(response);
-            return Ok(retry
-                .header(header::PROXY_AUTHORIZATION, auth)
-                .send()
-                .await?);
+        if response.status() != StatusCode::PROXY_AUTHENTICATION_REQUIRED {
+            return Ok(response);
         }
-        Ok(response)
+        // Reqwest builds a hyper URI from this URL for the absolute-form
+        // request line. The URI parser drops fragments and preserves escapes.
+        let target = retry
+            .url()
+            .as_str()
+            .parse::<hyper::Uri>()
+            .map_err(|_| Error::Origin)?;
+        let entity = match retry.body() {
+            None => &[][..],
+            Some(body) => body.as_bytes().ok_or(Error::Protocol)?,
+        };
+        let Some(auth) = credentials.challenged(
+            response.headers(),
+            retry.method(),
+            &target.to_string(),
+            entity,
+        )?
+        else {
+            return Ok(response);
+        };
+        drop(response);
+        retry
+            .headers_mut()
+            .insert(header::PROXY_AUTHORIZATION, auth);
+        let remaining = deadline
+            .checked_duration_since(tokio::time::Instant::now())
+            .ok_or(Error::Timeout)?;
+        *retry.timeout_mut() = Some(remaining);
+        Ok(self.client.execute(retry).await?)
     }
 
     pub async fn poll(&self, sid: Option<&str>) -> Result<Vec<u8>, Error> {
@@ -486,13 +528,16 @@ impl Transport {
         accept: &str,
     ) -> Result<reqwest::Upgraded, Error> {
         if let Some(relay) = &self.plaintext_proxy {
-            return crate::plaintext_proxy::websocket(
-                relay,
-                self.proxy_authorization.as_ref(),
-                request.build()?,
-                accept,
+            return tokio::time::timeout(
+                CONNECT_TIMEOUT,
+                crate::plaintext_proxy::websocket(
+                    relay,
+                    self.plaintext_credentials.as_ref(),
+                    request.build()?,
+                    accept,
+                ),
             )
-            .await;
+            .await?;
         }
         let response = self.send(request).await?;
         validate_upgrade(response.status(), response.headers(), accept)?;
