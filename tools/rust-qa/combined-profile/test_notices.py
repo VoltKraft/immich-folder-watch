@@ -7,6 +7,7 @@ import re
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 from zipfile import ZIP_STORED, ZipFile
 
 import notices
@@ -41,6 +42,25 @@ class Controls(unittest.TestCase):
         digest = self.crate([("parent/COPYING", original), ("promotional.png", b"unreviewed asset")])
         result = self.selected(digest, {"parent/COPYING": sbom.sha(original)})
         self.assertEqual(result, {"crates/fixture-1/parent/COPYING": original})
+
+    def test_patched_source_keeps_archive_license_and_compiler_excerpt(self):
+        license_text = b"unchanged license\n"
+        digest = self.crate([("LICENSE", license_text), ("lib.rs", b"// Copyright original\n")])
+        compiled = b"// Copyright maintained fixture\n"
+        (self.directory / "lib.rs").write_bytes(compiled)
+        attributions = {}
+        source_notices.note_source(attributions, "lib.rs", compiled)
+        row = {"name": "fixture", "version": "1", "archiveSha256": digest, "selected": "MIT",
+               "reconstructedSource": {"patchSha256": "e" * 64}, "originalCrate": "fixture-1.crate",
+               "compilerTree": {"files": 2}, "supplementalNotices": {}, "notices": {"LICENSE": sbom.sha(license_text)},
+               "sourceAttributions": attributions}
+        members = {}
+        with patch.object(source_notices, "reconstructed_root", return_value=self.directory):
+            record = notices.external_notices(row, {}, "revision", [self.directory], members, {}, "target")
+        self.assertEqual(record["notices"], ["crates/fixture-1/LICENSE"])
+        self.assertEqual(record["reconstructedSource"], row["reconstructedSource"])
+        self.assertEqual(members["crates/fixture-1/LICENSE"], license_text)
+        self.assertIn(compiled, members.values())
 
     def test_changed_archive_or_selected_member_is_rejected(self):
         digest = self.crate([("LICENSE", b"fixture")])
@@ -145,7 +165,7 @@ def check_native(args):
                 continue
             record = selected[key]
             root = "crates/" + row["name"] + "-" + row["version"] + "/"
-            prefix = root if row["source"] else "repository/"
+            prefix = root if row["source"] or row.get("originalCrate") else "repository/"
             paths = {prefix + p: d for p, d in row["notices"].items()}
             paths.update({"repository/" + p: d for p, d in row["supplementalNotices"].items()})
             case.assertCountEqual(record["notices"], paths.keys())

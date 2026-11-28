@@ -70,6 +70,7 @@ def external_notices(row, inventory, revision, caches, members, reuse, target):
     originals = {}
     if row.get("reconstructedSource"):
         record["reconstructedSource"] = row["reconstructedSource"]
+    if row.get("reconstructedSource") and not row.get("originalCrate"):
         for path, digest in row["notices"].items():
             require(repository.setdefault(path, digest) == digest, f"Conflicting Git notice digests: {path}")
     else:
@@ -113,7 +114,8 @@ def external_notices(row, inventory, revision, caches, members, reuse, target):
         compiler = source_notices.reconstructed_root(row)
         for path, item in attributions.items():
             members.update(source_notices.excerpt_members(item, (compiler / safe_path(path)).read_bytes()))
-    elif originals or attributions:
+        attributions = {}
+    if originals or attributions:
         members.update(crate_members(prefix, row["archiveSha256"], originals, caches, attributions))
     return record
 

@@ -1,8 +1,8 @@
 {
-  "allCompilerTreesSha256": "da9dcbf427adf97fd0072344c1fd2209e73af7cbfe17fda0c73dc87420f06489",
-  "inventorySha256": "689a15afb366727d89ed22233bd6c64b841e5d0a2520ef8cdd10bf1b7d7c6640",
-  "lockSha256": "6bbe711bfc27f7e8389f3073871defda19249d6c7121fd78aaf0337e2235aae7",
-  "registryLockCount": 472,
+  "allCompilerTreesSha256": "8ea27c8990838fd3ed78d0f40852c96155e1af621736e09a10902be3ed70f512",
+  "inventorySha256": "7250af5885bce270bd476143fffee80e3492ff6b9adab75b2bdc7439574a98c6",
+  "lockSha256": "88c614991fbfbdc84d461dfd44d5d359f7272e2064d5fd758df21be93a4b14d2",
+  "registryLockCount": 471,
   "summary": {
     "activeExternalPackages": 351,
     "buildScriptOrMacroPackages": 69,
@@ -70,7 +70,7 @@
     "native": 509,
     "notices": 639,
     "protocols": 101,
-    "registryPackages": 348,
+    "registryPackages": 347,
     "shaders": 16,
     "sourceAttributionBlocks": 1187,
     "sourceAttributionFiles": 1981,
@@ -93,7 +93,7 @@
       "newlyActiveFeatures": {},
       "normalBuildFeatureSetsSha256": "50fa98571ea1d0719fc73585b7d28c861757355ef6786ff21564cb2c485c91db",
       "packages": 249,
-      "registryPackages": 240,
+      "registryPackages": 239,
       "treeSha256": "8bd5a38dd9ca687a46189f94494c1a0380cc92ea07c231d10234fcbdd77be350"
     },
     "aarch64-unknown-linux-gnu": {
@@ -113,7 +113,7 @@
       "newlyActiveFeatures": {},
       "normalBuildFeatureSetsSha256": "b8bf43f3d188f26867abbdd54e965526fd266820522f94f035b281d21055e1e2",
       "packages": 336,
-      "registryPackages": 327,
+      "registryPackages": 326,
       "treeSha256": "31141a5d533da91839628c42af088825422bfbe075006352940933e7adcdf3df"
     },
     "x86_64-pc-windows-msvc": {
@@ -132,7 +132,7 @@
       "newlyActiveFeatures": {},
       "normalBuildFeatureSetsSha256": "29c99c7d57feaba22a9cf1ae5e378c363fe892b58b60e87120d93e3cc95ecf3a",
       "packages": 250,
-      "registryPackages": 241,
+      "registryPackages": 240,
       "treeSha256": "f76fad398b5896f1065a7a5455c0c84b31a010bbe9212fffeac3010923884627"
     },
     "x86_64-unknown-linux-gnu": {
@@ -152,7 +152,7 @@
       "newlyActiveFeatures": {},
       "normalBuildFeatureSetsSha256": "e9614ebaff26a85dca6014a94909d2f6354ab015eb3dc22e755662247a88f9ff",
       "packages": 337,
-      "registryPackages": 328,
+      "registryPackages": 327,
       "treeSha256": "db746b9b637dd412a3ecf517fad1a1349b6fe47faf7baa54f11ef5d53fea2c13"
     }
   }

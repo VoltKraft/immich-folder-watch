@@ -55,6 +55,7 @@ windows = { version = "=0.62.2", default-features = false, features = [
 [patch.crates-io]
 egui = { path = "../gui/artifacts/text/egui" }
 epaint = { path = "../gui/artifacts/text/epaint" }
+hyper-util = { path = "../../../artifacts/rust/realtime-sources/hyper-util" }
 
 [lints.rust]
 unsafe_code = "forbid"

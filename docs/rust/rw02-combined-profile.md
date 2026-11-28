@@ -150,6 +150,46 @@ on x64 and ARM64. Separate Windows desktop checks in the same run failed.
 [Windows x64 original files](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15220771583) ·
 [Native C# reference tests](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242375).
 
+## HTTP CONNECT challenge metadata
+
+The combined manifest and the realtime assessment both select the same
+private Cargo path for `hyper-util` 0.1.21. The offline preparation checks
+the original crates.io archive, reconstructs the two changed Rust files
+and verifies every file before Cargo resolves the profile. The Linux
+build and relink namespaces mount this tree read-only. The change makes
+the proxy's `Proxy-Authenticate` fields on a 407 CONNECT response
+available to the transport client.
+[Maintained patch](../../tools/rust-qa/realtime/hyper-util-connect.patch) ·
+[Reconstruction and checksum pins](../../tools/rust-qa/realtime/hyper_util_source.py).
+
+| Combined input | SHA-256 |
+| --- | --- |
+| Upstream archive, git revision `23a868965964c1d6bb1b94f30ba4c420a4bebe7c` | `ddc03d96684f9226b8a787cdb71488417b53ab5ea8fdb1dac946cb9431cc8bff` |
+| Maintained patch | `761b075d5fbf1d5c98c478bcc6f443898a1171973d4dcc557380ce45d84f9cd0` |
+| Reconstructed 62-file tree | `acd12c39160b6bfe7d7872fcbb6b7974ae880b23e01936576934c23127f4d4a4` |
+| Original MIT license | `9e0a97848ea543aef745c98e84fde696a9a3e0735538f6daefdd3cb1942effc1` |
+| Combined Cargo.lock, reproduced offline from an empty directory | `88c614991fbfbdc84d461dfd44d5d359f7272e2064d5fd758df21be93a4b14d2` |
+
+The source review compared all four target graphs and the 351 active
+external package records to the preceding source profile. Only
+`hyper-util` changed compiler source. The 471 registry identities in
+the lock now accompany the reconstructed path. All dependency edges,
+normal/build feature groups and selected license texts matched the
+preceding profile. In its SPDX source record, the upstream archive and
+compiled tree have separate hashes. The notice bundle reads the MIT
+license from the archive and its two source attribution excerpts from
+the reviewed compiler tree.
+The second full offline replay retained the four target reports and the
+aggregate inventory in
+`artifacts/rust/combined-profile/runs/hyper-connect-offline-01/`.
+Its `result.json` has SHA-256
+`4598651b581275d3db4b7309cc80ac690434ca28f79ba1ccdba29e57e09d0055`.
+The historical Linux x64 input at `0a2b5ca` also reproduced its original
+1,799-member notice ZIP byte-for-byte, SHA-256
+`a72d43330f20778444c50f7f5333f3be13635da3a50423164dbbf8e7f23993fa`.
+[Four-target profile](../../tools/rust-qa/combined-profile/review.json) ·
+[Original native notice archive](rw02-combined-notices.md#native-notices-at-0a2b5ca).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
@@ -157,7 +197,7 @@ The native receipt indexes `legacy-upload.json`, which identifies the corpus,
 the two streamed bodies, the directory-entry result and the retry position
 for each case.
 
-Run from the repository root after installing the pinned native toolchain and preparing the existing GUI sources and fonts. The source runner consumes the private GUI, storage, realtime and YAML acquisition caches. Its default path is offline. `--fetch` can acquire missing original archives from crates.io and verifies their existing SHA-256 pins before use. All Cargo resolution, builds and relinks operate offline. The ordinary native Linux path needs bubblewrap, the C toolchain and binutils. Windows requires the disposable GitHub-hosted x64 or ARM64 host, the matching Visual Studio environment, `dumpbin` and the reviewed ring build tools. [Toolchain contract](../../rust/toolchain-inputs.json) · [GUI preparation](../../tools/rust-qa/build-gui-probe.py) · [Native VS setup](../../tools/rust-qa/enter-windows-build.ps1)
+Run from the repository root after installing the pinned native toolchain and preparing the existing GUI sources and fonts. The source runner consumes the private GUI, storage, realtime and YAML acquisition caches. Its default path is offline. `--fetch` can acquire missing original archives from crates.io and verifies their existing SHA-256 pins before use. All Cargo resolution, builds and relinks operate offline. The ordinary native Linux path needs bubblewrap, the C toolchain and binutils. Windows requires the matching Visual Studio environment, `dumpbin` and the reviewed ring build tools. Windows ARM64 uses its disposable hosted runner. New Windows x64 runtime checks belong on the local disposable VM. [Toolchain contract](../../rust/toolchain-inputs.json) · [GUI preparation](../../tools/rust-qa/build-gui-probe.py) · [Native VS setup](../../tools/rust-qa/enter-windows-build.ps1)
 
 ```sh
 python3 -B -m unittest discover -s tools/rust-qa/combined-profile -p test_profile.py
@@ -165,4 +205,4 @@ python3 -B tools/rust-qa/combined-profile/run.py
 python3 -B tools/rust-qa/combined-profile/run.py --native x86_64-unknown-linux-gnu --relink
 ```
 
-Substitute `aarch64-unknown-linux-gnu` on native ARM64 Linux. On Windows, enter the appropriate VS environment and pass `--native x86_64-pc-windows-msvc` or `--native aarch64-pc-windows-msvc`. Add `--check-imports` where the source-bound Microsoft tar from the Windows import assessment is available. Each command accepts a fresh `--output artifacts/rust/combined-profile/runs/NAME`. Upload only the receipt directory. The temporary Cargo home, original archive containing the excluded promotional logo and build trees stay outside it. [Runner](../../tools/rust-qa/combined-profile/run.py)
+Substitute `aarch64-unknown-linux-gnu` on native ARM64 Linux. On the Windows ARM64 runner, enter the appropriate VS environment and pass `--native aarch64-pc-windows-msvc`. The historical x64 runner command includes execution. A new x64 run requires a compiler archive and local guest replay. Add `--check-imports` where the source-bound Microsoft tar from the Windows import assessment is available. Each command accepts a fresh `--output artifacts/rust/combined-profile/runs/NAME`. Upload only the receipt directory. The temporary Cargo home, original archive containing the excluded promotional logo and build trees stay outside it. [Runner](../../tools/rust-qa/combined-profile/run.py)

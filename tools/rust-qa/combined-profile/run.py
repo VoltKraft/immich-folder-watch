@@ -38,7 +38,8 @@ def source_witness():
     files = [ROOT / "rust/toolchain-inputs.json", ROOT / "rust/Cargo.toml",
              ROOT / "rust/tests/fixtures/behavior/legacy-upload.json", QA / "audit-graph.py",
              QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "gui/source_profile.py",
-             QA / "gui/src/fonts.rs", QA / "yaml/prepare.py"]
+             QA / "gui/src/fonts.rs", QA / "yaml/prepare.py", QA / "realtime/hyper_util_source.py",
+             QA / "realtime/hyper-util-connect.patch"]
     files += list((ROOT / "rust/audit").glob("*.json"))
     files += [p for d in SPIKES for p in [QA / d / "Cargo.toml", QA / d / "Cargo.lock"]]
     files += [QA / d / "inputs.json" for d in ("storage", "yaml", "realtime")]

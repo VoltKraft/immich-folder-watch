@@ -20,10 +20,19 @@ SPIKES = ("gui", "linux-services", "portal-dialog", "windows-services", "storage
           "performance/worker")
 sys.path.insert(0, str(QA))
 from gui import source_profile
+from realtime import hyper_util_source
 from storage.evidence import sha256
 spec = importlib.util.spec_from_file_location("rw02_yaml_prepare", QA / "yaml/prepare.py")
 yaml_prepare = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(yaml_prepare)
+HYPER_KEY = ("hyper-util", "0.1.21")
+HYPER_ROOT = hyper_util_source.SOURCE
+
+
+def hyper_tree(receipt):
+    return {"originalSha256": receipt["archiveSha256"], "compilerTreeSha256": receipt["treeSha256"],
+            "files": receipt["fileCount"], "transformations": [
+                {"path": path, **change} for path, change in sorted(receipt["changes"].items())]}
 
 
 def read(path):
@@ -79,6 +88,10 @@ def prepare(work, homes, fetch):
         if sha256(ROOT / "rust" / item["path"]) != item["sha256"]:
             raise ValueError(f"Changed GUI notice or font: {item['path']}")
     allowed = catalog()
+    hyper = next(p for p in read(QA / "realtime/inputs.json")["packages"] if (p["name"], p["version"]) == HYPER_KEY)
+    if hyper["archiveSha256"] != hyper_util_source.ARCHIVE_SHA:
+        raise ValueError("The realtime archive review differs from its source reconstruction")
+    allowed[HYPER_KEY] = hyper["archiveSha256"]
     yaml = {(row["name"], row["version"]): row for row in read(QA / "yaml/inputs.json")["packages"]}
     cache = work / "registry/cache/reviewed"
     vendor = work / "registry/src/reviewed"
@@ -86,6 +99,7 @@ def prepare(work, homes, fetch):
     vendor.mkdir(parents=True)
     locations = sorted({registry for home in homes for registry in (home / "registry/cache").glob("*")
                         if registry.is_dir()})
+    locations.append(HYPER_ROOT.parent)
 
     def one(item):
         (name, version), checksum = item
@@ -98,6 +112,11 @@ def prepare(work, homes, fetch):
             public_archive(name, archive, checksum)
         else:
             raise FileNotFoundError(f"Missing {archive.name} in the private Cargo caches")
+        if (name, version) == HYPER_KEY:
+            receipt = hyper_util_source.reconstruct(archive, HYPER_ROOT)
+            # Keep the authenticated original available to the standalone notice generator.
+            hyper_util_source.original(work)
+            return prefix, hyper_tree(receipt)
         # This shared filter authenticates the original and rejects links and duplicate members.
         # Only base64-0.23.1 has an approved transformed README and promotional asset removal.
         files, changes = yaml_prepare.source_files(archive, prefix, checksum)

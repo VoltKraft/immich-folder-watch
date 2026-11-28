@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 import upload_trial
-from sources import HERE, QA, ROOT, read, sha256, source_config, source_profile
+from sources import HERE, HYPER_ROOT, QA, ROOT, read, sha256, source_config, source_profile
 
 
 def linux_namespace(toolchain, vendor, build, fixture, flags, alternate_profile=None, replacement=None):
@@ -26,6 +26,7 @@ def linux_namespace(toolchain, vendor, build, fixture, flags, alternate_profile=
         (toolchain, "/toolchain"), (vendor, "/vendor"), (ROOT / "rust/Cargo.toml", "/project/rust/Cargo.toml"),
         (ROOT / "rust/crates", "/project/rust/crates"), (ROOT / "rust/assets/fonts", "/project/rust/assets/fonts"),
         (source_profile.SOURCES, "/project/tools/rust-qa/gui/artifacts/text"),
+        (HYPER_ROOT, "/project/artifacts/rust/realtime-sources/hyper-util"),
         (source_profile.FONTS, "/fonts"), (QA / "gui/src/fonts.rs", "/project/tools/rust-qa/gui/src/fonts.rs"),
         (fixture, "/fixture"),
     ):

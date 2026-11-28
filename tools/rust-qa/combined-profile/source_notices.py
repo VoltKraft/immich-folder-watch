@@ -9,7 +9,7 @@ import re
 import tarfile
 
 from graphs import audit, fingerprint
-from sources import local_caches, source_profile
+from sources import HYPER_KEY, HYPER_ROOT, hyper_tree, hyper_util_source, local_caches, source_profile
 
 
 ORIGINAL_INVENTORY = "244bec73e64cb8702e4c8a409c1d5f985160f173b11ea601a17c0ae027a456ca"
@@ -34,7 +34,7 @@ def sha(data):
 
 
 def caches():
-    return [source_profile.CACHE, *sorted(d for h in local_caches() for d in (h / "registry/cache").glob("*")
+    return [source_profile.CACHE, HYPER_ROOT.parent, *sorted(d for h in local_caches() for d in (h / "registry/cache").glob("*")
                                           if d.is_dir())]
 
 
@@ -103,6 +103,11 @@ def note_source(records, path, data):
 
 
 def reconstructed_root(row):
+    if (row["name"], row["version"]) == HYPER_KEY:
+        receipt = hyper_util_source.verify(hyper_util_source.ARCHIVE, HYPER_ROOT)
+        if row["reconstructedSource"] != receipt or row["compilerTree"] != hyper_tree(receipt):
+            raise ValueError("Reconstructed hyper-util source differs from its compiler receipt")
+        return HYPER_ROOT
     root = source_profile.SOURCES / row["name"]
     if source_profile.tree_info(root) != row["compilerTree"]:
         raise ValueError(f"Reconstructed compiler source differs: {row['name']}")

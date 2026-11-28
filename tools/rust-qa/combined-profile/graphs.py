@@ -8,7 +8,8 @@ from pathlib import Path
 import re
 import subprocess
 
-from sources import FIRST_PARTY, HERE, QA, ROOT, catalog, locked, read, sha256, source_config, source_profile, write
+from sources import (FIRST_PARTY, HERE, HYPER_KEY, HYPER_ROOT, QA, ROOT, catalog, hyper_util_source, locked,
+                     read, sha256, source_config, source_profile, write)
 from storage.evidence import target_graph
 
 spec = importlib.util.spec_from_file_location("rw02_audit", QA / "audit-graph.py")
@@ -59,7 +60,7 @@ def reproduce_lock(vendor, work, env, toolchain):
         return "path = " + json.dumps(str(path))
 
     relocated, count = re.subn(r'\bpath = "([^"]+)"', relocate, manifest)
-    if count != len(FIRST_PARTY) + 2:
+    if count != len(FIRST_PARTY) + 3:
         raise ValueError("Unexpected number of first-party and reconstructed manifest paths")
     (directory / "Cargo.toml").write_text(relocated, encoding="utf-8")
     (directory / "src/main.rs").touch()
@@ -107,6 +108,11 @@ def resolve(vendor, env, output, toolchain):
     def external(key):
         data = packages[key]
         root = Path(data["manifest_path"]).resolve().parent
+        if key == HYPER_KEY:
+            if data["source"] is not None:
+                raise ValueError("The combined compiler selected a different hyper-util source")
+            archive = vendor.parent.parent / "cache" / vendor.name / hyper_util_source.ARCHIVE.name
+            return audit.private_hyper_input(root, archive)
         if data["source"] == REGISTRY and root == vendor / (key[0] + "-" + key[1]):
             return audit.archive_inputs(data, checksums, False)
         if data["source"] is None and key[0] in approved["trees"]:
@@ -127,7 +133,9 @@ def resolve(vendor, env, output, toolchain):
             row.update(featureSets=groups, features=features, buildScriptsAndMacros=sorted(
                 t["name"] for t in data["targets"] if {"custom-build", "proc-macro"} & set(t["kind"])))
             manifest = Path(data["manifest_path"]).resolve()
-            if data["source"] or key[0] in approved["trees"]:
+            if data["source"] or key[0] in approved["trees"] or key == HYPER_KEY:
+                if key == HYPER_KEY and (data["source"] is not None or manifest != HYPER_ROOT / "Cargo.toml"):
+                    raise ValueError("The individual transport selected a different hyper-util source")
                 row.update(external(key))
             elif manifest in members:
                 row["repositoryManifest"] = members[manifest]
@@ -204,7 +212,7 @@ def resolve(vendor, env, output, toolchain):
 
     inventory = []
     for key in sorted(all_selected):
-        if key not in combined and key[0] not in approved["trees"]:
+        if key not in combined and key[0] not in approved["trees"] and key != HYPER_KEY:
             continue
         external_data = external(key)
         data = packages[key]

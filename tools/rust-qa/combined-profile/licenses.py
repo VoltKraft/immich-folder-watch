@@ -2,7 +2,7 @@
 from collections import Counter
 from pathlib import Path
 
-from sources import QA, ROOT, read, sha256, source_profile
+from sources import HYPER_KEY, HYPER_ROOT, QA, ROOT, read, sha256, source_profile
 import source_notices
 
 # Exact alternatives in the reviewed GUI archives. Preserve cumulative terms and file-level additions.
@@ -49,6 +49,7 @@ def inventory(rows, vendor, staged, text):
         name, version = row["name"], row["version"]
         prefix = name + "-" + version
         files = read(vendor / prefix / ".cargo-checksum.json")["files"] if row["source"] else None
+        compiler_root = HYPER_ROOT if (name, version) == HYPER_KEY else source_profile.SOURCES / name
         originals = prior.get((name, version), [])
         selects = set()
         for sample in originals:
@@ -58,7 +59,8 @@ def inventory(rows, vendor, staged, text):
             if isinstance(supplied, list):
                 supplied = {item["path"]: item["sha256"] for item in supplied}
             for path, checksum in supplied.items():
-                if files is None or files.get(path) != checksum or row["notices"].setdefault(path, checksum) != checksum:
+                actual = files.get(path) if files is not None else sha256(compiler_root / path)
+                if actual != checksum or row["notices"].setdefault(path, checksum) != checksum:
                     raise ValueError(f"Changed source notice in {prefix}/{path}")
             selects.add(sample.get("selected", sample.get("license_selected")))
         if originals and len(selects) != 1:
@@ -67,13 +69,13 @@ def inventory(rows, vendor, staged, text):
         row["supplementalNotices"] = {path: sha256(ROOT / path) for path in supplements(name)}
         if not row["notices"] and not row["supplementalNotices"]:
             raise ValueError(f"Missing original or supplemental notice for {prefix}")
-        if "reconstructedSource" in row:
+        if name in text["trees"]:
             row["compilerTree"] = text["trees"][name]
         else:
             row["originalCrate"] = f"https://static.crates.io/crates/{name}/{prefix}.crate"
             row["compilerTree"] = staged[prefix]
         for field in ("native", "shaders", "fonts"):
-            row[field] = {p: files[p] if files is not None else sha256(source_profile.SOURCES / name / p) for p in row[field]}
+            row[field] = {p: files[p] if files is not None else sha256(compiler_root / p) for p in row[field]}
         if row["fonts"]:
             raise ValueError(f"Unexpected font payload in selected source {prefix}")
         for sample in originals:
