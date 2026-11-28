@@ -73,13 +73,20 @@ pub(super) fn run(output: &Path) -> Result<Vec<Value>> {
             record["RejectedVersion"] = json!(latest);
             record["SourceAfter"] = json!(after);
         } else {
-            let ready = opened?;
+            let mut ready = opened?;
             let row: i64 = ready.query_one("SELECT value FROM sample", [], |r| r.get(0))?;
             ensure(
                 row == latest,
                 "first supported connection lost the committed WAL row",
             )?;
             record["OpenedValue"] = json!(row);
+            let write = ready.transaction()?;
+            ensure(
+                write.execute("UPDATE sample SET value=2 WHERE value=1", [])? == 1,
+                "unable to write the supported profile",
+            )?;
+            write.rollback()?;
+            record["WriteRolledBack"] = json!(true);
         }
         ensure(
             !scratch.try_exists()?,
@@ -121,4 +128,63 @@ pub(super) fn persistent_journal(output: &Path) -> Result<Value> {
         "persistent journal preflight changed inputs",
     )?;
     Ok(json!({"RejectedVersion": 99, "SourceBefore": before, "SourceAfter": after}))
+}
+
+pub(super) fn read_only_database(output: &Path) -> Result<Value> {
+    let directory = output.join("supported-read-only");
+    fs::create_dir(&directory)?;
+    let path = directory.join("state.db");
+    let writer = Connection::open(&path)?;
+    writer.execute_batch(
+        "PRAGMA journal_mode=WAL; PRAGMA user_version=1; CREATE TABLE sample(value INTEGER);",
+    )?;
+    writer.close().map_err(|(_, error)| error)?;
+    let before = fingerprint(&directory)?;
+    let original = fs::metadata(&path)?.permissions();
+    let mut protected = original.clone();
+    protected.set_readonly(true);
+    fs::set_permissions(&path, protected)?;
+    let observed = (|| -> Result<Value> {
+        match fs::OpenOptions::new().write(true).open(&path) {
+            Ok(_) => {
+                return Ok(
+                    json!({"Observed": false, "Reason": "the host user can still write this file"}),
+                );
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {}
+            Err(error) => return Err(error.into()),
+        }
+        let scratch = output.join("preflight");
+        let error = preflight::open_existing(&path, &scratch)
+            .err()
+            .ok_or("SQLite read-only fallback reached the writer")?;
+        let permission = error
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|cause| cause.kind() == std::io::ErrorKind::PermissionDenied);
+        let sqlite = error
+            .downcast_ref::<rusqlite::Error>()
+            .and_then(|cause| cause.sqlite_error_code());
+        ensure(
+            permission
+                || matches!(
+                    sqlite,
+                    Some(
+                        rusqlite::ErrorCode::ReadOnly
+                            | rusqlite::ErrorCode::CannotOpen
+                            | rusqlite::ErrorCode::PermissionDenied
+                    )
+                ),
+            "unexpected read-only preflight failure",
+        )?;
+        let after = fingerprint(&directory)?;
+        ensure(
+            before == after && !scratch.try_exists()?,
+            "read-only refusal changed the profile",
+        )?;
+        Ok(
+            json!({"Observed": true, "Error": error.to_string(), "SourceBefore": before, "SourceAfter": after}),
+        )
+    })();
+    fs::set_permissions(&path, original)?;
+    observed
 }

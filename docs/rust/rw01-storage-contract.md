@@ -80,6 +80,8 @@ changing. This is an observed baseline limitation, **not** permission for Rust
 to mutate an unsupported format. The Rust migration preflight must open unknown
 formats read-only and leave the database and sidecars unchanged before refusing
 to synchronize. Keep this stronger acceptance test separate from C# parity.
+For the stopped writer case, compare the [version committed only in the WAL](rw02-storage-inputs.md#schema-version-in-a-quiescent-wal)
+with and without a saved shared index.
 
 Likewise, preserving `owned_albums` in interchange is not authorization to reuse
 it after process start. Startup must revoke stale authority for the active account

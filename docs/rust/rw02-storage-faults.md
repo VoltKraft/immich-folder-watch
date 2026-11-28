@@ -739,11 +739,13 @@ external synchronization activity and their independent review remain open.
 
 Physical disk failure, power loss,
 storage-controller behavior, interrupted
-backup or restore, every app transaction boundary, unknown-schema WAL preflight,
+backup or restore, every app transaction boundary, migration with a live writer,
 installed migration/ownership handover, and application-side retry/replay remain
 unproven. This is not acceptance of full-disk recovery under every mechanism or
 completion of RI-AC03. The production migration/recovery implementation and its
 independent review remain behind the existing stage gates.
+The separate [schema preflight](rw02-storage-inputs.md#schema-version-in-a-quiescent-wal)
+checks a newer version committed in the WAL of a stopped writer.
 
 ## Opt-in ordinary FAT provider follow-up (2026-11-22)
 

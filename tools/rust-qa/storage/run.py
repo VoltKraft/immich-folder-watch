@@ -35,9 +35,9 @@ def isolated_path(value: Path) -> Path:
     return path
 
 
-def archive_first_party(output: Path, fixtures: Path, extra_inputs: list[Path]) -> dict:
+def first_party_paths(fixtures: Path, extra_inputs: list[Path]) -> list[Path]:
     paths = [ROOT / name for name in
-             ("global.json", "NuGet.Config", "Directory.Build.props", "rust/Cargo.toml",
+             ("global.json", "NuGet.Config", "Directory.Build.props", "Directory.Build.targets", "rust/Cargo.toml",
               "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py",
               "tools/rust-qa/legacy/InvariantUppercaseProfile.cs")]
     paths.extend(extra_inputs)
@@ -47,15 +47,27 @@ def archive_first_party(output: Path, fixtures: Path, extra_inputs: list[Path]) 
                   and ("bin" not in path.relative_to(directory).parts
                        or path.relative_to(directory).parts[:2] == ("src", "bin"))
                   and path.suffix != ".pyc"]
+    return sorted(set(paths))
+
+
+def archive_first_party(output: Path, fixtures: Path, extra_inputs: list[Path]) -> dict:
     hashes = {}
-    for path in sorted(set(paths)):
+    for path in first_party_paths(fixtures, extra_inputs):
         relative = path.relative_to(ROOT)
         destination = output / "first-party-sources" / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, destination)
-        hashes[relative.as_posix()] = sha256(path)
+        hashes[relative.as_posix()] = sha256(destination)
     write_json(output / "first-party-source-hashes.json", hashes)
     return hashes
+
+
+def confirm_sources(fixtures: Path, extra_inputs: list[Path], archived: dict) -> None:
+    current = {path.relative_to(ROOT).as_posix(): sha256(path)
+               for path in first_party_paths(fixtures, extra_inputs)}
+    if current != archived:
+        changed = sorted(name for name in current.keys() | archived.keys() if current.get(name) != archived.get(name))
+        raise ValueError("Assessment sources changed during execution: " + ", ".join(changed))
 
 
 def run_worker_activities(output, result, probe, test_assembly, dotnet, env, target):
@@ -158,7 +170,7 @@ def main() -> int:
         "source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "modifiedSources": subprocess.check_output([
             "git", "status", "--porcelain", "--", str(HERE), "rust/crates/ifw-legacy", "rust/Cargo.toml",
-            "src/ImmichFolderWatch.Core", "Directory.Build.props", "global.json", "NuGet.Config",
+            "src/ImmichFolderWatch.Core", "Directory.Build.props", "Directory.Build.targets", "global.json", "NuGet.Config",
             "rust/tests/fixtures/legacy", "tools/rust-qa/check-toolchain.py",
             "tools/rust-qa/legacy/InvariantUppercaseProfile.cs",
             *map(str, extra_inputs), *(["src/ImmichFolderWatch.Immich", "src/ImmichFolderWatch.App.Shared",
@@ -204,7 +216,8 @@ def main() -> int:
         result["lockSha256"] = sha256(HERE / "Cargo.lock")
         verify_fixture(fixtures, native_os)
         result["fixtureManifestSha256"] = sha256(fixtures / "manifest.json")
-        result["firstPartySourceCount"] = len(archive_first_party(output, fixtures, extra_inputs))
+        archived = archive_first_party(output, fixtures, extra_inputs)
+        result["firstPartySourceCount"] = len(archived)
         cargo = ["cargo", "metadata", "--manifest-path", str(MANIFEST), "--locked", "--format-version", "1"]
         if args.offline:
             cargo.append("--offline")
@@ -266,6 +279,7 @@ def main() -> int:
         assembly = work / "dotnet/bin/StorageReadback/release/StorageReadback.dll"
         result["csharpAssemblySha256"] = sha256(assembly)
         if args.compile_for_local_vm:
+            confirm_sources(fixtures, extra_inputs, archived)
             if result["modifiedSources"] or os.environ["GITHUB_SHA"] != result["source"]:
                 raise ValueError("Local VM inputs require the unmodified source revision of the compiler run")
             kit = output / "guest"
@@ -345,6 +359,7 @@ def main() -> int:
             command("activity-reference-build", [dotnet, "build", *common, "--no-restore", "--configuration", "Release"])
             test_assembly = activity_build / "bin/ImmichFolderWatch.Tests.Core/release/ImmichFolderWatch.Tests.Core.dll"
             run_worker_activities(output, result, example, test_assembly, dotnet, env, args.target)
+        confirm_sources(fixtures, extra_inputs, archived)
         result["status"] = "passed"
         print(f"Storage assessment passed; evidence: {output}", flush=True)
     except (KeyboardInterrupt, SystemExit):

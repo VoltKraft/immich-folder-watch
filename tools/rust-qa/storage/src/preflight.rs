@@ -72,6 +72,13 @@ pub(super) fn open_existing(database: &Path, scratch: &Path) -> Result<Connectio
     inspected?;
 
     let connection = Connection::open_with_flags(database, flags)?;
+    if connection.is_readonly("main")? {
+        return Err(io::Error::new(
+            ErrorKind::PermissionDenied,
+            "SQLite opened the original read-only",
+        )
+        .into());
+    }
     require_v1(&connection)?;
     let mode: String = connection.query_one("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
     if mode != "wal" {

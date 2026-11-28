@@ -258,6 +258,12 @@ main header and reaches version 1 through the WAL. A separate case keeps
 the original finalized SQLite PERSIST journal across refusal. These checks
 use stopped, synthetic single-database profiles.
 
+A supported version is also checked for actual write access. SQLite can
+return a read-only connection when asked for read/write access. The
+assessment queries the main database's effective mode before handing it to
+the writer. The writable control updates a row inside a rolled-back
+transaction. C# then independently reads the original committed value.
+
 ## Maintained native runner
 
 [`storage/Cargo.toml`](../../tools/rust-qa/storage/Cargo.toml) declares its own

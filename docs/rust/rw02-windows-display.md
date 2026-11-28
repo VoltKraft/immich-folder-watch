@@ -245,7 +245,8 @@ The local Intel x64 KVM host has a Windows Server x64 guest. For native
 Windows ARM64 mixed-DPI and RDP measurements, Microsoft documents local
 Windows 11 guests on Arm hardware and Windows Arm64 VMs on Azure that
 accept a Remote Desktop connection. No such dedicated host or subscription
-has been provided for this project. GitHub documents the native Windows
+has been provided for this project. On 2026-11-28 the user confirmed that
+they currently have no separate ARM64 test system. GitHub documents the native Windows
 ARM64 runner label. The original observations above capture the display and
 transport actually supplied to this job.
 [Microsoft Windows on Arm VM options](https://learn.microsoft.com/en-us/windows/arm/iso) ·

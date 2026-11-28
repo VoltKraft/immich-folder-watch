@@ -96,6 +96,7 @@ fn main() -> Result<()> {
         "Cases":cases, "AccountHashVectors":accounts.len(),
         "QuiescentWalPreflight":wal_preflight_cases::run(&output)?,
         "FinalizedRollbackJournal":wal_preflight_cases::persistent_journal(&output)?,
+        "ReadOnlyExisting":wal_preflight_cases::read_only_database(&output)?,
         "Unproven":["production migration adapter", "old optional schema repair", "exclusion of a live legacy writer",
             "full disk and process-crash recovery", "YAML", "device identities", "other native targets"]
     });

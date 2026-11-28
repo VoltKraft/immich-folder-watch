@@ -6,8 +6,10 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from evidence import sha256, verify_archive, verify_fixture
+import run
 
 
 class SourceEvidenceTests(unittest.TestCase):
@@ -71,6 +73,15 @@ class SourceEvidenceTests(unittest.TestCase):
         (self.source / "LICENSE").write_bytes(b"Changed fixture")
         with self.assertRaisesRegex(ValueError, "fixture checksum"):
             verify_fixture(self.source, "linux")
+
+    def test_source_edit_during_compilation_invalidates_receipt(self):
+        file = self.source / "LICENSE"
+        with patch.object(run, "ROOT", self.root), patch.object(run, "first_party_paths", return_value=[file]):
+            archived = run.archive_first_party(self.root / "retained", self.source, [])
+            run.confirm_sources(self.source, [], archived)
+            file.write_bytes(b"Edited during compilation\n")
+            with self.assertRaisesRegex(ValueError, "sources changed during execution"):
+                run.confirm_sources(self.source, [], archived)
 
 
 if __name__ == "__main__":
