@@ -21,6 +21,11 @@ Space closed the original GUI and its inventory worker and restored the
 original desktop. The separate default-desktop display checks in the same
 job failed. [Keyboard, process exit and original archive](rust/rw02-windows-services.md#keyboard-activation-of-the-visible-windows-arm64-quit-button).
 
+At `446fc1f` the local Server 2025 x64 guest passed all 30 GUI tests in
+five native test executables as the standard user. QEMU reported 3072 MiB
+of RAM. The guest shut down through ACPI and released its slot.
+[Local run and original compiler archives](../tools/rust-qa/windows-local/README.md#native-gui-tests-at-446fc1f).
+
 The Fedora x64 Flatpak check recorded at `70f9713` used the staged
 editor built from `c63d91c`. Two launches of the same installed commit
 showed the respective saved German and English languages.
