@@ -367,6 +367,31 @@ The updated inventory has canonical SHA-256
 The [combined review](../../tools/rust-qa/combined-profile/review.json) has
 file SHA-256 `fe9e9fb94be8b777c4a5353a0344c5e9b9316caa148d5269bc28478dfb3d2939`.
 
+### Fedora x64 compiler, SPDX and original notices at a4d967d
+
+A fresh two-job release build produced 403 compiler units from 338 Cargo
+packages. The executable had SHA-256
+`09332e8fa856271a995bdf15aa2b4c659cd5714992af39804e47347551af99be`.
+Clippy passed with warnings denied. The headless renderer smoke test and
+five held-file upload cases passed inside the disposable Linux namespaces.
+The native receipt in
+`artifacts/rust/combined-profile/runs/gui-language-native-a4d967d/result.json`
+has SHA-256 `87146674bce052bd3e05f8609f1d5dab54f60771e322db058f4054ed2fb010e3`.
+
+The archive replay matched all 117 source witnesses to Git and validated
+the 447 SPDX packages and 1,067 relationships against the official 2.3.1
+schema. All package license declarations, conclusions and relationships
+matched the previous Fedora document at `2f63c15`. All 1,800 original
+members of its 1,802-member notice archive matched byte-for-byte. The
+generated notice index and manifest identify the new compiler receipt.
+The SPDX document has SHA-256
+`cfe053cadec62c3ba555756c9769cac7f2b4244aeda26b6dccc2de9f3ad48a72`
+and the notice ZIP has SHA-256
+`91dc1ab0116c32c067739febdc9be1ed0e49633246780a5e318c6c9e5c2d864d`.
+The local verification and originals are indexed in
+`artifacts/rust/combined-profile/verification/gui-language-a4d967d/verification.json`,
+SHA-256 `e978101ae36e7970f515c3e140e4901c554fe72f18542dbf80305df63b22258d`.
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
