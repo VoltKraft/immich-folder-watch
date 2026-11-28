@@ -34,6 +34,8 @@ def png(path, width, height, changed):
 class DisplayTests(unittest.TestCase):
     def source_desktop(self, hit, *, topmost=False, expose=True):
         api = Mock()
+        self.enterContext(patch.object(c, "set_last_error", create=True))
+        self.enterContext(patch.object(c, "get_last_error", create=True, return_value=0))
         state = {"hit": hit, "topmost": topmost}
         def owner(window, out):
             out._obj.value = {100: 42, 101: 42, 200: 43}.get(window, 0)
@@ -78,6 +80,27 @@ class DisplayTests(unittest.TestCase):
                 with DRIVER["source_field_order"](api, 100, 42, [5, 10, 25, 20], lambda: True, proof):
                     self.assertEqual(proof["initialPointOwner"], classification)
                 api.order_subject.assert_not_called()
+
+    def test_lost_hwnd_or_failed_style_read_cannot_confirm_band_restoration(self):
+        for cause in ("lost-owner", "read-error"):
+            with self.subTest(cause=cause):
+                api = self.source_desktop(200)
+                normal_order = api.order_subject.side_effect
+                def order(hwnd, pid, topmost):
+                    result = normal_order(hwnd, pid, topmost)
+                    if not topmost:
+                        if cause == "lost-owner":
+                            api.owner.side_effect = None
+                            api.owner.return_value = 0
+                        else:
+                            c.get_last_error.return_value = 1400
+                    return result
+                api.order_subject.side_effect = order
+                proof = {}
+                with self.assertRaises((RuntimeError, OSError)):
+                    with DRIVER["source_field_order"](api, 100, 42, [5, 10, 25, 20], lambda: True, proof):
+                        pass
+                self.assertIs(proof["bandRestored"], False)
 
     def test_changed_input_session_or_subject_cannot_receive_the_order_request(self):
         for pid, availability in ((99, [True]), (42, [False]), (42, [True, False]), (42, [True, True, False])):

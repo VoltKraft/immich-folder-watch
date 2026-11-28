@@ -54,10 +54,20 @@ def source_field_order(api, hwnd, pid, rect, available, evidence):
             return "unavailable"
         return "subject" if root == hwnd and owner.value == pid else "other"
 
-    owner = w.DWORD()
-    if not available() or not api.owner(hwnd, c.byref(owner)) or owner.value != pid:
+    def owned_topmost():
+        c.set_last_error(0)
+        style = api.style(hwnd, GWL_EXSTYLE)
+        error = c.get_last_error() if not style else 0
+        if error:
+            raise OSError(error, "GetWindowLongW could not read the source window band")
+        owner = w.DWORD()
+        if not api.owner(hwnd, c.byref(owner)) or owner.value != pid:
+            raise RuntimeError("The source window owner changed during its band readback")
+        return bool(style & WS_EX_TOPMOST)
+
+    if not available():
         raise RuntimeError("The original source window, geometry or input desktop changed")
-    topmost = bool(api.style(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST)
+    topmost = owned_topmost()
     evidence.update(point=[x, y], initialPointOwner=point_owner(), originallyTopmost=topmost, raised=False)
     try:
         if evidence["initialPointOwner"] == "other" and not topmost:
@@ -76,10 +86,10 @@ def source_field_order(api, hwnd, pid, rect, available, evidence):
     finally:
         if evidence["raised"]:
             # order_subject checks the owning PID again, including after a failed observer process.
-            evidence["bandRestored"] = (api.order_subject(hwnd, pid, False) is True and
-                                        not (api.style(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST))
-            if not evidence["bandRestored"]:
+            evidence["bandRestored"] = False
+            if api.order_subject(hwnd, pid, False) is not True or owned_topmost():
                 raise RuntimeError("Windows could not restore the source window's original non-topmost band")
+            evidence["bandRestored"] = True
 
 
 def owned_layout(api, display, hwnd, pid):

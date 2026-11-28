@@ -127,11 +127,22 @@ the test window in the topmost band while the initial observer takes
 focus. It requires the same visible window, PID, input desktop, WTS
 transport, geometry and monitor. The supervisor restores the original
 non-topmost band before the frame capture, including on observer failure.
+Restoration requires a successful window-style read and the same owner
+after the read. A destroyed window or a Win32 read error fails that check.
 The field observer records whether the foreground request and guarded
 click succeeded. The PNG comparison still requires focus, the real UI
 Automation text and unobstructed field pixels on the original HWND.
 [Display supervisor](../../tools/rust-qa/windows-display/run.py) ·
 [Field observer](../../tools/rust-qa/windows-display/field.ps1).
+
+The focused native ARM64 job compiles the canonical and retained GUIs
+from the same revision, then requests a source-frame edit from each on
+the supplied input desktop. It keeps both result directories, including
+failed observations. The archive includes the two actual executables,
+the original retained compiler stream and library outputs, the eframe and
+winit sources, and the paired native inventory worker. The filename edit
+exercises the GUI on its synthetic profile. The worker is a compiler
+artifact in this trial. [Native ARM64 display workflow](../../.github/workflows/rust-windows-arm64-display.yaml).
 
 The local Intel x64 KVM host has a Windows Server x64 guest. For native
 Windows ARM64 mixed-DPI and RDP measurements, Microsoft documents local

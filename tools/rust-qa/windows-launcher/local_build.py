@@ -21,7 +21,7 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def inventory_sources(directory):
+def inventory_sources(directory, target):
     yaml = QA / "yaml"
     inputs = json.loads((yaml / "inputs.json").read_bytes())
     if sha(yaml / "Cargo.lock") != inputs["lock_sha256"]:
@@ -32,27 +32,26 @@ def inventory_sources(directory):
     prepare = runpy.run_path(str(yaml / "prepare.py"))
     vendor = directory / "vendor-inputs"
     changes = prepare["prepare"](cache, vendor, inputs)
-    archive = ART / "yaml-assessment/runs" / TARGET / "filtered-sources.tar"
+    archive = ART / "yaml-assessment/runs" / target / "filtered-sources.tar"
     archive.parent.mkdir(parents=True, exist_ok=True)
     prepare["bundle"](vendor, changes, archive)
     if sha(archive) != inputs["filtered_bundle_sha256"]:
         raise ValueError("The filtered worker sources differ from the audited archive")
 
 
-def build(target):
-    if (os.name != "nt" or target != TARGET or os.environ.get("GITHUB_ACTIONS") != "true"
+def hosted_revision():
+    if (os.name != "nt" or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
             or os.environ.get("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch"
             or os.environ.get("GITHUB_REF") != "refs/heads/rewrite/rust"):
-        raise ValueError("Use the branch-bound native Windows x64 compiler")
+        raise ValueError("Use the branch-bound native Windows compiler")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     if revision != os.environ.get("GITHUB_SHA"):
         raise ValueError("The compiler revision differs from the workflow revision")
-    out = ART / "local-vm-inputs/tray"
-    out.mkdir(parents=True, exist_ok=False)
-    subprocess.run([sys.executable, "-B", str(QA / "build-gui-probe.py"), target,
-                    "--local-x64-inputs", str(ART / "local-vm-inputs/gui")], check=True)
-    subprocess.run([sys.executable, "-B", str(QA / "windows-warm-window/build.py"), target, "--compile-only"], check=True)
+    return revision
+
+
+def stage_built_pair(out, target, revision):
     canonical = ART / "gui-native" / target
     cold = ART / "gui-build/release/native-gui-assessment.exe"
     warm = ART / "windows-warm-window" / target
@@ -61,7 +60,7 @@ def build(target):
     machine = runpy.run_path(str(QA / "windows-performance/build.py"))["pe_machine"]
     with TemporaryDirectory(prefix="ifw-tray-build-") as name:
         directory = Path(name)
-        inventory_sources(directory)
+        inventory_sources(directory, target)
         worker_build = runpy.run_path(str(QA / "windows-inventory/subject.py"))
         subject, _, inventory = worker_build["build_subject"](directory, out, gui, target, machine, compile_only=True)
         shutil.copyfile(subject.with_name("ifw-performance-worker.exe"), out / "ifw-performance-worker.exe")
@@ -83,9 +82,21 @@ def build(target):
         destination = out / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
-    receipt = dict(revision=revision, target=target, run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"],
-                   inventory=inventory, files={file.relative_to(out).as_posix(): sha(file)
-                                               for file in sorted(out.rglob("*")) if file.is_file()})
+    return dict(revision=revision, target=target, run=os.environ["GITHUB_RUN_ID"], attempt=os.environ["GITHUB_RUN_ATTEMPT"],
+                inventory=inventory, files={file.relative_to(out).as_posix(): sha(file)
+                                            for file in sorted(out.rglob("*")) if file.is_file()})
+
+
+def build(target):
+    if target != TARGET:
+        raise ValueError("Use the native Windows x64 compiler for local tray inputs")
+    revision = hosted_revision()
+    out = ART / "local-vm-inputs/tray"
+    out.mkdir(parents=True, exist_ok=False)
+    subprocess.run([sys.executable, "-B", str(QA / "build-gui-probe.py"), target,
+                    "--local-x64-inputs", str(ART / "local-vm-inputs/gui")], check=True)
+    subprocess.run([sys.executable, "-B", str(QA / "windows-warm-window/build.py"), target, "--compile-only"], check=True)
+    receipt = stage_built_pair(out, target, revision)
     (out / "tray-build.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
 
 

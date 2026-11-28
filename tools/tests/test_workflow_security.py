@@ -101,8 +101,22 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
                 self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
         for name in ("rust-windows-x64-build.yaml", "rust-windows-x64-gui-build.yaml",
                      "rust-windows-x64-combined-build.yaml", "rust-windows-x64-tray-build.yaml",
-                     "rust-windows-arm64-notification.yaml"):
+                     "rust-windows-arm64-notification.yaml", "rust-windows-arm64-display.yaml"):
             self.check_rust_workflow(name, {"actions/checkout", "actions/upload-artifact"})
+
+    def test_arm64_display_keeps_both_attempts_and_the_native_builds(self):
+        source = (WORKFLOWS / "rust-windows-arm64-display.yaml").read_text()
+        self.assertEqual(re.findall(r"runs-on: (\S+)", source), ["windows-11-arm"])
+        self.assertIn("NATIVE_TARGET: aarch64-pc-windows-msvc", source)
+        steps = source.split("      - name: ")
+        canonical, retained, archive = steps[-3:]
+        self.assertIn("windows-display/run.py $env:NATIVE_TARGET --require source-frame", canonical)
+        self.assertIn("windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame", retained)
+        for step in (retained, archive):
+            self.assertIn("!cancelled() && steps.inputs.outcome == 'success'", step)
+        self.assertIn("windows-display/archive_pair.py", steps[-4])
+        for path in ("windows-display-inputs/", "windows-display-runs/", "windows-display-retained-runs/"):
+            self.assertIn(path, archive)
 
     def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):
         compiler = "rust-windows-x64-build.yaml"

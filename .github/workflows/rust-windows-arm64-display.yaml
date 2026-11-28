@@ -1,0 +1,72 @@
+name: Rust Windows ARM64 source display
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-windows-arm64-display.yaml'
+      - 'tools/rust-qa/windows-display/**'
+      - 'tools/rust-qa/windows-text/**'
+      - 'tools/rust-qa/windows-desktop/**'
+      - 'tools/rust-qa/windows-warm-window/**'
+      - 'tools/rust-qa/windows-launcher/retained_subject.py'
+      - 'tools/rust-qa/windows-launcher/local_build.py'
+      - 'tools/rust-qa/windows-inventory/**'
+      - 'tools/rust-qa/gui/**'
+      - 'tools/rust-qa/build-gui-probe.py'
+      - 'rust/toolchain-inputs.json'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: windows-11-arm
+    timeout-minutes: 70
+    env:
+      NATIVE_TARGET: aarch64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned native compiler
+        shell: bash
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Compile both native GUI subjects and archive the corresponding worker
+        id: inputs
+        shell: pwsh
+        run: |
+          . ./tools/rust-qa/enter-windows-build.ps1 -Architecture arm64
+          python -B tools/rust-qa/build-gui-probe.py $env:NATIVE_TARGET
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-warm-window/build.py $env:NATIVE_TARGET --compile-only
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-display/archive_pair.py
+          exit $LASTEXITCODE
+
+      - name: Observe the canonical source-monitor edit
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --require source-frame
+
+      - name: Observe the retained source-monitor edit
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame
+
+      - name: Retain both measurements and the original compiler outputs
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-source-display-arm64-${{ github.sha }}
+          path: |
+            artifacts/rust/windows-display-inputs/
+            artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-runs/
+            artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-retained-runs/
+          if-no-files-found: error
+          retention-days: 14
