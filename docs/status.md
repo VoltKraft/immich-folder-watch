@@ -67,6 +67,15 @@ REST and the WebSocket CONNECT matched the signed 3.0.4 client's Basic proxy
 challenge. The direct-route control sent no proxy credentials to the origin.
 [Native suites and paired observations](rust/rw02-linux-basic-proxy.md#first-party-linux-transport).
 
+At `1910195`, Ubuntu x64 and ARM64 each passed all 54 wire scenarios and
+17 unit tests. Windows ARM64 passed its 49 wire scenarios and 18 unit
+tests. All three original archives matched their Actions digests. On the
+local Windows x64 guest, `79bcd3f` passed 17 unit tests, 49 wire scenarios
+and 16 Windows system proxy cases. Both the fixture and its supervisor
+verified restoration of the standard user's settings.
+[Three native transport jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46098223475)
+· [Local x64 system proxy](rust/rw02-realtime-transport.md#windows-per-user-system-proxy-on-the-local-x64-guest).
+
 The Windows x64 shipping assemblies passed six proxy wire trials using
 HTTP and HTTPS on the offline guest. The Rust environment adapter at
 `3104009` passed 49 Fedora wire scenarios and 14 unit tests. Windows
