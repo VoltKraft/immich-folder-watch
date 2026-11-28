@@ -19,6 +19,12 @@ public static class ReturnWindow {
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flag);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern IntPtr GetClipboardOwner();
+    [DllImport("user32.dll")] public static extern bool OpenClipboard(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool CloseClipboard();
+    [DllImport("user32.dll")] public static extern IntPtr GetClipboardData(uint format);
+    [DllImport("kernel32.dll")] public static extern IntPtr GlobalLock(IntPtr handle);
+    [DllImport("kernel32.dll")] public static extern bool GlobalUnlock(IntPtr handle);
+    [DllImport("kernel32.dll")] public static extern UIntPtr GlobalSize(IntPtr handle);
     [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber();
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] public static extern bool GetCursorPos(out Point p);
@@ -131,10 +137,29 @@ function ReadVisibleAlbum($tab) {
             throw 'The original WPF did not own a new clipboard value'
         }
         $record.method = 'WPF Copy on original window'
-        $record.clipboard = @{before=$before;after=$after;owner=$owner.ToInt64();pid=$writer}
-        $record.album = [Windows.Clipboard]::GetText()
-        if ([ReturnWindow]::GetClipboardOwner() -ne $owner -or [ReturnWindow]::GetClipboardSequenceNumber() -ne $after) {
-            throw 'Original clipboard owner or sequence changed during readback'
+        if (![ReturnWindow]::OpenClipboard([IntPtr]::Zero)) {throw 'Could not open the local WPF clipboard'}
+        try {
+            if ([ReturnWindow]::GetClipboardOwner() -ne $owner) {throw 'Clipboard owner changed before reading'}
+            # Requesting CF_UNICODETEXT can render a delayed native format and advance
+            # the sequence. The open clipboard prevents a second app from replacing it.
+            $data = [ReturnWindow]::GetClipboardData(13)
+            if ($data -eq [IntPtr]::Zero) {throw 'No owned Unicode text'}
+            $size = [ReturnWindow]::GlobalSize($data).ToUInt64()
+            if ($size -lt 2 -or $size -gt 4096 -or $size % 2) {throw 'Unexpected size for the synthetic album'}
+            $ptr = [ReturnWindow]::GlobalLock($data)
+            if ($ptr -eq [IntPtr]::Zero) {throw 'Cannot lock the owned album data'}
+            try {
+                $raw = [Runtime.InteropServices.Marshal]::PtrToStringUni($ptr, [int]($size / 2))
+                $endText = $raw.IndexOf([char]0)
+                if ($endText -lt 0) {throw 'Missing terminator on the owned WPF value'}
+                $record.album = $raw.Substring(0,$endText)
+            } finally { [void][ReturnWindow]::GlobalUnlock($data) }
+            $finalOwner = [ReturnWindow]::GetClipboardOwner()
+            if ($finalOwner -ne $owner) {throw 'The original WPF clipboard owner changed while open'}
+            $record.clipboard = @{before=$before; after=$after; owner=$owner.ToInt64(); pid=$writer
+                ownerAfterRead=$finalOwner.ToInt64(); sequenceAfterRead=[ReturnWindow]::GetClipboardSequenceNumber()}
+        } finally {
+            if (![ReturnWindow]::CloseClipboard()) {throw 'Could not close the owned clipboard read'}
         }
     } finally { [void][ReturnWindow]::SetCursorPos($prior.x,$prior.y) }
 }

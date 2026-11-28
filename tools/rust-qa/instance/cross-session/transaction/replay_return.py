@@ -19,7 +19,7 @@ def verify_ui(ui, wpf, script_hash):
 
     if ui['method'] == 'WPF Copy on original window':
         clip = ui['clipboard']
-        check(ui['focus']['pid'] == ui['pid'] == clip['pid'] and len(ui['point']) == 2 and clip['owner'] > 0
+        check(ui['focus']['pid'] == ui['pid'] == clip['pid'] and len(ui['point']) == 2 and clip['owner'] == clip['ownerAfterRead'] > 0
               and clip['before'] != clip['after'], 'Missing WPF clipboard ownership or pointer evidence')
     else:
         check(ui['method'] in ('UIA FromPoint', 'UIA FocusedElement') and ui['label'] == 'Immich-Albumname'
