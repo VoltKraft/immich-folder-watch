@@ -48,10 +48,21 @@ The ordinary visible Quit after tray loss passed on Fedora x64 at
 `c268a82`. The observer measured the focused button and pressed Space.
 The original worker had found a second file while hidden and exited
 successfully before the primary drained and released the bus name.
-The Windows partial-registration regression and the prepared private
-desktop window-Quit trial have separate evidence. RW-02 remains open.
+Windows x64 also passed the visible window-Quit trial on the local
+Server 2025 VM with a real refusal from the Shell, successful worker
+exit, final GUI drain and restored input desktop. The partial-registration
+API sequence has separate model coverage. The Windows ARM64 repeat at
+`07c0d70` passed the window-Quit trial on its private console desktop.
+RW-02 remains open.
 [Fedora X11 evidence](../../tools/rust-qa/gui/tray-loss-quit.md) ·
+[Local Windows x64 results](../../tools/rust-qa/windows-local/README.md#visible-quit-when-the-windows-tray-is-unavailable) ·
 [Windows adapter record](rw02-windows-services.md#partial-windows-tray-registration).
+
+On native Ubuntu ARM64 the same ordinary editor at `245a921` passed all
+40 unit tests and four lifecycle cases per desktop. Orca spoke the
+focused Quit button in German and English on both X11 and Wayland. The
+original primary retained the field, caret and backwards selection after
+its second launch. [Original observations and compiler archive](rw02-native-gui.md#ubuntu-arm64-selection-and-quit-focus-at-245a921).
 
 On Fedora x64 the installed portal client at `c7c614f` opened both selected
 directory grants and retained the literal percent escape in the second

@@ -23,6 +23,16 @@ second session of the same account.
 [Installed cross-session launches](rw02-cross-session.md#installed-304-worker-in-another-session) ·
 [Stage gates](../rust-rewrite-plan.md#staged-implementation-proposal) · [Acceptance record](acceptance.md).
 
+The editor now provides a visible Quit button if the Windows Shell
+declines tray registration. Windows UI Automation invoked it on private
+x64 and ARM64 console desktops and the original workers drained. On
+Fedora x64 the visible action also worked after tray loss, a window close
+and an ordinary second launch. These trials cover orderly shutdown while
+the tray is unavailable. Activation through Explorer on ARM64 remains open.
+[Windows x64](../../tools/rust-qa/windows-local/README.md#visible-quit-when-the-windows-tray-is-unavailable) ·
+[Windows ARM64](rw02-windows-services.md#partial-windows-tray-registration) ·
+[Fedora X11](../../tools/rust-qa/gui/tray-loss-quit.md).
+
 The native Ubuntu worker restart builds also passed all eleven paired
 resource limits. On Fedora x64 the canonical GUI now restores focus and
 backwards text selection when Mutter recreates the window. The newer

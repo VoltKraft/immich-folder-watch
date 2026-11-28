@@ -16,9 +16,35 @@ The Windows editor exposes the same action when its tray is unavailable.
 At `a7d42dc` the Windows tray adapter also preserves the running GUI and
 tracks the outstanding icon after a failed version handshake and withdrawal.
 The three partial-registration API responses were exercised in the model.
-Native Windows window-Quit observations are pending.
+The local Windows x64 VM ran the ordinary GUI at `245a921` and passed
+all 30 native GUI tests. After Explorer refused the icon on a private
+input desktop, UI Automation invoked the visible Beenden button.
+Worker and GUI both exited successfully and the original desktop returned.
+The first x64 and ARM64 observations recorded the worker exit before tray
+cleanup. The observer at `07c0d70` accepts either completion order before
+the final drain and passed the x64 repeat on the same binaries.
+The native ARM64 repeat also passed the visible button and shutdown
+check. The two separate editor observations on the runner's Default
+desktop failed. Mixed DPI and connected RDP on ARM64 remain open.
 [Fedora desktop record](../tools/rust-qa/gui/tray-loss-quit.md) ·
+[Local x64 console and original logs](../tools/rust-qa/windows-local/README.md#visible-quit-when-the-windows-tray-is-unavailable) ·
+[ARM64 repeat](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46128570840/job/140928524047) ·
 [Windows tray and shutdown trial](rust/rw02-windows-services.md#partial-windows-tray-registration).
+
+On Ubuntu ARM64 at `245a921`, X11 and Mutter both retained the backwards
+filename selection after an ordinary second launch. The Tab key reached
+Quit on both desktops and Orca spoke both translations. The paired
+Fedora render comparison also passed at 100% and 150% scale with the new
+button. [Ubuntu editor and speech](rust/rw02-native-gui.md#ubuntu-arm64-selection-and-quit-focus-at-245a921) ·
+[Six-frame pixel measurements](../tools/rust-qa/windows-cpu-paint/headless/README.md#editor-with-a-window-quit-button).
+
+The local Server 2025 x64 guest also repeated the ordinary private MSI
+transaction at `2e7a0f3`. Two process queries found no WPF worker after
+commit, the installed WPF path was absent, and the private successor
+still refused writes. Four profile digests matched across the measured
+transitions, including restoration of 3.0.4. This checks the installed
+paths on the observed host. Full writer exclusion remains open.
+[Original transaction, data digests and rollback](../tools/rust-qa/instance/cross-session/installed-writer.md#installed-path-and-process-snapshot-after-commit).
 
 The Fedora x64 portal client now decodes a selected directory URI into
 the original Unix filename bytes. At `c7c614f` two installed Flatpak trials
