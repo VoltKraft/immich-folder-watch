@@ -2,7 +2,9 @@
 use std::ffi::c_void;
 use std::fs;
 use std::io::{self, BufRead, Read, Write};
+use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
+use std::path::PathBuf;
 use std::time::Duration;
 
 #[allow(dead_code)]
@@ -14,6 +16,12 @@ unsafe extern "system" {
     fn GetCurrentProcess() -> RawHandle;
     fn ProcessIdToSessionId(pid: u32, session: *mut u32) -> i32;
     fn LocalFree(memory: *mut c_void) -> *mut c_void;
+    fn GetFileInformationByHandleEx(
+        file: RawHandle,
+        class: i32,
+        info: *mut c_void,
+        size: u32,
+    ) -> i32;
 }
 
 #[link(name = "advapi32")]
@@ -107,11 +115,80 @@ fn emit(event: &str) -> io::Result<()> {
     io::stdout().flush()
 }
 
+fn hold_synthetic_configuration() -> io::Result<()> {
+    let local = std::env::var_os("LOCALAPPDATA").ok_or(io::ErrorKind::NotFound)?;
+    let root = PathBuf::from(local).join("Immich Folder Watch");
+    let path = root.join("config.yaml");
+    for parent in path.ancestors() {
+        if !parent.is_absolute() || fs::symlink_metadata(parent)?.file_attributes() & 0x400 != 0 {
+            return Err(io::Error::other(
+                "expected an ordinary local synthetic profile",
+            ));
+        }
+    }
+    if fs::read(root.join(".ifw-instance-fixture"))? != b"synthetic-only\n" {
+        return Err(io::Error::other("missing synthetic profile marker"));
+    }
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .custom_flags(0x00200000)
+        .open(path)?;
+    if !file.metadata()?.is_file() || file.metadata()?.len() > 4096 {
+        return Err(io::Error::other("invalid synthetic configuration"));
+    }
+    let mut yaml = String::new();
+    file.read_to_string(&mut yaml)?;
+    if !yaml.contains("apiKey: \"synthetic-installed-upload\"")
+        || !yaml.contains("serverApiUrl: \"http://127.0.0.1:")
+    {
+        return Err(io::Error::other(
+            "expected the local synthetic upload fixture",
+        ));
+    }
+    #[repr(C)]
+    struct FileIdInfo {
+        volume: u64,
+        id: [u8; 16],
+    }
+    let mut info = FileIdInfo {
+        volume: 0,
+        id: [0; 16],
+    };
+    if unsafe {
+        GetFileInformationByHandleEx(
+            file.as_raw_handle(),
+            18,
+            (&raw mut info).cast(),
+            size_of::<FileIdInfo>() as u32,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    emit(&format!(
+        "CONFIG_HELD volume={} id={}",
+        info.volume,
+        u128::from_le_bytes(info.id)
+    ))?;
+    if io::stdin().lock().lines().next().transpose()?.as_deref() != Some("RELEASE") {
+        return Err(io::Error::other(
+            "expected an orderly configuration release",
+        ));
+    }
+    drop(file);
+    emit("CONFIG_RELEASED")
+}
+
 fn main() -> io::Result<()> {
-    if std::env::args_os().len() != 1 {
+    let (sid, session) = identity()?;
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.len() == 1 && args[0] == "--hold-synthetic-config" {
+        return hold_synthetic_configuration();
+    }
+    if !args.is_empty() {
         return Err(io::ErrorKind::InvalidInput.into());
     }
-    let (sid, session) = identity()?;
     let (_owner, created) = local::mutex(&format!(r"Local\ImmichFolderWatch-{sid}"), Some(&sid))?;
     emit(&format!(
         "SESSION_MUTEX session={session} created={created}"
