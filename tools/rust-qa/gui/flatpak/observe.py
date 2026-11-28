@@ -17,6 +17,7 @@ from session import checked_start, check_alive, private_session, wait_for
 sys.path.insert(0, '/driver/worker')
 from second_launch import identity, visible_pid
 from run import APP, GL, GL_COMMIT, sha
+import tray_menu
 
 
 def flatpak_ps():
@@ -118,6 +119,8 @@ def run(report, inputs, out):
         bus = Gio.bus_get_sync(Gio.BusType.SESSION)
         report['xserver'] = server
         report['launchBus'] = start_launch_bus(stack, bus)
+        if inputs['trayMenu']:
+            trace = tray_menu.monitor(stack, out)
         watcher_log = out / 'watcher.log'
         watcher = checked_start(stack, [sys.executable, '-B', '/app/watcher.py'], watcher_log)
         wait_for(lambda: check_alive(watcher, watcher_log) or 'WATCHER_READY' in watcher_log.read_text(), 5, 'Missing watcher')
@@ -140,14 +143,21 @@ def run(report, inputs, out):
             poll.register(fd, select.POLLIN)
             fds[fd] = pid
         target = before['dbusOwner']['name']
-        def quit_primary():
-            cleanup = report['cleanup'] = {'passed': False, 'quitDestination': target}
+        def quit_primary(via_menu=False):
+            if 'cleanup' in report:
+                return
+            cleanup = report['cleanup'] = {'passed': False, 'quitDestination': APP if via_menu else target,
+                                           'method': 'Event' if via_menu else 'ActivateAction'}
             try:
                 if (primary.poll() is not None or poll.poll(0)
-                        or dbus_call(bus, 'GetConnectionUnixProcessID', target) != before['dbusOwner']['proxyPid']):
+                        or owner(bus) != before['dbusOwner']):
                     raise RuntimeError('The original process or its bus proxy is unavailable during cleanup')
-                bus.call_sync(target, '/org/example/IfwGuiProbe', 'org.freedesktop.Application', 'ActivateAction',
-                              GLib.Variant('(sava{sv})', ('quit', [], {})), None, Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
+                if via_menu:
+                    tray_menu.click(bus, report['trayMenu']['menuPath'], 3)
+                else:
+                    bus.call_sync(target, '/org/example/IfwGuiProbe', 'org.freedesktop.Application', 'ActivateAction',
+                                  GLib.Variant('(sava{sv})', ('quit', [], {})), None,
+                                  Gio.DBusCallFlags.NO_AUTO_START, 3000, None)
                 report['primaryExit'] = primary.wait(timeout=12)
                 exited = set()
                 def drained():
@@ -204,6 +214,30 @@ def run(report, inputs, out):
                 return len(rows) == 1
 
             wait_for(only_primary, 8, 'The secondary Flatpak instance survived its launcher')
+        if inputs['trayMenu']:
+            menu = report['trayMenu'] = {'hiddenXid': xid}
+            display.request_close(xid)
+            wait_for(lambda: check_alive(primary, log) or (
+                display.visible() is None and log.read_text().splitlines().count('WINDOW_HIDDEN') == 3),
+                8, 'The original XID did not hide before the watcher handover')
+
+            def require_hidden():
+                if poll.poll(0) or owner(bus) != before['dbusOwner'] or display.visible() is not None:
+                    raise RuntimeError('The original hidden GUI or its bus proxy changed before menu Open')
+
+            tray_menu.replace_watcher(stack, bus, dbus_call, watcher, watcher_log, log, target, out, menu, require_hidden)
+            tray_menu.read_layout(bus, dbus_call, menu)
+            require_hidden()
+            tray_menu.click(bus, menu['menuPath'], 1)
+            menu['reopenedXid'] = wait_for(lambda: check_alive(primary, log) or display.visible(), 8,
+                                           'The menu Open event did not reopen the hidden GUI')
+            menu.update(windowNamespacePid=visible_pid(xid), primaryOwner=owner(bus), instances=flatpak_ps())
+            if (poll.poll(0) or menu['reopenedXid'] != xid or menu['windowNamespacePid'] != marker['namespacePid']
+                    or menu['primaryOwner'] != before['dbusOwner'] or menu['instances'] != [before['flatpak']]):
+                raise RuntimeError('Menu Open did not retain the original window, proxy and Flatpak instance')
+            quit_primary(via_menu=True)
+            if report['cleanup']['passed']:
+                tray_menu.verify_trace(trace, menu, target)
         stack.close()
         if not report['cleanup']['passed']:
             raise RuntimeError('The installed GUI did not drain cleanly')

@@ -5,6 +5,7 @@ The argument names a staged Linux GUI under artifacts/rust/performance/subjects,
 to select a scratch build from tools/rust-qa/gui/build.py. The local system must already have
 the pinned public x64 Platform and GL.default deployments. Each trial uses a fresh offline user
 installation under tmpfs. The result and raw inputs go to artifacts/rust/flatpak-gui-launch-assessment.
+Add --tray-menu to replace the watcher and exercise Open and Quit through the installed bus proxy.
 """
 
 import argparse
@@ -83,7 +84,7 @@ def main(args):
     shipping = [line.removeprefix('  - ') for line in finish]
     if set(shipping) != set(PERMISSIONS + ['--share=network', '--device=dri']):
         raise ValueError('Review the current shipping sandbox permissions')
-    drivers = [HERE / n for n in ('run.py', 'observe.py', 'launch.sh')]
+    drivers = [HERE / n for n in ('run.py', 'observe.py', 'tray_menu.py', 'launch.sh')]
     drivers += [qa / 'gui/watcher.py', *(qa / 'performance' / n for n in
                 ('linux.py', 'session.py', 'observations.py', 'x11.py', 'worker/second_launch.py')),
                 qa / 'portal-dialog/flatpak_fixture.py', qa / 'portal-dialog/runtime_pin.py']
@@ -99,6 +100,8 @@ def main(args):
     software_driver = gl / 'files/lib/libvulkan_lvp.so'
     icd = gl / 'files/lib/vulkan/icd.d/lvp_icd.x86_64.json'
     commands = ('bwrap', 'dbus-daemon', 'flatpak', 'ostree', 'xprop', 'xdg-dbus-proxy')
+    if args.tray_menu:
+        commands += ('dbus-monitor', 'stdbuf')
     save(out / 'inputs.json', {'sourceRevision': revision, 'guiPath': str(binary), 'guiSha256': sha(binary),
          'buildReceiptPath': str(receipt), 'buildReceiptSha256': sha(receipt), 'compilerSources': sources,
          'driverInputs': {p.relative_to(root).as_posix(): sha(p) for p in drivers},
@@ -109,7 +112,8 @@ def main(args):
                 'driverPath': str(software_driver), 'driverSha256': sha(software_driver),
                 'icdPath': str(icd), 'icdSha256': sha(icd)},
          'shipping': {'file': manifest.relative_to(root).as_posix(), 'sha256': sha(manifest), 'finishArgs': shipping},
-         'testFinishArgs': PERMISSIONS, 'outerNamespaces': {n: os.readlink('/proc/self/ns/' + n) for n in NS}})
+         'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu,
+         'outerNamespaces': {n: os.readlink('/proc/self/ns/' + n) for n in NS}})
     cmd = namespace(out, qa / 'gui', None)
     (out / 'etc/passwd').write_text('root:x:0:0:Synthetic user:/tmp/home:/bin/false\n')
     (out / 'etc/group').write_text('root:x:0:\n')
@@ -193,4 +197,5 @@ if __name__ == '__main__':
         source = parser.add_mutually_exclusive_group(required=True)
         source.add_argument('stage', nargs='?')
         source.add_argument('--gui-build', type=Path)
+        parser.add_argument('--tray-menu', action='store_true')
         main(parser.parse_args())

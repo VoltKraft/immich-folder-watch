@@ -447,6 +447,38 @@ trial's `result.json` SHA-256 is
 The SHA-256 of its evidence manifest is
 `c64925dbff10da16381195bca07499c2b4336ed3b164d9dca838953d71c955bb`.
 
+### Tray watcher replacement and menu delivery through the installed Flatpak
+
+The optional menu trial runs after the two installed second launches. It
+closes the original X11 window again, waits for the original watcher to exit
+and starts a new watcher process on the same private session bus. A separate
+protocol peer reads the installed item's `Menu` property and requests
+`GetLayout`. It sends Open and Quit to the normal application bus name. The
+monitor matches the requests and replies by sender, destination and serial.
+The app uses the same X11, shared IPC and watcher permissions as the preceding
+trial. [Installed menu observer](../../tools/rust-qa/gui/flatpak/tray_menu.py).
+
+```sh
+python3 -B tools/rust-qa/gui/flatpak/run.py plasma-menu-noble-02 --tray-menu
+```
+
+On native x64 the executable built from the sources at `9487dbe` had SHA-256
+`8c8bfba1496d0b74424e6c316de6f8d58a488e6ebec6e89643384de88aecfb12`.
+The original proxy (PID 53, `:1.6`) registered the same item with watchers
+`:1.2` and `:1.17` while the original window remained hidden during handover.
+The menu advertised “GUI öffnen”, “Neustart” and “Beenden” with IDs 1–3.
+From peer `:1.0`, `Event(1, "clicked")` reopened XID 4194306 on the original
+Flatpak instance 3343806487. `Event(3, "clicked")` drained GUI PID 57, its
+two wrappers and its bus proxy. The private user installation was empty after
+uninstall. The result SHA-256 is
+`75234d6975f3da072244bf2549d595deaf32e5944be91c39a8b197a045b1687c` and the
+evidence manifest SHA-256 is
+`a6db24a2199c8669fa483aa0c55c4a363e78c283b628464b1a0ec7622c92a6d9`.
+The ordinary mode passed independently with result SHA-256
+`abffbda3b86fc8d82c6e25b7faada2848290b5aa7d040cf8260cc91ee0783718`.
+The installed test exercises GUI-only protocol delivery. The physical panel
+and worker restart use the [separate Plasma trial](rw02-plasma.md#open-restart-and-quit-from-the-plasma-menu).
+
 ## Ordinary second launch of the Windows GUI
 
 The shipping desktop shortcut starts the executable without arguments. A second
