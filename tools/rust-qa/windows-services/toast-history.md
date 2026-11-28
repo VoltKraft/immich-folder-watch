@@ -277,3 +277,26 @@ Offline replay verified all 54 source hashes, the original compiled sender
 the raw Shell query sequence and the Settings restoration receipts. The
 archive and replay are under
 `artifacts/rust/hosted-toast-history/arm64-eligible-85936d4/`.
+
+### Ordinary notification in app state after quiet time
+
+The [separate app-state comparison](../../../.github/workflows/rust-windows-arm64-after-quiet-app.yaml)
+waits for two consecutive successful native queries reporting quiet time (6)
+and then app state (7), on the same unlocked ARM64 console. On the original
+131-sample trace above, only sample 100 satisfied that transition. The
+strict state-5 comparison retains its own workflow and result.
+
+The app-state comparison reopens Settings to verify Notifications On and
+Do not disturb Off, closes that test window and arms the physical observer.
+It checks state 7 again before starting the history trial and immediately
+before launching the ordinary sender process. Replay requires exactly one
+ordinary WinRT `Show`, checks state 7 around its native timing interval and
+correlates its two labels, Shell view queries and physical screen observation.
+The observer reads the foreground and Shell window handles, owner processes
+and threads, executable basenames, classes and bounds; each snapshot retains
+its counter interval and an ownership recheck. A missing window is recorded.
+The observer leaves the foreground window and its process alone.
+
+The dedicated ZIP is named `rust-after-quiet-app-arm64-<revision>`. Use the
+same offline CLI commands to replay it. `requestedStateObserved` refers to
+the selected comparison and `eligible` specifically to state 5.

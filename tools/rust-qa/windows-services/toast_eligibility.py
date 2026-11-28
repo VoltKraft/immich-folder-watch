@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 import ctypes as c
+from ctypes import wintypes as w
 import json
 import os
 from pathlib import Path
@@ -15,11 +16,14 @@ import toast_history
 
 ARM = TARGET["ARM64"][0]
 WORKFLOW = "Rust Windows ARM64 notification after quiet time"
+APP_WORKFLOW = "Rust Windows ARM64 notification in app state after quiet time"
+APP_MODE = "after-quiet-app"
 SOURCE = "tools/rust-qa/windows-services/toast_eligibility.py"
 OBSERVERS = ("toast_eligibility.py", "toast_console.py", "toast_console.ps1", "toast_settings.ps1")
 LIMIT = 65 * 60
 INTERVAL = 30
 ACCEPTS = 5
+QUIET, APP = 6, 7
 
 
 class NotificationState:
@@ -49,9 +53,11 @@ class NotificationState:
 
 def dedicated():
     toast_history.request_identity(ARM)
-    if (os.environ.get("GITHUB_WORKFLOW") != WORKFLOW or os.environ.get("GITHUB_JOB") != "observe"
-            or os.environ.get("IFW_QA_TOAST_ELIGIBILITY") != "wait" or os.environ.get("IFW_QA_TOAST_POLICY") != "permitted"):
+    mode = os.environ.get("IFW_QA_TOAST_ELIGIBILITY")
+    if ((mode, os.environ.get("GITHUB_WORKFLOW")) not in (("wait", WORKFLOW), (APP_MODE, APP_WORKFLOW))
+            or os.environ.get("GITHUB_JOB") != "observe" or os.environ.get("IFW_QA_TOAST_POLICY") != "permitted"):
         raise ValueError("Use the dedicated ARM64 notification eligibility job")
+    return mode
 
 
 def identity(desktop):
@@ -65,11 +71,49 @@ def identity(desktop):
             or not ordinary_console(desktop, "Default")):
         raise ValueError("The observer must run on the source-bound native sender's original console")
     return dict(target=ARM, head=head, run=build["workflowRun"], attempt=build["workflowAttempt"],
-                workflow=WORKFLOW, job=os.environ["GITHUB_JOB"], session=desktop["session"], sources=sources,
+                workflow=os.environ["GITHUB_WORKFLOW"], job=os.environ["GITHUB_JOB"], session=desktop["session"], sources=sources,
                 nativeBuildSha256=sha(original / "result.json"))
 
 
-def wait_for_accepts(report, sample, console, save, clock=time.monotonic, sleep=time.sleep):
+def reached(mode, previous, current):
+    if mode == "wait":
+        return "accepts-notifications" if current == ACCEPTS else None
+    if mode == APP_MODE:
+        return "app-after-quiet-time" if (previous, current) == (QUIET, APP) else None
+    raise ValueError("Unknown Shell notification comparison")
+
+
+def window_facts(desk):
+    facts = {}
+    for role, read in (("foreground", desk.foreground), ("shell", desk.shell)):
+        hwnd = read()
+        window = desk.window(hwnd)
+        # Retain only the image basename, ownership, class and bounds from the existing desktop observer.
+        owner = w.DWORD()
+        again = desk.owner(hwnd, c.byref(owner)) if hwnd else 0
+        same = bool(hwnd and window and read() == hwnd and again == window["tid"] and owner.value == window["pid"])
+        facts[role] = dict(window=window, sameOwner=same, session=desk.pid_session(window["pid"]) if window else None)
+    return facts
+
+
+def sample_console(state, desk, mode):
+    row = state.sample()
+    if mode == APP_MODE:
+        begin = state.read_counter(state.counter)
+        row["windows"] = dict(beginQpc=begin, **window_facts(desk), endQpc=state.read_counter(state.counter))
+    return row
+
+
+def guard_app_launch(report, desk, state):
+    if desk.context() != report["desktopBefore"]:
+        raise ValueError("The original test desktop changed before the normal sender")
+    row = sample_console(state, desk, APP_MODE)
+    report.setdefault("beforeNormalLaunch", []).append(row)
+    if row["hresult"] != 0 or row["state"] != APP:
+        raise ValueError("The ordinary announcement requires the measured app state at sender launch")
+
+
+def wait_for_accepts(report, sample, console, save, clock=time.monotonic, sleep=time.sleep, *, mode="wait"):
     start = clock()
     while True:
         if not console():
@@ -83,18 +127,17 @@ def wait_for_accepts(report, sample, console, save, clock=time.monotonic, sleep=
             report["status"] = "query-failed"
         elif elapsed > LIMIT:
             report["status"] = "deadline"
-        elif row["state"] == ACCEPTS:
-            report["status"] = "accepts-notifications"
-        elif elapsed >= LIMIT:
-            report["status"] = "deadline"
+        else:
+            previous = report["samples"][-2]["state"] if len(report["samples"]) >= 2 else None
+            report["status"] = reached(mode, previous, row["state"]) or ("deadline" if elapsed >= LIMIT else "waiting")
         save()
         if report["status"] != "waiting":
-            return report["status"] == "accepts-notifications"
+            return report["status"] in ("accepts-notifications", "app-after-quiet-time")
         sleep(min(INTERVAL, LIMIT - elapsed))
 
 
 def wait():
-    dedicated()
+    mode = dedicated()
     desk, state = Desktop(), NotificationState()
     before = desk.context()
     report = dict(**identity(before), desktopBefore=before, frequency=state.frequency,
@@ -112,7 +155,7 @@ def wait():
         here = report["desktopAfter"] = desk.context()
         return ordinary_console(here, "Default") and here["session"] == before["session"]
 
-    return wait_for_accepts(report, state.sample, console, save)
+    return wait_for_accepts(report, lambda: sample_console(state, desk, mode), console, save, mode=mode)
 
 
 def check_unsent_policy():
@@ -129,7 +172,7 @@ def check_unsent_policy():
 
 @contextmanager
 def during_sender():
-    dedicated()
+    mode = dedicated()
     desk, state = Desktop(), NotificationState()
     before = desk.context()
     out = ART / ("toast-eligibility-" + ARM)
@@ -137,8 +180,9 @@ def during_sender():
     report = dict(**identity(before), desktopBefore=before, frequency=state.frequency, samples=[])
     if any(prior[key] != value for key, value in report.items() if key not in ("desktopBefore", "samples")):
         raise ValueError("The waiting console or native source changed before sending")
-    if prior["status"] != "accepts-notifications" or prior["samples"][-1]["state"] != ACCEPTS:
-        raise ValueError("The original console did not become eligible")
+    requested = APP if mode == APP_MODE else ACCEPTS
+    if not completed_wait(prior, mode):
+        raise ValueError("The original console did not reach the requested comparison state")
     report["waitSha256"] = sha(out / "wait.json")
     path = out / "sender.json"
     if path.exists():
@@ -148,11 +192,11 @@ def during_sender():
     def observe():
         try:
             while True:
-                report["samples"].append(state.sample())
+                report["samples"].append(sample_console(state, desk, mode))
                 ready.set()
                 if stop.wait(.025):
                     break
-            report["samples"].append(state.sample())
+            report["samples"].append(sample_console(state, desk, mode))
         except Exception as exc:
             report["samplerError"] = str(exc)
             ready.set()
@@ -160,9 +204,9 @@ def during_sender():
     thread = Thread(target=observe, daemon=True)
     thread.start()
     try:
-        if not ready.wait(5) or not report["samples"] or report["samples"][0]["state"] != ACCEPTS:
-            raise ValueError("The Shell did not permit notifications before starting the original sender")
-        yield
+        if not ready.wait(5) or not report["samples"] or report["samples"][0]["state"] != requested:
+            raise ValueError("The Shell state changed before starting the original sender trial")
+        yield (lambda: guard_app_launch(report, desk, state)) if mode == APP_MODE else None
     finally:
         stop.set()
         thread.join(5)
@@ -195,19 +239,26 @@ def bracket(rows, timing):
                 afterMs=(right["beginQpc"] - end) * 1000 / frequency)
 
 
-def accepted_wait(waited, trace):
+def completed_wait(waited, mode):
     rows = waited["samples"]
-    if (waited["status"] != "accepts-notifications" or (waited["limitSeconds"], waited["intervalSeconds"]) != (LIMIT, INTERVAL)
-            or not rows or not trace["samples"] or rows[-1]["state"] != ACCEPTS or rows[-1]["elapsedSeconds"] > LIMIT
-            or rows[-1]["endQpc"] > trace["samples"][0]["beginQpc"] or trace["samples"][0]["state"] != ACCEPTS):
+    if ((waited["limitSeconds"], waited["intervalSeconds"]) != (LIMIT, INTERVAL) or not rows
+            or rows[-1]["elapsedSeconds"] > LIMIT):
         return False
-    last_qpc, last_seconds = 0, 0
+    last_qpc, last_seconds, previous = 0, 0, None
     for index, row in enumerate(rows):
-        if (row["hresult"] != 0 or type(row["state"]) is not int or (row["state"] == ACCEPTS and index != len(rows) - 1)
+        status = reached(mode, previous, row["state"])
+        if (row["hresult"] != 0 or type(row["state"]) is not int
+                or (status is not None) != (index == len(rows) - 1) or (status is not None and status != waited["status"])
                 or not last_qpc <= row["beginQpc"] <= row["endQpc"] or not last_seconds <= row["elapsedSeconds"]):
             return False
-        last_qpc, last_seconds = row["endQpc"], row["elapsedSeconds"]
+        last_qpc, last_seconds, previous = row["endQpc"], row["elapsedSeconds"], row["state"]
     return True
+
+
+def accepted_wait(waited, trace, mode="wait"):
+    return (completed_wait(waited, mode) and bool(trace["samples"])
+            and waited["samples"][-1]["endQpc"] <= trace["samples"][0]["beginQpc"]
+            and trace["samples"][0]["hresult"] == 0 and trace["samples"][0]["state"] == (APP if mode == APP_MODE else ACCEPTS))
 
 
 def verify(directory, frames):
@@ -223,8 +274,12 @@ def verify(directory, frames):
     binary = directory.parent / "build" / ARM / "release/ifw-windows-services-probe.exe"
     if sha(binary) != native["binarySha256"]:
         raise ValueError("The archived executable differs from the sender that issued the ordinary Show")
+    workflow = waited["workflow"]
+    if workflow not in (WORKFLOW, APP_WORKFLOW):
+        raise ValueError("Unknown dedicated workflow in the wait receipt")
+    mode = APP_MODE if workflow == APP_WORKFLOW else "wait"
     expected = dict(head=native["head"], run=native["run"], attempt=native["attempt"], target=ARM,
-                    workflow=WORKFLOW, job="observe", session=native["desktop"]["session"],
+                    workflow=workflow, job="observe", session=native["desktop"]["session"],
                     nativeBuildSha256=sha(directory / "native-build.json"))
     names = [Path(SOURCE).with_name(name).as_posix() for name in OBSERVERS]
     files = {name: native["observerInputs"][name] for name in names}
@@ -233,9 +288,9 @@ def verify(directory, frames):
                 or any(not ordinary_console(receipt[key], "Default") or receipt[key]["session"] != expected["session"]
                        for key in ("desktopBefore", "desktopAfter"))):
             raise ValueError("An eligibility observation belongs to a different console, build, job or observer")
-    if (not accepted_wait(waited, trace)
+    if (not accepted_wait(waited, trace, mode)
             or trace["waitSha256"] != sha(wait_path) or trace["samplerStopped"] is not True or "samplerError" in trace
-            or physical["workflow"] != WORKFLOW or physical["job"] != "observe"
+            or physical["workflow"] != workflow or physical["job"] != "observe"
             or physical["session"] != expected["session"] or physical["token"] != native["token"]):
         raise ValueError("The eligibility wait and original sender observations do not agree")
     confirm = json.loads((directory.parent / ("toast-settings-" + ARM + "-confirmpermitted.json")).read_text(encoding="utf-8-sig"))
@@ -258,9 +313,27 @@ def verify(directory, frames):
             or any(type(diagnostics[k]) is not int or diagnostics[k] < 0 for k in
                    ("visibleCoreWindowVisits", "shellWindowVisits", "viewQueries", "normalViewMatches", "onscreenViewVisits"))):
         raise ValueError("No measured physical Shell window and toast-view samples in the ordinary Show interval")
+    around = [observed["before"], *observed["overlapping"], observed["after"]]
     result = dict(**observed, token=native["token"], senderPid=proc["pid"], timing=timing, physicalStatus=physical["status"],
-                  diagnostics=diagnostics, eligible=all(row["state"] == ACCEPTS for row in
-                                                      [observed["before"], *observed["overlapping"], observed["after"]]))
+                  diagnostics=diagnostics, eligible=all(row["state"] == ACCEPTS for row in around),
+                  requestedStateObserved=all(row["state"] == (APP if mode == APP_MODE else ACCEPTS) for row in around))
+    if mode == APP_MODE:
+        launches = trace["beforeNormalLaunch"]
+        if (not launches or len(launches) != sum(p["operation"] == "post-normal" for p in native["processes"])
+                or any(row["hresult"] != 0 or row["state"] != APP for row in launches)
+                or launches[-1]["endQpc"] > timing[1]):
+            raise ValueError("The original normal sender was not launched in the observed app state")
+        for row in [waited["samples"][-2], waited["samples"][-1], *launches, *around]:
+            windows = row["windows"]
+            if not row["endQpc"] <= windows["beginQpc"] <= windows["endQpc"]:
+                raise ValueError("The original window readbacks are outside their ordered counter interval")
+            for role in ("foreground", "shell"):
+                item = windows[role]
+                if type(item["sameOwner"]) is not bool or item["sameOwner"] and (
+                        not item["window"] or min(item["window"]["pid"], item["window"]["tid"]) <= 0
+                        or not item["window"]["hwnd"] or item["session"] != expected["session"]):
+                    raise ValueError("The original foreground or Shell window owner did not match its console")
+        result["beforeNormalLaunch"] = launches
     return result
 
 
@@ -279,4 +352,4 @@ if __name__ == "__main__":
         raise SystemExit(0)
     result = verify(*args.verify)
     print(json.dumps(result, indent=2))
-    raise SystemExit(0 if result["eligible"] else 2)
+    raise SystemExit(0 if result["requestedStateObserved"] else 2)

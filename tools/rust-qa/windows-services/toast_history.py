@@ -481,7 +481,7 @@ def replay(directory, result):
     return original
 
 
-def measure(target, exe, out, record, *, isolated_vm=False):
+def measure(target, exe, out, record, *, isolated_vm=False, before_normal=None):
     from notification_probe import (Desktop, Win32, child, fixture_profile, ordinary_console, owned_directory,
                                     pin_new_marker, pin_path)
     from native import known_folder
@@ -518,6 +518,8 @@ def measure(target, exe, out, record, *, isolated_vm=False):
             record["processes"].append(info)
 
             def run():
+                if operation == "post-normal" and before_normal is not None:
+                    before_normal()
                 with child(api, exe, [mode, str(area), token, operation], area, env, log, info) as proc:
                     proc.wait(timeout=25)
                 item = parse_log(log.read_bytes(), operation, token, info["pid"], session, info["exit"],
@@ -611,7 +613,7 @@ def main():
         return observe_sender(target, exe, original, build, args.archive_sha256)
 
 
-def observe_sender(target, exe, original, archived, archive_digest):
+def observe_sender(target, exe, original, archived, archive_digest, *, before_normal=None):
     out = ART / ("toast-history-" + target)
     out.mkdir(parents=True, exist_ok=False)
     result = dict(status="failed", target=target)
@@ -651,7 +653,8 @@ def observe_sender(target, exe, original, archived, archive_digest):
             raise ValueError("The native service's import table changed since the original build")
         (out / table.name).write_bytes(table.read_bytes())
         (out / "native-build.json").write_bytes((original / "result.json").read_bytes())
-        result["historyStatus"] = result["status"] = measure(target, exe, out, result, isolated_vm=archived is not None)
+        result["historyStatus"] = result["status"] = measure(target, exe, out, result, isolated_vm=archived is not None,
+                                                             before_normal=before_normal)
         if result["status"] == "passed":
             result["evidenceFiles"] = evidence_files(out)
             replay(out, result)

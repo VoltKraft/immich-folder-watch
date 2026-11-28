@@ -222,8 +222,8 @@ def observe_arm64(*, eligible=False):
                     if eligible and not receipt["armedBeforeSender"]:
                         return 2
                     from toast_eligibility import during_sender
-                    with during_sender() if eligible else nullcontext():
-                        return toast_history.observe_sender(target, exe, original, None, None)
+                    with during_sender() if eligible else nullcontext() as before_normal:
+                        return toast_history.observe_sender(target, exe, original, None, None, before_normal=before_normal)
             finally:
                 if log.is_file():
                     frames.mkdir(exist_ok=True)

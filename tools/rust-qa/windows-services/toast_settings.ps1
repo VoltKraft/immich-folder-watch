@@ -8,6 +8,8 @@ if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hos
     throw 'This readback requires the native ARM64 rewrite runner.'
 }
 $eligibleJob = $env:GITHUB_WORKFLOW -ceq 'Rust Windows ARM64 notification after quiet time' -and $env:IFW_QA_TOAST_ELIGIBILITY -ceq 'wait'
+$eligibleJob = $eligibleJob -or ($env:GITHUB_WORKFLOW -ceq 'Rust Windows ARM64 notification in app state after quiet time' -and
+    $env:IFW_QA_TOAST_ELIGIBILITY -ceq 'after-quiet-app')
 if ($Action -ne 'Read' -and ($env:GITHUB_JOB -cne 'observe' -or
     ($env:GITHUB_WORKFLOW -cne 'Rust Windows ARM64 notification on a fresh console' -and !$eligibleJob) -or
     $env:IFW_QA_TOAST_POLICY -cne 'permitted')) {

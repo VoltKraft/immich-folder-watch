@@ -17,22 +17,25 @@ on:
       wait_eligible:
         type: boolean
         default: false
+      after_quiet_app:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   observe:
-    if: github.ref == 'refs/heads/rewrite/rust'
+    if: github.ref == 'refs/heads/rewrite/rust' && (!inputs.after_quiet_app || inputs.wait_eligible)
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(inputs.wait_eligible && '{"include":[{"policy":"permitted","artifact":"rust-eligible-console-arm64"}]}' || '{"include":[{"policy":"original","artifact":"rust-fresh-console-arm64"},{"policy":"permitted","artifact":"rust-permitted-console-arm64"}]}') }}
+      matrix: ${{ fromJSON(inputs.after_quiet_app && '{"include":[{"policy":"permitted","artifact":"rust-after-quiet-app-arm64"}]}' || inputs.wait_eligible && '{"include":[{"policy":"permitted","artifact":"rust-eligible-console-arm64"}]}' || '{"include":[{"policy":"original","artifact":"rust-fresh-console-arm64"},{"policy":"permitted","artifact":"rust-permitted-console-arm64"}]}') }}
     runs-on: windows-11-arm
     timeout-minutes: ${{ inputs.wait_eligible && 105 || 35 }}
     env:
       NATIVE_TARGET: aarch64-pc-windows-msvc
       IFW_QA_TOAST_POLICY: ${{ matrix.policy }}
-      IFW_QA_TOAST_ELIGIBILITY: ${{ inputs.wait_eligible && 'wait' || 'immediate' }}
+      IFW_QA_TOAST_ELIGIBILITY: ${{ inputs.after_quiet_app && 'after-quiet-app' || inputs.wait_eligible && 'wait' || 'immediate' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,7 +66,7 @@ jobs:
           powershell.exe -NoLogo -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File tools/rust-qa/windows-services/toast_settings.ps1 -Action Permit
           exit $LASTEXITCODE
 
-      - name: Wait for the original console to accept notifications
+      - name: Wait for the requested Shell notification state on the original console
         id: wait_for_shell
         if: ${{ !cancelled() && inputs.wait_eligible && steps.prepare.outcome == 'success' }}
         timeout-minutes: 67
@@ -86,7 +89,7 @@ jobs:
         shell: pwsh
         run: |
           $extra = @()
-          if ($env:IFW_QA_TOAST_ELIGIBILITY -ceq 'wait') { $extra += '--after-eligibility' }
+          if ($env:IFW_QA_TOAST_ELIGIBILITY -cin @('wait','after-quiet-app')) { $extra += '--after-eligibility' }
           python -B tools/rust-qa/windows-services/toast_console.py --observe-arm64 @extra
           exit $LASTEXITCODE
 
