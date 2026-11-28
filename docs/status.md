@@ -23,7 +23,13 @@ original Shell window. The console observer retained the screenshot and the
 original Do Not Disturb setting was restored. [Local Windows evidence](rust/rw02-windows-services.md).
 
 Local Windows trials share one guest slot. The Server 2025 test guest now
-runs with 4 GiB of RAM. In the ARM64 Default desktop trials at `f69065e`,
+runs with 4 GiB of RAM, down from 6 GiB. The three .NET test media images
+now reside on the SSD. Their original paths resolve to copies verified by
+SHA-256, freeing 2,944,704,512 bytes on the host's tmpfs. The standard user
+also completed Japanese IME composition in the filename field with the 4 GiB
+limit. [Native IME result](rust/rw02-windows-ime.md#standard-user-console-result-at-065ae57).
+
+In the ARM64 Default desktop trials at `f69065e`,
 the installed WPF window reopened and the separate backup run logged its
 first upload. A different foreground window covered all sixteen sampled
 Quit menu anchor points in both runs. The private desktop trials passed.
