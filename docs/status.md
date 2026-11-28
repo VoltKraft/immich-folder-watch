@@ -32,7 +32,10 @@ wire cases. For explicitly allowed HTTP origins the relay verified Digest
 responses for the original inventory, polling and CONNECT targets, the
 exact POST bytes with `auth-int`, and the UTF-8 realm `München`. The
 signed 3.0.4 client sent no Digest response for that localized realm.
-[Signed and native proxy results](rust/rw02-linux-basic-proxy.md#localized-digest-realm).
+At `85936d4` Ubuntu x64 and ARM64 each passed the same 24 unit and
+72 network cases. Windows ARM64 passed 18 unit and 49 network cases.
+[Signed comparison](rust/rw02-linux-basic-proxy.md#localized-digest-realm) ·
+[Three original native archives](rust/rw02-linux-basic-proxy.md#native-ubuntu-and-windows-comparison-at-85936d4).
 
 On Windows ARM64 at `ee0bcd2` the ordinary and quiet WinRT sends and
 history checks passed on two fresh consoles. Neither physical observer
@@ -122,8 +125,13 @@ When WPF started first, Rust identified the WPF pipe server and refused
 admission. In a separate trial Rust held the existing configuration file
 exclusively. A fresh WPF process remained visible for 12 seconds without an
 upload or SQLite file. After release, a new WPF process uploaded the PNG and
-committed one row. Handling an already active worker, applying settings and
-atomic config replacement remain part of the migration work.
+committed one row. At `92b26c2` the same installed window also tried to
+save an edited draft under the lock. Windows returned sharing violation
+32. The original 416-byte config remained intact. After release, the same
+window saved the draft, uploaded the 69-byte test PNG and committed one
+matching row. QEMU confirmed 4 GiB base memory and zero hot-plugged
+memory. The guest shut down and released its slot. Handling an already
+active worker and replacing the guarded file during a Rust save remain open.
 [Both launch orders and original archives](rust/rw02-cross-session.md#installed-304-worker-in-another-session) ·
 [Held and released configuration](rust/rw02-cross-session.md#an-exclusive-configuration-handle-during-wpf-startup).
 

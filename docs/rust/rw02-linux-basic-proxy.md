@@ -163,3 +163,22 @@ the 12 indexed outputs matched the receipt. The executable SHA-256 was
 The original `linux-plain-utf8-source-bound-02/result.json` in the same
 evidence directory has SHA-256
 `c8c59bc7818bbc1ae053b33b08e7ba8093a1d4000250bd59f196b1e67bfa19eb`.
+
+### Native Ubuntu and Windows comparison at 85936d4
+
+Both Ubuntu architectures passed the six plaintext Digest cases. The four
+positive cases each carried ten authenticated album requests, one event and
+a normal close. Both incorrect-password cases received only 407 responses.
+Windows ARM64 passed its existing system and environment proxy checks. Its
+HTTPS case made thirteen authenticated requests over two TLS connections.
+
+| Native target | Unit / network cases | Original Actions archive SHA-256 |
+| --- | --- | --- |
+| Ubuntu x64 | 24 / 72 | [`ea77454d2689d2f9552d99bcf20494cdc0ad8c9e5265de78ee764611a3fcb530`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46107366263/artifacts/15247499133) |
+| Ubuntu ARM64 | 24 / 72 | [`9889a49e9deed8c42c7970178f67974aa0617399ba03ee7dfddae23e220e75d6`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46107366263/artifacts/15248376449) |
+| Windows ARM64 | 18 / 49 | [`9c7cb78d9d9e5495b3e3750cd58b74163f699ff2ebdf2072727b0e007f5d8b3f`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46107366263/artifacts/15247644403) |
+
+Independent readback matched each ZIP to its Actions digest, 35 source files
+to the revision and all indexed outputs to the native receipt. The combined
+readback in `artifacts/rust/realtime-assessment/hosted-85936d4/verified.json`
+has SHA-256 `9dc580679f4d262a31ae89739759eb03f4c95a74164d52911ce1457e7d1643e0`.
