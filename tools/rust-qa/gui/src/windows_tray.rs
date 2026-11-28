@@ -137,7 +137,7 @@ impl Registration<'_> {
         );
     }
 
-    fn register(&mut self, phase: &str, token: &str) -> io::Result<bool> {
+    fn register(&mut self, phase: &str, token: &str) -> bool {
         let candidate = pin_shell();
         let (added, v4) = self.icon.register(phase, self.images[self.selected].0);
         if added {
@@ -150,17 +150,13 @@ impl Registration<'_> {
             u8::from(added),
             u8::from(v4)
         );
-        self.available = added && v4;
-        if added && !v4 {
-            if !self.icon.remove("incompatible_version") {
-                return Err(io::Error::other("Failed to withdraw the rejected v4 icon"));
-            }
-            self.host.clear();
-        }
-        Ok(self.available)
+        self.available = self
+            .host
+            .registration_available(added, v4, || self.icon.remove("incompatible_version"));
+        self.available
     }
 
-    fn recover(&mut self, attempt: Attempt, token: &str) -> io::Result<bool> {
+    fn recover(&mut self, attempt: Attempt, token: &str) -> bool {
         let phase = match attempt {
             Attempt::Recreate => "recreate",
             Attempt::Retry => "retry",
@@ -177,7 +173,7 @@ impl Registration<'_> {
             {
                 self.bind(phase, candidate);
                 self.available = true;
-                return Ok(true);
+                return true;
             }
             // Only this receiver's HWND/ID is withdrawn before retrying a fresh add.
             if self
@@ -190,7 +186,7 @@ impl Registration<'_> {
                 self.host.clear();
                 if !self.icon.remove("existing.withdraw") {
                     self.available = false;
-                    return Ok(false);
+                    return false;
                 }
             }
         }
@@ -289,7 +285,7 @@ fn run<T>(
         let mut seen = EVENTS.get();
         let mut recovery = Recovery::new(taskbar());
         // Bootstrap probes the Shell even on a shell-less desktop to establish real fallback.
-        let available = tray.register("initial", token)?;
+        let available = tray.register("initial", token);
         recovery.result(available, Instant::now());
         tray.sample("initial", available);
         ready.send(available).map_err(io::Error::other)?;
@@ -346,7 +342,7 @@ fn run<T>(
                     }
                 }
                 if let Some(attempt) = recovery.observe(current, recreated, now) {
-                    let acknowledged = tray.recover(attempt, token)?;
+                    let acknowledged = tray.recover(attempt, token);
                     recovery.result(acknowledged, Instant::now());
                 }
                 if was_available != tray.available {

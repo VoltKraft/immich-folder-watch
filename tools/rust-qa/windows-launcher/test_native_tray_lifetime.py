@@ -107,6 +107,20 @@ class NativeLifetimeTests(unittest.TestCase):
         self.stack.close()
         self.api.close.assert_called_once_with(717)
 
+    def test_refused_v4_withdrawal_keeps_the_icon_outstanding_until_confirmed_cleanup(self):
+        refused = attempt("initial", True, False).replace("incompatible_version=true", "incompatible_version=false")
+        retry = "gui_tray.existing.version4=true\n" + BIND.replace("phase=recreate", "phase=retry")
+        for recovery in ("", retry):
+            with self.subTest(recovery=recovery):
+                self.probe.check_drain(self.proc, 1, PRIMARY + refused + recovery + closed(True), self.report)
+                report = self.report["nativeShutdown"]
+                self.assertEqual(report["cleanupMethod"], "deletedAtQuit")
+                self.assertEqual(report["withdrawals"], [])
+                self.assertFalse(report["stableRegistration"])
+        for invalid in (closed(False), attempt("retry", False, False) + closed(True), RETIRED):
+            with self.subTest(invalid=invalid), self.assertRaises(tray.CleanupUnconfirmed):
+                self.probe.check_drain(self.proc, 1, PRIMARY + refused + invalid, self.report)
+
     def test_live_unpinned_or_superseded_handle_cannot_certify_a_failed_delete(self):
         self.gone()
         with self.assertRaises(tray.CleanupUnconfirmed):

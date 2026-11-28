@@ -23,6 +23,20 @@ impl<T> BoundHost<T> {
         self.0 = None;
     }
 
+    /// A rejected version cannot supply a usable tray. Keep the owner of a
+    /// successful add until the Shell also acknowledges its withdrawal.
+    pub(crate) fn registration_available(
+        &mut self,
+        added: bool,
+        version4: bool,
+        withdraw: impl FnOnce() -> bool,
+    ) -> bool {
+        if added && !version4 && withdraw() {
+            self.clear();
+        }
+        added && version4
+    }
+
     pub(crate) fn modified(
         &mut self,
         before: Option<Host>,

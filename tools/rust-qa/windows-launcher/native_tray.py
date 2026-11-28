@@ -127,9 +127,7 @@ def replay_shutdown(log, key, token, report):
                 bound = bind_owner((phase,))
             if take("TRAY_REGISTER") != (phase, *key, token, str(int(outcome)), str(int(version4))):
                 raise CleanupUnconfirmed("Shell calls and registration receipt disagree")
-            if outcome and not version4:
-                if not take("incompatible_version"):
-                    raise CleanupUnconfirmed("The Shell did not remove the rejected v4 icon")
+            if outcome and not version4 and take("incompatible_version"):
                 withdrawals.append("incompatible_version")
                 outstanding, bound = False, None
         elif action == "existing.version4" and outstanding:
@@ -432,7 +430,8 @@ class NativeTray:
             if report["shellAfterExit"]["hresult"] >= 0:
                 raise CleanupUnconfirmed("The Shell did not confirm absence of the original icon after quit")
         report["cleanupMethod"] = report["reportedCleanupMethod"]
-        quiet = len(rows) == 1 and not retirement and not report["withdrawals"] and not shell_changed(log)
+        quiet = (len(rows) == 1 and initial[-2:] != ("1", "0") and not retirement
+                 and not report["withdrawals"] and not shell_changed(log))
         stable = quiet
         if self.name == "Default" and initial[-2:] == ("1", "1"):
             self.original_at("afterQuit")

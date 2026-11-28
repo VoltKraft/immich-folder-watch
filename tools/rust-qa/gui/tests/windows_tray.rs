@@ -1,6 +1,7 @@
 #[path = "../src/windows_tray_state.rs"]
 mod windows_tray_state;
 
+use desktop_lifecycle::{DesktopLifecycle, HostCommand, WindowIntent};
 use std::sync::mpsc::{TryRecvError, TrySendError, sync_channel};
 use std::time::{Duration, Instant};
 use windows_tray_state::{Attempt, BoundHost, Pending, Recovery, TrayAction, TrayEvent};
@@ -78,6 +79,42 @@ fn a_replacement_can_refuse_twice_before_acknowledging_and_cancelling_retries() 
     assert_eq!(recovery.observe(new, false, at(10)), Some(Attempt::Retry));
     recovery.result(true, at(10));
     assert_eq!(recovery.observe(new, false, at(150)), None);
+}
+
+#[test]
+fn a_rejected_version_reports_an_unavailable_tray_and_retains_any_outstanding_icon() {
+    let host = Some((12, 43));
+    let now = Instant::now();
+    for removed in [false, true] {
+        let mut bound = BoundHost::default();
+        bound.confirm(host.map(|id| (id, 88u32)), host, |_| true);
+        let mut calls = 0;
+        let available = bound.registration_available(true, false, || {
+            calls += 1;
+            removed
+        });
+        assert_eq!(calls, 1);
+        assert!(!available);
+        let mut background = DesktopLifecycle::new(true);
+        assert_eq!(
+            background.tray_result(available),
+            Some(HostCommand::ShowAndFocus)
+        );
+        assert_eq!(background.window_intent(), WindowIntent::Visible);
+        assert_eq!(
+            bound.departed(|owner| *owner == 88, || true),
+            if removed { None } else { host }
+        );
+        let mut recovery = Recovery::new(host);
+        recovery.result(available, now);
+        assert_eq!(
+            recovery.observe(host, false, now + Duration::from_secs(3)),
+            Some(Attempt::Retry)
+        );
+    }
+    let mut bound = BoundHost::<u32>::default();
+    assert!(!bound.registration_available(false, false, || panic!("no icon to withdraw")));
+    assert!(bound.registration_available(true, true, || panic!("valid icon must stay")));
 }
 
 #[test]

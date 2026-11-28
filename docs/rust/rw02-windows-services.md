@@ -725,6 +725,33 @@ sequences. The first combined native observations are recorded below.
 [Shell lifetime and cleanup](../../tools/rust-qa/windows-launcher/native_tray.py)
 · [Observer regression cases](../../tools/rust-qa/windows-launcher/test_native_tray_lifetime.py).
 
+### Partial Windows tray registration
+
+Explorer can accept the icon before the separate version-4 handshake
+finishes. An isolated API model returned success for `NIM_ADD`, failure
+for `NIM_SETVERSION` and failure for the attempted `NIM_DELETE`. With
+these three replies, the registration method at `6a322bd` returned an
+error before the GUI received its initial tray state. The same error on
+re-registration could terminate the tray thread.
+
+The adapter now reports the tray unavailable and retains responsibility
+for the possibly outstanding icon. A background start receives the normal
+visible-window fallback. The existing retry timer probes the same icon's
+version again, and Quit still needs either an acknowledged final deletion
+or the existing proof that the original, independently identified Shell
+exited and its icon disappeared. A failed withdrawal is recorded in the
+original Shell operation stream. The shutdown observer rejects a
+`neverAdded` result after a successful add.
+
+The regression cases exercise these API replies, the actual lifecycle's
+initial show command, the retry deadline, recovery and final ownership
+readback. The ARM64 desktop recorded below refused the initial add itself
+and showed the real fallback window. A native Shell returning the three
+partial-registration replies remains unobserved.
+[Adapter](../../tools/rust-qa/gui/src/windows_tray.rs) ·
+[State and lifecycle tests](../../tools/rust-qa/gui/tests/windows_tray.rs) ·
+[Cleanup replay](../../tools/rust-qa/windows-launcher/test_native_tray_lifetime.py).
+
 ### Original Explorer and the primary GUI at 93ecc35
 
 On Windows x64 the integrated primary registered its own icon with the
