@@ -44,6 +44,15 @@ It saw two known Shell roots and recorded zero provider errors. Neither
 label was visible to that observer. This archive predates the separate
 physical screen observer.
 
+At `6c4a364` the native ARM64 sender posted both messages and completed
+selective removal. The physical observer stopped before process creation
+because its launcher had received the ambient environment without the
+fixture token or isolated-profile flag. Windows Settings subsequently
+reported notifications on and Do not disturb on. The owned Settings
+window closed. This run has no physical popup observation. The corrected
+physical observer uses its own pinned marker and scratch directory, checks
+them in PowerShell and records cleanup. [Original fresh-console receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46103222352/artifacts/15246364381).
+
 ## Visible normal WinRT popup
 
 On the hosted ARM64 desktop the command above starts a second, native

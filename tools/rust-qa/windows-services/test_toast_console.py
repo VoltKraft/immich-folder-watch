@@ -1,9 +1,15 @@
 """Keep local and hosted physical notification receipts distinct during offline replay."""
 
+from contextlib import ExitStack, contextmanager
+import json
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
+import notification_probe
+import toast_console
 
 from activation import TARGET
 from toast_console import CleanupUnconfirmed, armed_screen, check_venue, corroborates_labels
@@ -25,6 +31,48 @@ class PhysicalVenueTests(unittest.TestCase):
             child.__enter__.side_effect = CleanupUnconfirmed("cannot confirm cleanup")
             with self.assertRaises(CleanupUnconfirmed), armed_screen(child, Path(folder), {}):
                 self.fail("Unconfirmed observer cleanup cannot start a sender")
+
+    def test_normal_arm64_entry_passes_its_pinned_profile_to_the_physical_observer(self):
+        with TemporaryDirectory() as temp, ExitStack() as stubs:
+            work = Path(temp)
+            target, machine = TARGET["ARM64"]
+            frames = work / ("toast-physical-" + target)
+
+            @contextmanager
+            def profile(_api, parent, token, receipt):
+                area = parent / ("ifw-shell-" + token)
+                area.mkdir()
+                try:
+                    yield area
+                finally:
+                    (area / "synthetic.fixture").unlink()
+                    area.rmdir()
+                    receipt["profileRemoved"] = True
+
+            @contextmanager
+            def child(_api, _exe, _args, area, env, _log, _receipt):
+                token = (area / "synthetic.fixture").read_text()
+                self.assertRegex(token, "^[0-9a-f]{32}$")
+                self.assertEqual((env["IFW_QA_INVENTORY_TOKEN"], env["IFW_QA_ISOLATED"]), (token, "1"))
+                self.assertEqual((env["TMP"], env["TEMP"]), (str(area), str(area)))
+                frames.mkdir()
+                (frames / "ready").touch()
+                yield MagicMock()
+
+            stubs.enter_context(patch.dict(os.environ, RUNNER_TEMP=temp))
+            stubs.enter_context(patch.object(toast_console, "ART", work))
+            stubs.enter_context(patch.object(toast_console, "ordinary_console", return_value=True))
+            stubs.enter_context(patch.object(toast_console.toast_history, "request_identity"))
+            stubs.enter_context(patch.object(toast_console.toast_history, "observe_sender", return_value=0))
+            for name, stub in {"Win32": MagicMock(), "Desktop": MagicMock(), "fixture_profile": profile,
+                               "pin_new_marker": lambda _, _api, p, t: p.write_text(t),
+                               "select_powershell": lambda *_: ("powershell.exe", []),
+                               "pe_machine": lambda _: machine, "child": child}.items():
+                stubs.enter_context(patch.object(notification_probe, name, stub))
+            notification_probe.Desktop.return_value.context.return_value = {"session": 2}
+            self.assertEqual(toast_console.observe_arm64(), 0)
+            receipt = json.loads((frames / "observer.json").read_bytes())
+            self.assertTrue(receipt["armedBeforeSender"] and receipt["profileRemoved"])
 
     def test_original_local_observer_has_no_hosted_run(self):
         sender = {"host": "isolated-vm", "target": TARGET["X64"][0]}

@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path, PureWindowsPath
 import struct
-import tempfile
+import uuid
 import time
 
 from activation import ART, HERE, TARGET, paths, sha, write
@@ -45,6 +45,9 @@ def verify(directory, frames):
     check_venue(native, captured)
     if captured.get("host") == "github-hosted":
         observer = json.loads((frames / "observer.json").read_bytes())
+        if "profileToken" in captured and (observer.get("profileToken") != captured["profileToken"]
+                                           or observer.get("profileRemoved") is not True):
+            raise ValueError("The screen observer lost its original marker or its private profile remained")
         machine = TARGET["ARM64"][1]
         view = captured["popup"]["normalView"]
         if view["automationId"] not in ("NormalToastView", "Normal Toast View") or not view["runtimeId"]:
@@ -127,7 +130,7 @@ def armed_screen(child_context, frames, receipt):
 def observe_arm64():
     target, machine = TARGET["ARM64"]
     toast_history.request_identity(target)
-    from notification_probe import Desktop, Win32, child, pe_machine, select_powershell
+    from notification_probe import Desktop, Win32, child, fixture_profile, pe_machine, pin_new_marker, select_powershell
 
     directory = ART / ("toast-history-" + target)
     frames = ART / ("toast-physical-" + target)
@@ -135,30 +138,35 @@ def observe_arm64():
         raise ValueError("The sender and physical observer require two fresh output directories")
     exe, original = paths(target)
     api, desk = Win32(), Desktop()
-    with tempfile.TemporaryDirectory(dir=os.environ["RUNNER_TEMP"], prefix="ifw-toast-screen-") as temp:
-        area = Path(temp)
-        host, attempts = select_powershell(area, "accessibility")
-        context = desk.context()
-        if not (host and pe_machine(Path(host)) == machine and ordinary_console(context, "Default")):
-            frames.mkdir()
-            write(frames / "physical.json", dict(status="unavailable", reason="No native observer on the unlocked console",
-                                                 hosts=attempts, desktop=context))
-            return toast_history.observe_sender(target, exe, original, None, None)
-        args = ["-NoProfile", "-NoLogo", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File",
-                str(HERE / "toast_console.ps1"), "-HostedArm64", "-NativeDirectory", str(directory),
-                "-OutputDirectory", str(frames)]
-        receipt = dict(desktopBefore=context, hosts=attempts)
-        log = area / "observer.log"
-        try:
-            physical = child(api, Path(host), args, area, dict(os.environ), log, receipt)
-            with armed_screen(physical, frames, receipt):
+    token = uuid.uuid4().hex
+    receipt = dict(profileToken=token, desktopBefore=desk.context())
+    try:
+        with fixture_profile(api, Path(os.environ["RUNNER_TEMP"]), token, receipt) as area, ExitStack() as pins:
+            pin_new_marker(pins, api, area / "synthetic.fixture", token)
+            env = dict(os.environ, TEMP=str(area), TMP=str(area), IFW_QA_ISOLATED="1", IFW_QA_INVENTORY_TOKEN=token,
+                       POWERSHELL_TELEMETRY_OPTOUT="1", POWERSHELL_UPDATECHECK="Off")
+            host, receipt["hosts"] = select_powershell(area, "accessibility", env)
+            if not (host and pe_machine(Path(host)) == machine and ordinary_console(receipt["desktopBefore"], "Default")):
+                frames.mkdir()
+                write(frames / "physical.json", dict(status="unavailable", reason="No native observer on the unlocked console",
+                                                     hosts=receipt["hosts"], desktop=receipt["desktopBefore"]))
                 return toast_history.observe_sender(target, exe, original, None, None)
-        finally:
-            frames.mkdir(exist_ok=True)
-            receipt["desktopAfter"] = desk.context()
-            write(frames / "observer.json", receipt)
-            if log.is_file():
-                (frames / log.name).write_bytes(log.read_bytes())
+            args = ["-NoProfile", "-NoLogo", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File",
+                    str(HERE / "toast_console.ps1"), "-HostedArm64", "-NativeDirectory", str(directory),
+                    "-OutputDirectory", str(frames)]
+            log = area / "observer.log"
+            try:
+                physical = child(api, Path(host), args, area, env, log, receipt)
+                with armed_screen(physical, frames, receipt):
+                    return toast_history.observe_sender(target, exe, original, None, None)
+            finally:
+                if log.is_file():
+                    frames.mkdir(exist_ok=True)
+                    (frames / log.name).write_bytes(log.read_bytes())
+    finally:
+        frames.mkdir(exist_ok=True)
+        receipt["desktopAfter"] = desk.context()
+        write(frames / "observer.json", receipt)
 
 
 if __name__ == "__main__":

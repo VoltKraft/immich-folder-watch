@@ -29,6 +29,14 @@ if (![Environment]::Is64BitProcess -or (Split-Path -Leaf $NativeDirectory) -cne 
 [void](New-Item -ItemType Directory -Path $OutputDirectory)
 $report = [ordered]@{status='unavailable'; target=$target; frequency=[Diagnostics.Stopwatch]::Frequency}
 if ($HostedArm64) {
+    $profileToken = $env:IFW_QA_INVENTORY_TOKEN
+    $scratch = Join-Path $env:RUNNER_TEMP ("ifw-shell-" + $profileToken)
+    if ($profileToken -cnotmatch '^[a-f0-9]{32}$' -or $env:IFW_QA_ISOLATED -cne '1' -or
+        $PWD.Path -ine $scratch -or $env:TEMP -ine $scratch -or $env:TMP -ine $scratch -or
+        [IO.File]::ReadAllText((Join-Path $scratch 'synthetic.fixture')) -cne $profileToken) {
+        throw 'The physical observer requires its original pinned profile.'
+    }
+    $report.profileToken = $profileToken
     $report.host = 'github-hosted'
     $report.head = $env:GITHUB_SHA
     $report.run = $env:GITHUB_RUN_ID
