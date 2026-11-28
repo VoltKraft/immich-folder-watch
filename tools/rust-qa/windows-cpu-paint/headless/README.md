@@ -143,3 +143,30 @@ SHA-256 `5de2a39b5f3185b11ad0929e3bd3071bf2e7fa7ba353baef08a2d1c9567cea99`.
 This offscreen comparison exercises the model's German and English views.
 The separate [native editor and tray trial](../../gui/startup/README.md#fedora-desktop-readback)
 covers reading the saved language and applying the system fallback at startup.
+
+## Ordinary Linux editor with the settings reader
+
+On Fedora x64, the ordinary invocation at `446fc1f` rendered all six frames
+from the checked-in GUI at `c361c69`. All 40 first-party inputs matched that
+revision. The YAML manifest and eight source files also matched `bb3afd5`.
+The verified registry contained 385 compiler trees. Cargo rebuilt the YAML
+library, desktop lifecycle and instrumented GUI in the existing target cache
+with one build job. The executable was a native x86-64 ELF with SHA-256
+`bfa6e6debb31546b9fe5a4eabcf7e881799f249580763b0645958b8cc5b21d73`.
+
+All 18 BGRA images matched both the original window-Quit editor and the
+historical startup-language editor byte for byte. Across both CPU painters,
+4,985,368 of 4,992,000 pixels exactly matched the Vulkan reference. The largest
+channel difference was two, in the direct-mode English frame at 640 × 400.
+The original configuration, build log and per-frame hashes are retained under
+`artifacts/rust/egui-cpu-assessment/headless-e94nfyhl/`. The SHA-256 of
+`pixel-comparison.json` is
+`a6eea23d1365574e62a7469a5f330dad0988257f5e03fb1af90ebb8d144b38ab`.
+The independent `readback.json` has SHA-256
+`396323c36ff71c1d9458c415b0ef427dab1ac50ba6ef0c2f87307126350f0631`.
+
+The separate historical source replay compared both sets of 30 instrumented
+files with the originals in `headless-kk5idh56` and `headless-ycr1rvcu`.
+Both matched. The per-file SHA-256 lists are in
+`artifacts/rust/egui-cpu-assessment/source-controls-qdr5whw5/controls.json`
+with SHA-256 `523c8781f14ab2fe188dd93f3592b0f0d35b521a3594321badea26629497f6a4`.
