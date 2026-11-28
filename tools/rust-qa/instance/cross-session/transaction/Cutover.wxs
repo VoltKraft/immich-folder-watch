@@ -1,0 +1,29 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="IFW disposable cutover trial" Manufacturer="IFW QA" Version="3.0.5"
+           ProductCode="{C09DB689-221F-4AE3-8C72-2D5B5C92DD82}"
+           UpgradeCode="{F82E51D6-6D61-4A5D-B8AA-9D84A5D0D57D}" Scope="perMachine">
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="IFW_CUTOVER_TEST" Secure="yes" />
+    <Property Id="IFW_ROLLBACK" Secure="yes" />
+    <Upgrade Id="{F82E51D6-6D61-4A5D-B8AA-9D84A5D0D57D}">
+      <UpgradeVersion Minimum="3.0.4" IncludeMinimum="yes" Maximum="3.0.4" IncludeMaximum="yes"
+                      Property="IFW_SHIPPING_304" />
+    </Upgrade>
+    <Launch Condition='Installed OR (ComputerName ~= "IFW-QA25" AND IFW_CUTOVER_TEST = "1" AND IFW_SHIPPING_304 = "{50554B02-DB63-4388-A959-8F0B25856F5A}")'
+            Message="This test requires the original x64 3.0.4 MSI on the disposable IFW-QA25 guest." />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="TrialDirectory" Name="IFW Cutover QA">
+        <Component Id="NativePreflight" Guid="{BFD7A521-140B-46DF-91A4-9F779F468E34}">
+          <File Id="ProbeExe" Source="$(var.Endpoint)" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Probe"><ComponentRef Id="NativePreflight" /></Feature>
+    <CustomAction Id="TrialFailure" Error="Requested private cutover rollback after InstallExecute." />
+    <InstallExecuteSequence>
+      <RemoveExistingProducts After="InstallInitialize" Condition="IFW_SHIPPING_304" />
+      <InstallExecute Sequence="6500" />
+      <Custom Action="TrialFailure" Sequence="6501" Condition='NOT Installed AND IFW_ROLLBACK = "1"' />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>
