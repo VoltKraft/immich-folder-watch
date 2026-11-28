@@ -74,6 +74,38 @@ Settings again reported Do not disturb on. The physical observer now
 uses the runtime SHA-256 implementation to hash its script and image.
 [Original native process log and histories](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46104122444/artifacts/15247386025).
 
+At `1fe4a36` the original ARM64 physical observer reached readiness
+before the sender, sampled the console after Show and exited zero. It
+found no matching popup. Its private job drained and its profile was
+removed. The separate timed observer completed 92 samples. History replay
+verified the normal and quiet messages and their selective removal.
+In the sibling job, Windows PowerShell rejected the settings reader's
+omitted by-reference argument before any toggle. The corrected default
+supplies a reference and the regression test calls both parameter forms.
+[Original console](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46105006703/artifacts/15247072856) ·
+[Companion settings trial](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46105006703/artifacts/15247930467).
+
+At `ee0bcd2` both fresh ARM64 consoles completed the settings and sender
+checks. On the original console the master notification switch and Do not
+disturb were on. On the comparison console the master stayed on. The
+fixture observed Do not disturb on, switched it off before the sender,
+read it back off after the sender, then restored it to on. A new Settings
+window confirmed that restoration. The run, session and script hashes
+matched the native sender receipts. The Shell reported state 6 when the
+comparison started and again immediately before restoration.
+
+Both normal and quiet sends appeared in the corresponding histories and
+selective removal succeeded. Neither physical observer found the popup.
+Both armed before their sender, exited zero and removed their private
+profile. The independent timed observers made 92 and 93 samples
+respectively. Visible ARM64 presentation remains open. Microsoft
+identifies Shell state 6 as quiet time after first logon. On the local
+x64 console a banner had been visible during that state.
+[Original runner](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46105620407/artifacts/15246969338) ·
+[Runner with verified restoration](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46105620407/artifacts/15247358753) ·
+[Shell state definitions](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ne-shellapi-query_user_notification_state) ·
+[Observed x64 banner](../../../docs/rust/rw02-windows-services.md#visible-winrt-banner-on-the-local-windows-server-2025-x64-console).
+
 ## Visible normal WinRT popup
 
 On the hosted ARM64 desktop the command above starts a second, native

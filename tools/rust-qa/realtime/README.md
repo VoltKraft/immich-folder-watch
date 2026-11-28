@@ -29,7 +29,10 @@ trust cases and five named HTTP Basic proxy cases for explicitly enabled plainte
 The latter compare the initial anonymous request, the challenge and its single
 retry for REST, polling and WebSocket CONNECT. The controls exercise an incorrect
 password for all requests or just the tunnel, a different authentication scheme
-and an exact-host bypass. Eight Linux HTTPS cases additionally require the actual Basic challenge from
+and an exact-host bypass. The Linux HTTP Digest cases verify the absolute
+GET/POST target, the CONNECT authority, shared nonce counts and the original
+entity bytes for `auth-int`. [Signed comparison and native evidence](../../../docs/rust/rw02-linux-basic-proxy.md#digest-for-explicitly-enabled-http-origins).
+Eight Linux HTTPS cases additionally require the actual Basic challenge from
 the anonymous CONNECT before an authenticated tunnel, and exercise refusal,
 later changed challenges, wrong server identity, origin-issued 407, a redirect
 and a direct bypass. The separate paired references use the signed Linux assemblies. [Linux Basic proxy comparison](../../../docs/rust/rw02-linux-basic-proxy.md). Two strict polling peers accept only the
