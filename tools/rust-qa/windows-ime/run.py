@@ -203,7 +203,7 @@ def run(args, result):
         else:
             target, machine = native_target()
             receipt = args.build_receipt or ROOT / "artifacts/rust/gui-native" / target / "build.json"
-            result["guiBuild"] = checked_build(args.binary, receipt, target, machine, os.getenv("GITHUB_SHA"))
+            result["guiBuild"] = checked_build(args.binary, receipt, target, machine, result.get("source"))
             subject(args, api, env, host, result)
             result["compositionObserved"] = True
             outcome = "passed"
@@ -216,6 +216,7 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--isolated-vm", action="store_true", help="use an explicitly authorized disposable Windows test VM")
     parser.add_argument("--build-receipt", type=Path, help="the matching native GUI build.json in an isolated test VM")
+    parser.add_argument("--build-source", help="the compiler revision from the verified local desktop archive")
     parser.add_argument("--inventory-only", action="store_true", help="read actual installed support without sending input")
     args = parser.parse_args()
     hosted = all(os.getenv(k) == v for k, v in {
@@ -227,12 +228,11 @@ def main():
     if args.binary.name.lower() != "native-gui-assessment.exe":
         parser.error("Use the development-only native GUI assessment binary")
     args.output.mkdir(parents=True, exist_ok=False)
-    source = [*sorted(HERE.glob("*.py")), HERE / "observe.ps1", HERE / "hosted.ps1", HERE / "language-list.ps1",
-              HERE / "test_language_list.ps1", HERE / "Ime.cs", HERE / "mode-sample.ps1", HERE / "test_mode_sample.ps1",
-              HERE / "test_field_focus.ps1",
+    source = [*sorted(HERE.glob("*.py")), *sorted(HERE.glob("*.ps1")), HERE / "Ime.cs",
               QA / "windows-desktop/worker.py", QA / "windows-desktop/win32.py", QA / "windows_observer.py",
               QA / "observe-windows-gui.py", QA / "observe-windows-input.ps1", *FIELD_SOURCES]
-    result = {"status": "failed", "source": os.getenv("GITHUB_SHA"), "run": os.getenv("GITHUB_RUN_ID"),
+    result = {"status": "failed", "source": os.getenv("GITHUB_SHA") if hosted else args.build_source,
+              "run": os.getenv("GITHUB_RUN_ID"),
               "host": platform.platform(), "machine": platform.machine(), "binarySha256": digest(args.binary),
               "inputs": {p.relative_to(ROOT).as_posix(): digest(p) for p in source}}
     try:

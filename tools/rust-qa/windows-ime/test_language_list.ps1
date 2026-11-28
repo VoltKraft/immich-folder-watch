@@ -37,3 +37,31 @@ foreach ($incomplete in @(
     if (Test-IfwImeObservation $incomplete 0) { throw 'An incomplete native IME trial was accepted' }
 }
 Write-Output 'Native IME receipt requires an observed composition and a removed profile'
+
+$mock = @{tags=@('en-US'); writes=0}
+function New-WinUserLanguageList($Language) {
+    $list = [Collections.Generic.List[object]]::new()
+    foreach ($tag in @($Language)) { $list.Add([pscustomobject]@{LanguageTag=$tag; InputMethodTips=@("tip-$tag"); Handwriting=$false}) }
+    Write-Output -NoEnumerate $list
+}
+function Get-WinUserLanguageList { New-WinUserLanguageList $mock.tags }
+function Set-WinUserLanguageList($LanguageList, [switch]$Force) {
+    if (-not $Force) { throw 'Fixture language settings must be explicit.' }
+    $mock.writes++
+    $mock.tags=@(foreach ($entry in $LanguageList) { $entry.LanguageTag })
+}
+$report = @{}
+$failure = $null
+try {
+    Invoke-IfwJapaneseLanguage (Get-WinUserLanguageList) $report {
+        if ($mock.tags -notcontains 'ja-JP') { throw 'The observer never received a Japanese keyboard.' }
+        throw 'Synthetic desktop failure.'
+    }
+} catch { $failure = $_.Exception.Message }
+if ($failure -cne 'Synthetic desktop failure.' -or $mock.writes -ne 2 -or -not $report.languageListRestored -or
+    $mock.tags.Count -ne 1 -or $mock.tags[0] -cne 'en-US') { throw 'The failing observer did not restore the account.' }
+$mock.tags=@('en-US','ja')
+$mock.writes=0
+Invoke-IfwJapaneseLanguage (Get-WinUserLanguageList) @{} { if ($mock.tags -notcontains 'ja') { throw 'Missing original keyboard.' } }
+if ($mock.writes) { throw 'An already configured Japanese keyboard changed the account.' }
+Write-Output 'The observer preserves an existing keyboard and restores a temporary keyboard after failure.'

@@ -28,6 +28,53 @@ The native `japanese/compose.json` SHA-256 was
 `248066be78e3fd4c0a3434c05117f0a6c33a4cce34191db4a93b5029ac8c1f91`.
 [ARM64 original results and servicing receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105348/artifacts/15244658835).
 
+## Local Windows Server 2025 x64
+
+Run the original desktop executable on the unlocked console of a disposable
+`IFW-QA25` overlay. The standard `ifw-test` account owns the language list,
+GUI, keyboard and UI Automation observer. Use the original
+`rust-gui-windows-x64-` ZIP, its published Actions digest and full compiler
+revision. The driver checks the native PE machine, graph, lockfile, Rust inputs
+and executable against the compiler receipt. Each phase needs a new directory.
+[Guest entry point](../../tools/rust-qa/windows-ime/guest.py) ·
+[Verified x64 compiler archive at 1660aeb](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46099044960/artifacts/15244358084).
+
+```powershell
+python -B tools/rust-qa/windows-ime/guest.py --archive D:\gui.zip --archive-sha256 $digest --head $revision --output C:\QA\ime-initial --phase installed
+```
+
+Exit 0 means the standard user's existing IME passed. Exit 3 means the native
+inventory found a missing Japanese input service on an active desktop and
+removed its private profile. For exit 3, mount Microsoft's Windows Server 2025
+x64 **Languages and Optional Features** DVD. The complete original ISO is
+6,864,345,088 bytes with locally measured SHA-256
+`72c33705d0c35610cba354de8c3cbf1274b55a096227135b5bd8babb8b222be3`.
+Its AMD64 Japanese Basic Typing CAB is 60,590,466 bytes with SHA-256
+`1e2f24108e78da689d1a7607110e9c5bd564ec35119ba5e5b754cb8e059a385a`.
+The CAB contains Microsoft's 10.0.26100.1 package manifest and catalog.
+[Microsoft's Server 2025 download](https://go.microsoft.com/fwlink/?linkid=2273506) ·
+[Microsoft's matching media instructions](https://learn.microsoft.com/en-us/windows-server/get-started/server-core-app-compatibility-feature-on-demand).
+
+From a trusted checkout in an elevated guest session, run the first command
+below. Return to the same standard user's desktop for the second command.
+In the elevated session, run the final command even if preparation or the
+desktop trial fails after the servicing record was created. The administrator
+checks the initial observation, CAB digest and original capability state.
+DISM uses the optical source with `-LimitAccess`. The standard-user driver
+restores its language list on an observer failure. The administrator restores
+the original capability state and retains the record under
+`%ProgramFiles%\ImmichFolderWatchImeQa\capability.json`. Keep that record,
+both desktop directories and the original compiler ZIP with the trial.
+[Servicing and restoration](../../tools/rust-qa/windows-ime/guest-capability.ps1).
+
+```powershell
+.\tools\rust-qa\windows-ime\guest-capability.ps1 -Action Prepare -InitialDirectory C:\QA\ime-initial -LanguageSource E:\LanguagesAndOptionalFeatures
+python -B tools/rust-qa/windows-ime/guest.py --archive D:\gui.zip --archive-sha256 $digest --head $revision --output C:\QA\ime-japanese --phase japanese
+.\tools\rust-qa\windows-ime\guest-capability.ps1 -Action Restore
+```
+
+## Hosted language provisioning
+
 The hosted wrapper first runs the actual field test with the installed
 components. If the runner has an active input desktop and the native
 inventory identifies a missing Japanese input service, Windows servicing

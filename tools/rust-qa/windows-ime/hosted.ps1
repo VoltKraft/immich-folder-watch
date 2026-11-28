@@ -10,7 +10,7 @@ $parent = Join-Path $env:GITHUB_WORKSPACE "artifacts\rust\gui-native\$target\win
 if (Test-Path -LiteralPath $parent) { throw 'Expected a new native IME output directory.' }
 [void](New-Item -ItemType Directory -Path $parent)
 $feature = 'Language.Basic~~~ja-JP~0.0.1.0'
-$serviced = $changedList = $false
+$serviced = $false
 $report = [ordered]@{ tested=$false; passed=$false; capability=$feature; nativeTarget=$target }
 . (Join-Path $PSScriptRoot 'language-list.ps1')
 & (Join-Path $PSScriptRoot 'test_language_list.ps1')
@@ -35,7 +35,6 @@ try {
         if (-not $current -or $current.Name -cne $feature) { throw 'This OS image does not offer Japanese Basic Typing.' }
         $report.originalCapability = $current.State.ToString()
         $original = Get-WinUserLanguageList
-        $originalState = Get-IfwLanguageState $original
         $report.originalLanguages = @(foreach ($entry in $original) { $entry.LanguageTag })
         if ($report.originalCapability -ceq 'NotPresent') {
             $serviced = $true
@@ -50,56 +49,29 @@ try {
         $report.osPackages = @(Get-WindowsPackage -Online | Where-Object {
             $_.PackageName -like 'Microsoft-Windows-LanguageFeatures-Basic-ja-jp-Package~*' -and $_.PackageState -eq 'Installed'
         } | ForEach-Object PackageName)
-        $sessionList = Get-WinUserLanguageList
-        if (@(Get-IfwJapaneseLanguage $sessionList).Count -eq 0) {
-            $newList = New-WinUserLanguageList -Language 'ja-JP'
-            $entry = @(Get-IfwJapaneseLanguage $newList)
-            if ($entry.Count -ne 1) { throw 'Windows did not construct a Japanese input language.' }
-            [void]$sessionList.Add($entry[0])
-            if (@(Get-IfwJapaneseLanguage $sessionList).Count -ne 1) { throw 'The proposed language list is incomplete.' }
-            $changedList = $true
-            Set-WinUserLanguageList -LanguageList $sessionList -Force
-        }
-        $report.requestedLanguages = @(foreach ($entry in $sessionList) { $entry.LanguageTag })
-        $until = [DateTime]::UtcNow.AddSeconds(25)
-        do {
-            $actual = Get-WinUserLanguageList
-            $language = @(Get-IfwJapaneseLanguage $actual)
-            if ($language.Count -eq 1) { break }
-            Start-Sleep -Milliseconds 300
-        } while ([DateTime]::UtcNow -lt $until)
-        $report.currentLanguages = @(foreach ($entry in $actual) { $entry.LanguageTag })
-        if ($language.Count -ne 1) { throw 'The disposable account did not acquire the Japanese locale.' }
-        $report.inputTips = @($language[0].InputMethodTips)
-        $after = Join-Path $parent 'japanese'
-        & python $session $target 'ime-japanese'
-        $status = $LASTEXITCODE
-        $observation = [IO.File]::ReadAllText((Join-Path $after 'result.json')) | ConvertFrom-Json
-        $report.afterProvisioning = $observation.status
-        if (-not (Test-IfwImeObservation $observation $status)) {
-            throw 'Native Japanese composition, filename readback and private-profile cleanup must all pass.'
+        Invoke-IfwJapaneseLanguage $original $report {
+            $after = Join-Path $parent 'japanese'
+            & python $session $target 'ime-japanese'
+            $status = $LASTEXITCODE
+            $observation = [IO.File]::ReadAllText((Join-Path $after 'result.json')) | ConvertFrom-Json
+            $report.afterProvisioning = $observation.status
+            if (-not (Test-IfwImeObservation $observation $status)) {
+                throw 'Native Japanese composition, filename readback and private-profile cleanup must all pass.'
+            }
         }
         $report.tested = $true
     }
 } finally {
     try {
-        try {
-            if ($changedList) {
-                Set-WinUserLanguageList -LanguageList $original -Force
-                $report.languageListRestored = (Get-IfwLanguageState (Get-WinUserLanguageList)) -ceq $originalState
-                if (-not $report.languageListRestored) { throw 'The original test-account language settings differ.' }
+        if ($serviced) {
+            $state = (Get-WindowsCapability -Online -Name $feature).State.ToString()
+            if ($state -ceq 'Installed') {
+                $removed = Remove-WindowsCapability -Online -Name $feature
+                $report.removalNeedsRestart = [bool]$removed.RestartNeeded
             }
-        } finally {
-            if ($serviced) {
-                $state = (Get-WindowsCapability -Online -Name $feature).State.ToString()
-                if ($state -ceq 'Installed') {
-                    $removed = Remove-WindowsCapability -Online -Name $feature
-                    $report.removalNeedsRestart = [bool]$removed.RestartNeeded
-                }
-                $report.finalCapability = (Get-WindowsCapability -Online -Name $feature).State.ToString()
-                if ($report.finalCapability -cne $report.originalCapability) {
-                    throw 'The disposable OS requires further servicing before its original capability state returns.'
-                }
+            $report.finalCapability = (Get-WindowsCapability -Online -Name $feature).State.ToString()
+            if ($report.finalCapability -cne $report.originalCapability) {
+                throw 'The disposable OS requires further servicing before its original capability state returns.'
             }
         }
         $report.passed = $report.tested
