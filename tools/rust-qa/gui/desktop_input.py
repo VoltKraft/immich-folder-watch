@@ -11,7 +11,7 @@ import gi
 gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi, Gio, GLib
 
-from native import action, call
+from native import action, call, second_launch
 from session import checked_start, check_alive, wait_for
 
 
@@ -33,7 +33,7 @@ def nodes(target_pid):
     return result
 
 
-def read_tree(target_pid):
+def read_tree(target_pid, filename_selection=False):
     result = []
     for item in nodes(target_pid):
         entry = {"role": item.get_role_name(), "name": item.get_name()}
@@ -42,17 +42,25 @@ def read_tree(target_pid):
         entry["focused"] = item.get_state_set().contains(Atspi.StateType.FOCUSED)
         if item.get_text_iface() is not None:
             entry["text"] = Atspi.Text.get_text(item, 0, -1)
+            if entry["role"] == "password text" and entry["text"].strip("•"):
+                raise RuntimeError("The password field exposed unmasked text")
+            if filename_selection and entry["name"] == "Filename" and entry["role"] in ("entry", "text"):
+                entry["caret"] = Atspi.Text.get_caret_offset(item)
+                entry["selections"] = []
+                for index in range(Atspi.Text.get_n_selections(item)):
+                    marks = Atspi.Text.get_selection(item, index)
+                    entry["selections"].append([marks.start_offset, marks.end_offset])
         result.append(entry)
     Path("/qa/last-accessibility-tree.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
     return result
 
 
-def read_x11_tree(target_pid):
+def read_x11_tree(target_pid, filename_selection=False):
     # A desktop child can lose its Accessible interface between enumeration
     # and its next D-Bus call. Discard that scan and start at the desktop again.
     for attempt in range(4):
         try:
-            return read_tree(target_pid)
+            return read_tree(target_pid, filename_selection)
         except GLib.Error as error:
             if (error.domain != "atspi_error" or error.code != 1
                     or error.message != "Unknown interface 'org.a11y.atspi.Accessible'" or attempt == 3):
@@ -79,6 +87,55 @@ def shortcut(observer, key, *modifiers):
     tap(observer, key)
     for modifier in reversed(modifiers):
         observer.key(modifier, False)
+
+
+def check_reopened_selection(stack, observer, app, log, tree, backend, original):
+    evidence = {"primaryPid": app.pid}
+    path = Path("/qa/selection-reopen.json")
+
+    def expect(stage, value, caret, selections):
+        def matches():
+            check_alive(app, log)
+            field = next((n for n in tree(filename_selection=True) if "selections" in n), None)
+            evidence[stage] = field
+            return (field and field["focused"] and field["text"] == value
+                    and field["caret"] == caret and field["selections"] == selections)
+
+        try:
+            wait_for(matches, 6, f"Unexpected filename focus, text, caret or selection at {stage}. See {path}")
+        finally:
+            path.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n")
+
+    tap(observer, 0xff50)  # Home
+    for _ in range(5):
+        tap(observer, 0xff53)  # Right
+    for _ in range(3):
+        shortcut(observer, 0xff51, 0xffe1)  # Shift+Left selects üße backwards
+    expect("beforeClose", original, 2, [[2, 5]])
+
+    original_window = observer.poll()
+    evidence["close"] = observer.close()
+    state = "WINDOW_HIDDEN" if backend == "x11" else "WINDOW_RELEASED"
+    wait_for(lambda: check_alive(app, log) or (not observer.poll() and state in log.read_text()),
+             10, f"Native close did not reach {state}")
+    evidence["secondLaunch"] = second_launch(stack, app, Path("/qa/input-secondary.log"))
+    reopened_window = wait_for(lambda: check_alive(app, log) or observer.poll(), 10,
+                               "Second launch did not reopen the window")
+    if backend == "x11":
+        if reopened_window != original_window:
+            raise RuntimeError("X11 did not reopen the retained window")
+        # The private X server has no window manager to focus the remapped
+        # top-level. Give it keyboard input, without focusing a widget.
+        evidence["focusedX11TopLevel"] = reopened_window
+    observer.focus_for_input()
+    expect("afterReopen", original, 2, [[2, 5]])
+    # Moving the active end distinguishes a backwards selection from a
+    # forwards selection with the same AT-SPI start and end offsets.
+    shortcut(observer, 0xff51, 0xffe1)
+    expect("afterShiftLeft", original, 1, [[1, 5]])
+    tap(observer, ord("x"))
+    expect("afterReplacement", original[:1] + "x" + original[5:], 2, [])
+    return evidence
 
 
 def ibus_start(stack):
@@ -201,6 +258,9 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
     wait_for(lambda: any(n["name"] == "Filename" and n.get("text") == original for n in tree()),
              3, "Unicode filename did not round-trip through native copy and paste")
     details["clipboard"] = {"text": original, "native_owner_or_selection_serial": owner}
+    if reader is not None:
+        details["screen_reader"] = reader.result()
+    details["selectionReopen"] = check_reopened_selection(stack, observer, app, log, tree, backend, original)
     if ime:
         shortcut(observer, ord("a"), 0xffe3)
         engine_log = Path("/qa/anthy.log")
@@ -233,8 +293,6 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
         if "IME commit chars=1" not in stages:
             raise RuntimeError("No native composition commit for the single Japanese character")
         details["ime"] = {"engine": "IBus Anthy via XIM", "text": "あ", "events": stages}
-    if reader is not None:
-        details["screen_reader"] = reader.result()
     action("quit")
     if app.wait(timeout=8) != 0:
         raise RuntimeError("Input fixture failed to shut down")
