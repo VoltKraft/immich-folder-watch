@@ -1,12 +1,31 @@
 """Keep local and hosted physical notification receipts distinct during offline replay."""
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import MagicMock
 
 from activation import TARGET
-from toast_console import check_venue, corroborates_labels
+from toast_console import CleanupUnconfirmed, armed_screen, check_venue, corroborates_labels
 
 
 class PhysicalVenueTests(unittest.TestCase):
+    def test_clean_observer_start_failure_preserves_original_sender_once(self):
+        child = MagicMock()
+        child.__enter__.side_effect = OSError("could not start observer")
+        with TemporaryDirectory() as folder:
+            receipt, sends = {}, []
+            with armed_screen(child, Path(folder), receipt):
+                sends.append("original")
+            self.assertEqual(sends, ["original"])
+            self.assertFalse(receipt["armedBeforeSender"])
+            self.assertTrue((Path(folder) / "physical.json").is_file())
+            with self.assertRaises(OSError), armed_screen(child, Path(folder), {"pid": 7}):
+                self.fail("The child did not drain")
+            child.__enter__.side_effect = CleanupUnconfirmed("cannot confirm cleanup")
+            with self.assertRaises(CleanupUnconfirmed), armed_screen(child, Path(folder), {}):
+                self.fail("Unconfirmed observer cleanup cannot start a sender")
+
     def test_original_local_observer_has_no_hosted_run(self):
         sender = {"host": "isolated-vm", "target": TARGET["X64"][0]}
         check_venue(sender, {})

@@ -1,6 +1,7 @@
 """Verify a native WinRT sender, both physical Shell label hits and the captured popup pixels."""
 
 import argparse
+from contextlib import ExitStack, contextmanager
 import json
 import os
 from pathlib import Path, PureWindowsPath
@@ -10,7 +11,7 @@ import time
 
 from activation import ART, HERE, TARGET, paths, sha, write
 import toast_history
-from notification_probe import ordinary_console
+from notification_probe import CleanupUnconfirmed, ordinary_console
 
 
 def check_venue(native, captured):
@@ -104,6 +105,25 @@ def verify(directory, frames):
                 afterShowMs=round((captured["beginQpc"] - end) * 1000 / frequency, 3))
 
 
+@contextmanager
+def armed_screen(child_context, frames, receipt):
+    with ExitStack() as stack:
+        try:
+            proc = stack.enter_context(child_context)
+        except (OSError, RuntimeError, ValueError) as exc:
+            if CleanupUnconfirmed.in_chain(exc) or ("pid" in receipt and receipt.get("jobEmpty") is not True):
+                raise
+            frames.mkdir(exist_ok=True)
+            write(frames / "physical.json", dict(status="unavailable", reason=f"Observer launch failed: {exc}"))
+            receipt["armedBeforeSender"] = False
+        else:
+            deadline = time.monotonic() + 30
+            while not (frames / "ready").is_file() and proc.poll() is None and time.monotonic() < deadline:
+                time.sleep(.1)
+            receipt["armedBeforeSender"] = (frames / "ready").is_file()
+        yield
+
+
 def observe_arm64():
     target, machine = TARGET["ARM64"]
     toast_history.request_identity(target)
@@ -130,11 +150,8 @@ def observe_arm64():
         receipt = dict(desktopBefore=context, hosts=attempts)
         log = area / "observer.log"
         try:
-            with child(api, Path(host), args, area, dict(os.environ), log, receipt) as proc:
-                deadline = time.monotonic() + 30
-                while not (frames / "ready").is_file() and proc.poll() is None and time.monotonic() < deadline:
-                    time.sleep(.1)
-                receipt["armedBeforeSender"] = (frames / "ready").is_file()
+            physical = child(api, Path(host), args, area, dict(os.environ), log, receipt)
+            with armed_screen(physical, frames, receipt):
                 return toast_history.observe_sender(target, exe, original, None, None)
         finally:
             frames.mkdir(exist_ok=True)
