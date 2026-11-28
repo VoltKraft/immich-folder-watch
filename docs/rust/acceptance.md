@@ -46,8 +46,9 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 For the desktop accessibility requirement, the Fedora x64 private Flatpak
 at `9cbbf41` exposed four focused controls to the external reader in each
-saved language. Orca spoke all eight labels. The ordinary cross-platform
-GUI still needs to adopt the tested startup and accessibility inputs.
+saved language. Orca spoke all eight labels. The ordinary GUI integrated
+the saved startup language at `c361c69`. The Flatpak accessibility adapter
+still uses its separate qualified build.
 [Installed screen reader evidence](../../tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs).
 
 For RI-AC03, all four native targets at `9d4d550` preserved the complete

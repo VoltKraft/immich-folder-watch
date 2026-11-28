@@ -15,6 +15,12 @@ display, and the user currently has no separate ARM64 test system.
 [Local x64 display trial](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial) ·
 [ARM64 console](rust/rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
 
+On Windows 11 ARM64 at `e610d61`, three Tab presses moved native focus from
+the filename through the protected password and language button to Quit.
+Space closed the original GUI and its inventory worker and restored the
+original desktop. The separate default-desktop display checks in the same
+job failed. [Keyboard, process exit and original archive](rust/rw02-windows-services.md#keyboard-activation-of-the-visible-windows-arm64-quit-button).
+
 The Fedora x64 Flatpak check recorded at `70f9713` used the staged
 editor built from `c63d91c`. Two launches of the same installed commit
 showed the respective saved German and English languages.
@@ -58,8 +64,13 @@ comparisons and all 14 scalar-alias comparisons. The signed 3.0.4
 assemblies reopened, validated and saved 20 Rust outputs. Separately,
 a Linux GUI built from the staged `c63d91c` sources selected the
 correct initial editor and tray language on all four Fedora desktops.
-The running inventory worker honored the same profile. The ordinary
-cross-platform build still needs the integrated input profile.
+The running inventory worker honored the same profile. The ordinary GUI
+integrated the current settings library at `c361c69`. Replaying the four
+complete source reports reproduced all four target digests.
+The ordinary binary subsequently passed all 40 Fedora tests, the four
+signed language comparisons and both installed Flatpak startup cases.
+Mutter retained the selected filename range after a normal second launch.
+[Ordinary editor and installed Flatpak](rust/rw02-native-gui.md#ordinary-linux-startup-language-at-c361c69).
 [Typed YAML values](rust/rw02-yaml.md#grouped-floats-and-untagged-scalar-aliases) ·
 [Linux startup language](rust/rw02-native-gui.md#saved-language-at-linux-editor-and-tray-startup).
 

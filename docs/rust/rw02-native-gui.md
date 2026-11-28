@@ -1140,8 +1140,11 @@ one-shot frame patches on Fedora yielded the original third-party library
 trees and 136 diagnostic feature rows including the timing helper. The
 measured input digests are in
 `artifacts/rust/combined-profile/retained-language-iyj_knxv/measured-pins.json`.
-These measurements cover source reconstruction. Adoption in the ordinary
-cross-platform build and native GUI checks at the integrated revision remain open.
+These measurements cover source reconstruction. The ordinary GUI adopted
+the reader at `c361c69`. Its current YAML sources match the eight files at
+`bb3afd5`. The Linux reports contain 251 packages on x64 and 250 on ARM64.
+Each Windows report contains the same 135 original package rows.
+[Current first-party source and four reports](../../tools/rust-qa/gui/startup/README.md#current-yaml-library-at-bb3afd5).
 
 The isolated Fedora renderer also reproduced all 18 original images at
 100% and 150% scale. Across six frames every CPU-to-Vulkan pixel comparison
@@ -1165,6 +1168,33 @@ echoes. Both binaries exited normally when the bus was absent. The
 candidate retained the original package permissions and AccessKit notices.
 [Native compiler and source receipt](../../tools/rust-qa/gui/flatpak-accessibility/README.md) ·
 [Installed focus, speech and audio results](../../tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs).
+
+### Ordinary Linux startup language at c361c69
+
+The Fedora x64 compiler linked 310 units from the reviewed 385-archive
+inventory. Clippy and all 40 native tests passed. The resulting executable
+had SHA-256 `5357b1f9c71edbd2409257ed503db61e3da50805147de4c07d6c6b6c043677f2`.
+All 40 first-party inputs and all eight compiler drivers matched `446fc1f`.
+
+In four private X11 sessions, the first editor and tray menu used the
+explicit German or English preference, or the desktop language when the
+setting was absent. The signed 3.0.4 assemblies selected the same language
+from each original configuration. In every session the worker found the
+additional file, the GUI drained on Quit and the profile retained its
+original bytes. The result digest was
+`d8408a3886f5a5a2424f6a724109c547165734b7448ac6266eac666d1c342da8`.
+On Mutter the same executable passed all four lifecycle cases and the
+keyboard and Orca checks. It retained the backward selection across
+reopening the filename. The Mutter result digest was
+`e4521c9654e0dea0029db8b0e1a1402503c65cefe50aecb5e95aec9632c3634a`.
+
+In the installed Flatpak, the ordinary executable displayed all eight
+saved-language labels and both first menus under the opposite desktop
+language. Both processes exited with status 0 and the private installation
+was empty after cleanup. The result digest was
+`a16058d9e6f0056ba1b007a3cbd2feb2ec724388e95e0dda03163e91b4a968cb`.
+The ordinary installed ref still needs the separately verified AT-SPI adapter.
+[Installed language comparison](../../tools/rust-qa/gui/flatpak/README.md).
 
 ## Reproduction
 

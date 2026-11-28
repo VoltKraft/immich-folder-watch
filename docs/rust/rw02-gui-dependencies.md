@@ -221,6 +221,15 @@ cases on each display. The respective `results.json` digests were
 `2997002748a926d60010001cdc19f0f17ca8a339a3bd035caa2fe11895af3108`
 and `13a7b2321429ae7665f90fb0d3507a89b82ddaca568302af2be60b189ffebb8d`.
 
+Both native Ubuntu architectures repeated this 372-package build at
+`6e16a58`. The original compiler stream on each host contained 289 units.
+All 40 native tests and both Plasma menu trials passed on each host. The
+installed Flatpak quit and its private user installation was empty after
+cleanup. The archived executables, compiler-driver hashes, inventories
+and test logs matched their receipts.
+[Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46137503766/artifacts/15260154507) ·
+[Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46137503766/artifacts/15260711717).
+
 ## Windows notification-area bindings
 
 The ordinary GUI and the retained-window comparison now use the same
