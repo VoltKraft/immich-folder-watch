@@ -166,6 +166,20 @@ session after the worker exits. This trial requires a stationary source
 frame and leaves the mixed-DPI and RDP results unset.
 [Private source-frame supervisor](../../tools/rust-qa/windows-display/private_source.py).
 
+The same focused ARM64 job reads the effective `AllowTSConnections` setting,
+its local or group-policy source, the TermService state, and the TCP
+listeners on the configured RDP port. The listener class is `none`,
+`loopback-only` or `other-or-any`. Unavailable settings and listeners
+whose owning process cannot be correlated with TermService are recorded
+as `unavailable`. A shared service-process PID can establish correlation
+only. The receipt contains the service settings, listener class and WTS
+session counts grouped by state and protocol. RDP rendering requires a
+separate verified frame from a connected session.
+[Read-only venue observer](../../tools/rust-qa/windows-display/venue.py) ·
+[Terminal Services settings](https://learn.microsoft.com/en-us/windows/win32/termserv/win32-terminalservicesetting) ·
+[TCP listener state and owner](https://learn.microsoft.com/en-us/windows/win32/fwp/wmi/nettcpipprov/msft-nettcpconnection) ·
+[WTS protocol values](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_info_class).
+
 The local Intel x64 KVM host has a Windows Server x64 guest. For native
 Windows ARM64 mixed-DPI and RDP measurements, Microsoft documents local
 Windows 11 guests on Arm hardware and Windows Arm64 VMs on Azure that

@@ -116,9 +116,10 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertIn("windows-display/private_source.py --retained", private_retained)
         for step in (retained, private, private_retained, archive):
             self.assertIn("!cancelled() && steps.inputs.outcome == 'success'", step)
-        self.assertIn("windows-display/archive_pair.py", steps[-6])
+        self.assertIn("windows-display/archive_pair.py", steps[-7])
+        self.assertIn("windows-display/venue.py", steps[-6])
         for path in ("windows-display-inputs/", "windows-display-runs/", "windows-display-retained-runs/",
-                     "windows-display-private/", "windows-display-retained-private/"):
+                     "windows-display-private/", "windows-display-retained-private/", "windows-display-venue/"):
             self.assertIn(path, archive)
 
     def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):

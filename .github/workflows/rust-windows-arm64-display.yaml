@@ -50,7 +50,12 @@ jobs:
           python -B tools/rust-qa/windows-display/archive_pair.py
           exit $LASTEXITCODE
 
+      - name: Read the existing Remote Desktop settings and aggregate WTS session states
+        shell: pwsh
+        run: python -B tools/rust-qa/windows-display/venue.py
+
       - name: Observe the canonical source-monitor edit
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
         shell: pwsh
         run: python -B tools/rust-qa/windows-display/run.py $env:NATIVE_TARGET --require source-frame
 
@@ -76,6 +81,7 @@ jobs:
           name: rust-source-display-arm64-${{ github.sha }}
           path: |
             artifacts/rust/windows-display-inputs/
+            artifacts/rust/windows-display-venue/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-runs/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-retained-runs/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-private/
