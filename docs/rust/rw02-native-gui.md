@@ -1081,6 +1081,39 @@ python3 -B tools/rust-qa/gui/native.py --binary "$gui_binary" --backend x11 --in
 python3 -B tools/rust-qa/gui/native.py --binary "$gui_binary" --backend wayland --wayland-ime
 ```
 
+### Ubuntu ARM64 selection and Quit focus at `245a921`
+
+On 2026-11-28 the native Ubuntu 24.04 ARM64 runner built the editor with
+Rust 1.100.0 and passed 40 tests. Both private desktops ran the same AArch64
+ELF, SHA-256 `42f96a2735569c903635353bb9fb1e7e30ee1e97aad1f66c8e28c270683e95ad`.
+The downloaded ZIP matched the Actions SHA-256
+`13057e804a8c09bfcf1187bd1b4255c7e3213bbf6d4387855d777f7924d14363`.
+Its source archive matched the Git archive of `245a92120167a8cbba013b2f791bac7d7b47f436`.
+[Native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46127122015/job/140924083837)
+and [original archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46127122015/artifacts/15256800379).
+
+AT-SPI observed Tab move through Dateiname, Kennwort and English. After
+Space switched the language, the next Tab focused Quit and the following
+Tab returned to Filename. Orca 46.1 announced both `Beenden push button.`
+and `Quit push button.` on each desktop. Each password keystroke produced
+one spoken mask. The original Orca traces, Speech Dispatcher logs and
+non-silent ALSA samples reproduced the two observations.
+
+| Desktop | Input result under `gui-run/` | Primary / second PID | D-Bus owner before and after | Measured audio bytes |
+| --- | --- | --- | --- | ---: |
+| X11 | `x11-5j226wqi/results.json` | 165 / 218 | `:1.29` | 706,900 |
+| Mutter Wayland | `wayland-px2oush3/results.json` | 206 / 244 | `:1.31` | 878,452 |
+
+Both second processes exited with status zero. The private X server
+remapped XID `0xa00002`, which the observer focused before reading the
+widget. Mutter closed the original surface on Alt+F4 and gave input
+focus to the reopened editor. On both desktops the filename retained
+focus, caret 2 and the backward range [2, 5). Shift+Left extended it to
+[1, 5). Typing `x` produced `Gx – Sommer.jpg`, caret 2 and an empty
+selection. Each backend also passed its four lifecycle cases. The separate
+[Fedora tray-loss test](../../tools/rust-qa/gui/tray-loss-quit.md) exercised
+activating Quit and observed the inventory worker drain.
+
 ## Reproduction
 
 At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed
