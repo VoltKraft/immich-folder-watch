@@ -98,9 +98,11 @@ def main(args):
     if arch not in COMMITS:
         raise ValueError('A native x64 or ARM64 Linux host is required')
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
-    if args.startup_gui:
-        from installed_language import compiler_input, reference_images
+    if args.startup_pixels:
+        from installed_language import reference_images
         references = reference_images(args.startup_pixels.resolve(strict=True), art)
+    if args.startup_gui:
+        from installed_language import compiler_input
         binary, receipt, sources = compiler_input(args.startup_gui, args.startup_receipt, art, arch,
                                                    candidate=args.screen_reader == 'candidate')
     else:
@@ -135,7 +137,7 @@ def main(args):
         raise ValueError('Review the current shipping sandbox permissions')
     drivers = [HERE / n for n in ('run.py', 'observe.py', 'tray_menu.py', 'launch.sh')]
     drivers.append(qa / 'gui/compiler_inputs.py')
-    if args.startup_gui:
+    if args.startup_pixels:
         drivers += [HERE / 'installed_language.py', HERE / 'accessibility-readback.sh',
                     qa / 'gui/desktop_input.py', qa / 'gui/native.py']
     if args.screen_reader:
@@ -173,7 +175,7 @@ def main(args):
          'platform': {**platform_receipt, 'path': str(runtime)},
          'gl': {**graphics, 'path': str(gl), **mesa},
          'shipping': {'file': manifest.relative_to(root).as_posix(), 'sha256': sha(manifest), 'finishArgs': shipping},
-         'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu, 'savedLanguageCases': bool(args.startup_gui),
+         'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu, 'savedLanguageCases': bool(args.startup_pixels),
          'screenReader': args.screen_reader,
          'outerNamespaces': {n: os.readlink('/proc/self/ns/' + n) for n in NS}})
     cmd = namespace(out, qa / 'gui', None)
@@ -191,7 +193,7 @@ def main(args):
         '--setenv', 'FLATPAK_USER_DIR', '/tmp/home/.local/share/flatpak', '--dir', '/run/user/0',
         '--setenv', 'XDG_RUNTIME_DIR', '/run/user/0', '--chdir', '/qa', '--', '/usr/bin/python3', '-B',
         '/app/flatpak/run.py', '--inside']
-    if args.startup_gui:
+    if args.startup_pixels:
         position = cmd.index('--chdir')
         cmd[position:position] = ['--dir', '/references', *(item for lang, path in references.items()
                                  for item in ('--ro-bind', str(path), '/references/' + lang + '.bgra'))]
@@ -283,8 +285,8 @@ if __name__ == '__main__':
         parser.add_argument('--hosted-runtime', type=Path, metavar='DEPLOYMENT',
                             help='verified native Platform deployment on a disposable hosted runner')
         args = parser.parse_args()
-        if bool(args.startup_gui) != bool(args.startup_receipt) or bool(args.startup_gui) != bool(args.startup_pixels):
-            parser.error('--startup-gui, --startup-receipt and --startup-pixels must be used together')
+        if bool(args.startup_gui) != bool(args.startup_receipt) or (args.startup_gui and not args.startup_pixels):
+            parser.error('the archived --startup-gui requires --startup-receipt and --startup-pixels')
         if args.screen_reader and not args.startup_gui:
             parser.error('--screen-reader requires the source-bound installed startup GUI')
         main(args)

@@ -22,6 +22,18 @@ python3 -B tools/rust-qa/gui/flatpak/run.py \
   --tray-menu
 ```
 
+For the ordinary Linux GUI, select the directory produced by
+`build-gui-probe.py`. The observer checks the executable and its current
+first-party sources against the native compiler receipt. It uses the same
+German and English reference images for both binaries.
+
+```sh
+python3 -B tools/rust-qa/gui/flatpak/run.py \
+  --gui-build artifacts/rust/gui-build \
+  --startup-pixels artifacts/rust/egui-cpu-assessment/headless-ycr1rvcu/pixels \
+  --tray-menu
+```
+
 The fixture installs one private test commit and seeds
 `$XDG_CONFIG_HOME/immich-folder-watch/config.yaml` for that app under a synthetic
 home. For each ordinary primary, the observer follows its outer PID, Flatpak PID
