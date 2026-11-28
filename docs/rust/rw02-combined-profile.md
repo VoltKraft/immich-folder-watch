@@ -298,8 +298,34 @@ The compiler dependency file, ordinary executable, SPDX document and
 notice ZIP are indexed by
 `artifacts/rust/combined-profile/verification/digest-2f63c15/verification.json`,
 SHA-256 `ccc46ca7d4698c60fcb2b53cf6e0f81ef7bceb4809b7706591d498632ce27a1c`.
-The Linux ARM64 evidence for this revision covers source and dependency
-resolution. Its native build and relink remain open.
+
+### Native Ubuntu ARM64 Digest inventory at 378b36a
+
+Two fresh offline builds on Ubuntu 24.04 ARM64 compiled 402 units from
+337 packages each. Their compiler inventories identify `md-5` 0.11.0
+with no enabled features on `aarch64-unknown-linux-gnu`. Both ordinary
+executables had SHA-256
+`c14a806900c1b0ee4fc38cbf40207b66ef49e8001110a274170de571f9a70945`.
+Both modified Wayland executables had SHA-256
+`26c9105cb9a761ca4e04b2450748f3d10ca6e14a074a45ef6115323057f1c68f`
+and reported interface version 2 after the original version 1. Clippy
+passed twice. Each native headless smoke test tessellated one primitive
+and observed winit declining to open a missing display. Each of the five
+held-file upload cases reproduced the Fedora x64 corpus output byte-for-byte.
+[Native run and original artifacts](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46107679867).
+
+The detached replay verified both original compiler ZIPs against their
+Actions digests, matched all 82 first-party source hashes in each receipt
+to Git blobs at `378b36ac78bb85e3d8be7f9e9d96679702b0dcca` and checked
+all 27 referenced outputs in each ZIP. The first and second ZIP digests
+were `babe45130a057195b4abfda7ab80014b2518c8fc0df575d035dca7a1ec83c3d7`
+and `b57201467df167c3fcb3c63674c440e56918724b4d587758e8605e033e03ad7b`.
+The first ZIP reproduced the hosted SPDX 2.3.1 document byte-for-byte
+with 446 packages and 1,067 relationships. Its original notices also
+reproduced byte-for-byte, including both upstream licenses for `md-5`
+among the 1,799 archive members. The four original Actions digests and
+independent checks are recorded in
+`artifacts/rust/combined-profile/verification/ubuntu-arm64-378b36a/verified.json`.
 
 The focused Ubuntu 24.04 ARM64 job installs the pinned native compiler,
 reconstructs the reviewed GUI inputs and retains the original crate
