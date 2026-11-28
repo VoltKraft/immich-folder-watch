@@ -124,6 +124,10 @@ def main(args):
             raise ValueError('The staged native executable and its exact compiled first-party sources must match')
         subprocess.run(['git', 'ls-files', '--error-unmatch', '--', *sources], cwd=root, check=True, stdout=subprocess.DEVNULL)
         subprocess.run(['git', 'diff', '--quiet', revision, '--', *sources], cwd=root, check=True)
+        if args.screen_reader:
+            original = runpy.run_path(str(qa / 'gui/flatpak-accessibility/build.py'))['original'](subject.parent)
+            if original.receipt_sha != sha(receipt):
+                raise ValueError('The screen-reader control must use the ordinary compiler receipt')
     runtime, platform_receipt = deployment(args.hosted_runtime)
     gl, graphics = graphics_deployment(args.hosted_runtime)
     work = hosted_work(args.hosted_runtime) if args.hosted_runtime else None
@@ -142,9 +146,10 @@ def main(args):
                     qa / 'gui/desktop_input.py', qa / 'gui/native.py']
     if args.screen_reader:
         drivers += [HERE / 'reader.py', qa / 'gui/screen_reader.py']
-    if args.screen_reader == 'candidate':
-        drivers += [qa / 'gui/source_profile.py', qa / 'gui/flatpak-accessibility/application-bus.patch',
-                    qa / 'gui/flatpak-accessibility/build.py']
+    if args.screen_reader and (args.gui_build or args.screen_reader == 'candidate'):
+        drivers += [qa / 'gui/source_profile.py', qa / 'gui/startup/vendor.py',
+                    *(qa / 'gui/flatpak-accessibility' / name for name in
+                      ('build.py', 'accesskit_source.py', 'source-review.json', 'application-bus.patch'))]
     drivers += [qa / 'gui/watcher.py', *(qa / 'performance' / n for n in
                 ('linux.py', 'session.py', 'observations.py', 'x11.py', 'worker/second_launch.py')),
                 qa / 'portal-dialog/flatpak_fixture.py', qa / 'portal-dialog/runtime_pin.py',
@@ -287,6 +292,10 @@ if __name__ == '__main__':
         args = parser.parse_args()
         if bool(args.startup_gui) != bool(args.startup_receipt) or (args.startup_gui and not args.startup_pixels):
             parser.error('the archived --startup-gui requires --startup-receipt and --startup-pixels')
-        if args.screen_reader and not args.startup_gui:
-            parser.error('--screen-reader requires the source-bound installed startup GUI')
+        if args.screen_reader and not (args.tray_menu and args.startup_pixels):
+            parser.error('--screen-reader requires the saved-language reference pixels and --tray-menu')
+        if args.screen_reader == 'candidate' and not args.startup_gui:
+            parser.error('use --startup-gui and --startup-receipt for the separate candidate compiler build')
+        if args.screen_reader == 'stock' and not (args.gui_build or args.startup_gui):
+            parser.error('use --gui-build or the archived --startup-gui for the stock compiler build')
         main(args)

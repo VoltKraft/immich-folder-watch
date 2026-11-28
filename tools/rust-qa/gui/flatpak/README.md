@@ -179,3 +179,54 @@ separate build and qualification records.
 The original command without the Orca option also completed with the final
 observer in `x11-uyqg87yr`. It reproduced both stock pixel and menu results,
 the GTK control and the empty AT-SPI discovery intervals.
+
+## Orca with the ordinary GUI and current settings reader
+
+The Fedora x64 comparison installed the ordinary editor at `c361c69` and
+the private AccessKit build from those same application sources. The paired
+compiler receipts bind 310 units each. Among 40 first-party inputs, the
+private build changes the GUI Cargo patch declaration and corresponding lock
+entry. Both installations used `app/org.example.IfwGuiProbe/x86_64/test`,
+the same Platform, Mesa extension, sandbox permissions and observer archive.
+The test installs each executable into a fresh private user installation.
+[Adapter build and notices](../flatpak-accessibility/README.md).
+
+Both GUIs opened and quit with the accessibility bus absent. With the bus
+available and zero registered listeners, all three early samples showed an
+empty registry for the stock control. All three candidate samples contained
+the root belonging to its Flatpak proxy. A native GTK button was accessible
+on each private desktop. With Orca running, both executables drew the four
+expected labels in each saved language. The stock editor produced only Tab
+echoes and exposed no controls. The candidate's physical Tab traversal produced
+the following focus changes and corresponding speech on its original window.
+
+| Saved language | GUI PID / proxy PID | AT-SPI owner | Announced controls in order | Captured PCM bytes |
+| --- | --- | --- | --- | ---: |
+| English | 1280 / 1276 | `:1.8` | Filename, Password, Deutsch, Quit | 443,584 |
+| German | 1674 / 1670 | `:1.9` | Dateiname, Kennwort, English, Beenden | 467,586 |
+
+Both installed GUIs reopened their original windows, exited through Quit and
+left an empty private installation. The independent comparison checks the
+original screenshots, proxy/PID and XID, Orca speech log and non-silent PCM
+spans. It also matches both source lists, compiler lineage, reference frames
+and observer before accepting the pair. From the repository root:
+
+```sh
+area=artifacts/rust
+pixels="$area/egui-cpu-assessment/headless-e94nfyhl/pixels"
+candidate="$area/flatpak-accessibility/current-a4d967d"
+fixture=tools/rust-qa/gui/flatpak
+python3 -B "$fixture/run.py" --gui-build "$area/gui-build" \
+  --startup-pixels "$pixels" --tray-menu --screen-reader stock
+python3 -B "$fixture/run.py" --startup-gui "$candidate/target/release/native-gui-assessment" \
+  --startup-receipt "$candidate/native.json" --startup-pixels "$pixels" --tray-menu --screen-reader candidate
+```
+
+Pass the two printed run directories to [verify_reader_pair.py](verify_reader_pair.py),
+stock first. The retained pair is under `artifacts/rust/flatpak-gui-launch-assessment/`.
+
+| Evidence | SHA-256 |
+| --- | --- |
+| Stock `x11-u36lrntk/result.json` | `f356af31e54ea699d8426580219e7f71c6d926055fdc9928701d6946a9f37693` |
+| Candidate `x11-_ign7mu3/result.json` | `42f41a232b135f4469ad10f01daa2ce62558eb74af0565f560bd222486e97a25` |
+| `reader-pair-b01ed1b-68d808a.json` | `5ca09398bf8875ebf58b5ca399255926b5ab86774680fdcdb1ebf6a4b0915fde` |

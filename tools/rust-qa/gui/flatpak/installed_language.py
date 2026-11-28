@@ -13,7 +13,11 @@ SYSTEM = {'en': 'de_DE.UTF-8', 'de': 'en_US.UTF-8'}
 MENU = {'en': ('Open GUI', 'Restart', 'Quit'), 'de': ('GUI öffnen', 'Neustart', 'Beenden')}
 EDITOR = {'en': ('Filename', 'Password', 'Deutsch', 'Quit'), 'de': ('Dateiname', 'Kennwort', 'English', 'Beenden')}
 COMPILER_RECEIPT = 'bfde3d81b0948a70d55221591ec3b57d3a7707a497d889d3758ccbdfbfd1fac0'
-CANDIDATE_RECEIPT = 'c21f6d98033b6574cc887bc393bf0e7ea77a4845630c9be721acc21194d1d909'
+# Each receipt binds its own stock binary, compiler units and the reconstructed adapter.
+CANDIDATE_RECEIPTS = {
+    'c21f6d98033b6574cc887bc393bf0e7ea77a4845630c9be721acc21194d1d909',
+    '68d808ae984b4e8684df87ce8048b479fe795eed14506300d7354b392eabb3e9',
+}
 
 
 def compiler_input(binary, receipt, area, arch, *, candidate=False):
@@ -23,7 +27,10 @@ def compiler_input(binary, receipt, area, arch, *, candidate=False):
         raise ValueError('Use the original source-bound Fedora x64 GUI under artifacts/rust')
     if candidate:
         builder = Path(__file__).resolve().parents[1] / 'flatpak-accessibility/build.py'
-        return runpy.run_path(str(builder))['verify_candidate'](binary, receipt, CANDIDATE_RECEIPT)
+        digest = sha(receipt)
+        if digest not in CANDIDATE_RECEIPTS:
+            raise ValueError('Use a measured Fedora x64 candidate compiler receipt')
+        return runpy.run_path(str(builder))['verify_candidate'](binary, receipt, digest)
     if sha(receipt) != COMPILER_RECEIPT:
         raise ValueError('The native receipt differs from the reviewed startup compiler')
     evidence = receipt.parent
