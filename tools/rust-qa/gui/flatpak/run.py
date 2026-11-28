@@ -96,28 +96,33 @@ def main(args):
     arch = platform.machine()
     if arch not in COMMITS:
         raise ValueError('A native x64 or ARM64 Linux host is required')
-    if args.gui_build:
-        subject = args.gui_build.resolve(strict=True)
-        if not subject.is_relative_to(art) or subject == art:
-            raise ValueError('Use an existing isolated GUI build under artifacts/rust')
-        subject = subject / 'release'
-    else:
-        if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', args.stage):
-            raise ValueError('Expected a staged subject name')
-        subject = art / 'performance/subjects' / args.stage
-    binary = subject / 'native-gui-assessment'
-    receipt = binary.with_suffix('.inputs.json')
-    gui = json.loads(receipt.read_bytes())
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
-    source_paths = [*sorted((qa / 'gui/src').glob('*.rs')), qa / 'gui/src/tray-icon.argb',
-                    qa / 'gui/Cargo.toml', qa / 'gui/Cargo.lock', root / 'rust/Cargo.toml',
-                    root / 'rust/crates/desktop-lifecycle/Cargo.toml', root / 'rust/crates/desktop-lifecycle/src/lib.rs']
-    sources = {p.relative_to(root).as_posix(): sha(p) for p in source_paths}
-    if (gui['target'] != f'{arch}-unknown-linux-gnu' or gui['binary_sha256'] != sha(binary)
-            or sources != gui['sources']):
-        raise ValueError('The staged native executable and its exact compiled first-party sources must match')
-    subprocess.run(['git', 'ls-files', '--error-unmatch', '--', *sources], cwd=root, check=True, stdout=subprocess.DEVNULL)
-    subprocess.run(['git', 'diff', '--quiet', revision, '--', *sources], cwd=root, check=True)
+    if args.startup_gui:
+        from installed_language import compiler_input, reference_images
+        references = reference_images(args.startup_pixels.resolve(strict=True), art)
+        binary, receipt, sources = compiler_input(args.startup_gui, args.startup_receipt, art, arch)
+    else:
+        if args.gui_build:
+            subject = args.gui_build.resolve(strict=True)
+            if not subject.is_relative_to(art) or subject == art:
+                raise ValueError('Use an existing isolated GUI build under artifacts/rust')
+            subject = subject / 'release'
+        else:
+            if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', args.stage):
+                raise ValueError('Expected a staged subject name')
+            subject = art / 'performance/subjects' / args.stage
+        binary = subject / 'native-gui-assessment'
+        receipt = binary.with_suffix('.inputs.json')
+        gui = json.loads(receipt.read_bytes())
+        source_paths = [*sorted((qa / 'gui/src').glob('*.rs')), qa / 'gui/src/tray-icon.argb',
+                        qa / 'gui/Cargo.toml', qa / 'gui/Cargo.lock', root / 'rust/Cargo.toml',
+                        root / 'rust/crates/desktop-lifecycle/Cargo.toml', root / 'rust/crates/desktop-lifecycle/src/lib.rs']
+        sources = {p.relative_to(root).as_posix(): sha(p) for p in source_paths}
+        if (gui['target'] != f'{arch}-unknown-linux-gnu' or gui['binary_sha256'] != sha(binary)
+                or sources != gui['sources']):
+            raise ValueError('The staged native executable and its exact compiled first-party sources must match')
+        subprocess.run(['git', 'ls-files', '--error-unmatch', '--', *sources], cwd=root, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(['git', 'diff', '--quiet', revision, '--', *sources], cwd=root, check=True)
     runtime, platform_receipt = deployment(args.hosted_runtime)
     gl, graphics = graphics_deployment(args.hosted_runtime)
     work = hosted_work(args.hosted_runtime) if args.hosted_runtime else None
@@ -130,6 +135,9 @@ def main(args):
     if set(shipping) != set(PERMISSIONS + ['--share=network', '--device=dri']):
         raise ValueError('Review the current shipping sandbox permissions')
     drivers = [HERE / n for n in ('run.py', 'observe.py', 'tray_menu.py', 'launch.sh')]
+    if args.startup_gui:
+        drivers += [HERE / 'installed_language.py', HERE / 'accessibility-readback.sh',
+                    qa / 'gui/desktop_input.py', qa / 'gui/native.py']
     drivers += [qa / 'gui/watcher.py', *(qa / 'performance' / n for n in
                 ('linux.py', 'session.py', 'observations.py', 'x11.py', 'worker/second_launch.py')),
                 qa / 'portal-dialog/flatpak_fixture.py', qa / 'portal-dialog/runtime_pin.py',
@@ -156,7 +164,7 @@ def main(args):
          'platform': {**platform_receipt, 'path': str(runtime)},
          'gl': {**graphics, 'path': str(gl), **mesa},
          'shipping': {'file': manifest.relative_to(root).as_posix(), 'sha256': sha(manifest), 'finishArgs': shipping},
-         'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu,
+         'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu, 'savedLanguageCases': bool(args.startup_gui),
          'outerNamespaces': {n: os.readlink('/proc/self/ns/' + n) for n in NS}})
     cmd = namespace(out, qa / 'gui', None)
     (out / 'etc/passwd').write_text('root:x:0:0:Synthetic user:/tmp/home:/bin/false\n')
@@ -173,9 +181,13 @@ def main(args):
         '--setenv', 'FLATPAK_USER_DIR', '/tmp/home/.local/share/flatpak', '--dir', '/run/user/0',
         '--setenv', 'XDG_RUNTIME_DIR', '/run/user/0', '--chdir', '/qa', '--', '/usr/bin/python3', '-B',
         '/app/flatpak/run.py', '--inside']
+    if args.startup_gui:
+        position = cmd.index('--chdir')
+        cmd[position:position] = ['--dir', '/references', *(item for lang, path in references.items()
+                                 for item in ('--ro-bind', str(path), '/references/' + lang + '.bgra'))]
     result = subprocess.run(cmd, timeout=180)
-    files = sorted(p for p in out.iterdir() if p.is_file())
-    (out / 'evidence.sha256').write_text(''.join(f'{sha(p)}  {p.name}\n' for p in files))
+    files = sorted(p for p in out.rglob('*') if p.is_file())
+    (out / 'evidence.sha256').write_text(''.join(f'{sha(p)}  {p.relative_to(out)}\n' for p in files))
     if result.returncode or not json.loads((out / 'result.json').read_bytes()).get('passed'):
         raise RuntimeError(f'Installed Flatpak observation failed in {out}')
 
@@ -249,7 +261,16 @@ if __name__ == '__main__':
         source = parser.add_mutually_exclusive_group(required=True)
         source.add_argument('stage', nargs='?')
         source.add_argument('--gui-build', type=Path)
+        source.add_argument('--startup-gui', type=Path, metavar='BINARY',
+                            help='exercise saved German and English using the original reviewed Linux x64 GUI')
+        parser.add_argument('--startup-receipt', type=Path, metavar='NATIVE_JSON',
+                            help='original source and compiler receipt from gui/startup/qualify.py')
+        parser.add_argument('--startup-pixels', type=Path, metavar='PIXELS',
+                            help='directory containing the reviewed German and English 640 by 400 headless GPU frames')
         parser.add_argument('--tray-menu', action='store_true')
         parser.add_argument('--hosted-runtime', type=Path, metavar='DEPLOYMENT',
                             help='verified native Platform deployment on a disposable hosted runner')
-        main(parser.parse_args())
+        args = parser.parse_args()
+        if bool(args.startup_gui) != bool(args.startup_receipt) or bool(args.startup_gui) != bool(args.startup_pixels):
+            parser.error('--startup-gui, --startup-receipt and --startup-pixels must be used together')
+        main(args)

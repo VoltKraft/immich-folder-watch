@@ -69,7 +69,7 @@ def call(bus, path, interface, method, arguments, reply_type):
                          Gio.DBusCallFlags.NO_AUTO_START, 3000, None).unpack()
 
 
-def read_layout(bus, dbus_call, report):
+def read_layout(bus, dbus_call, report, labels=('GUI öffnen', 'Neustart', 'Beenden')):
     sender = bus.get_unique_name()
     pid = dbus_call(bus, 'GetConnectionUnixProcessID', sender)
     if pid != os.getpid():
@@ -81,7 +81,7 @@ def read_layout(bus, dbus_call, report):
     revision, (root, props, rows) = call(bus, path, MENU, 'GetLayout', GLib.Variant('(iias)', (0, 1, [])),
                                          '(u(ia{sv}av))')
     entries = [(index, {'label': label, 'enabled': True, 'visible': True}, [])
-               for index, label in enumerate(('GUI öffnen', 'Neustart', 'Beenden'), 1)]
+               for index, label in enumerate(labels, 1)]
     if not revision or root != 0 or props.get('children-display') != 'submenu' or rows != entries:
         raise RuntimeError(f'Unexpected native menu layout: {rows}')
     report.update(menuPath=path, revision=revision, entries=rows)

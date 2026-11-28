@@ -13,7 +13,7 @@ import time
 
 from flatpak_fixture import LAUNCH_BUS, start_launch_bus
 from gi.repository import Gio, GLib
-from session import checked_start, check_alive, private_session, wait_for
+from session import checked_start, check_alive, german_editor_env, private_session, wait_for
 sys.path.insert(0, '/driver/worker')
 from second_launch import identity, visible_pid
 from run import APP, sha
@@ -126,14 +126,46 @@ def run(report, inputs, out):
         bus = Gio.bus_get_sync(Gio.BusType.SESSION)
         report['xserver'] = server
         report['launchBus'] = start_launch_bus(stack, bus)
+        if not inputs.get('savedLanguageCases'):
+            run_primary(report, inputs, out, display, bus)
+            return
+        import installed_language as startup
+        sys.path.insert(0, '/app')
+        os.environ['GSETTINGS_BACKEND'] = 'memory'
+        report['accessibilityControl'] = startup.accessibility_control(stack, bus, dbus_call, out)
+        cases = report['startupLanguages'] = {}
+        previous = None
+        for language in ('en', 'de'):
+            case_dir = out / language
+            case_dir.mkdir()
+            case = cases[language] = {'installation': report['installation']}
+            previous = startup.seed(language, previous)
+            run_primary(case, inputs, case_dir, display, bus, language)
+            current = sha(previous[0])
+            case['language']['configSha256AfterExit'] = current
+            if current != previous[1]:
+                raise RuntimeError('The installed GUI changed its synthetic startup configuration')
+        if flatpak_ps():
+            raise RuntimeError('A Flatpak instance survived before the runtime accessibility probe')
+        report['sandboxAccessibility'] = startup.sandbox_accessibility(report['installation']['commit'], out)
+        wait_for(lambda: not flatpak_ps(), 8, 'The accessibility probe survived the runtime readback')
+
+
+def run_primary(report, inputs, out, display, bus, language=None):
+    with ExitStack() as stack:
         if inputs['trayMenu']:
             trace = tray_menu.monitor(stack, out)
         watcher_log = out / 'watcher.log'
         watcher = checked_start(stack, [sys.executable, '-B', '/app/watcher.py'], watcher_log)
         wait_for(lambda: check_alive(watcher, watcher_log) or 'WATCHER_READY' in watcher_log.read_text(), 5, 'Missing watcher')
         command = ['env', 'DBUS_SYSTEM_BUS_ADDRESS=' + LAUNCH_BUS, 'flatpak', '--verbose', 'run', '--user', '--branch=test', APP]
+        if language:
+            import installed_language as startup
+            editor_env = {**os.environ, 'LC_ALL': startup.SYSTEM[language]}
+        else:
+            editor_env = german_editor_env()
         log = out / 'primary.log'
-        primary = checked_start(stack, command, log)
+        primary = checked_start(stack, command, log, env=editor_env)
         xid = wait_for(lambda: check_alive(primary, log) or display.visible(), 20, 'The primary did not map its X11 window')
         before = report['primary'] = process_witness(primary, log, bus, inputs, report['installation'], out)
         marker = before['inSandboxLaunch']
@@ -177,6 +209,8 @@ def run(report, inputs, out):
             except Exception as error:
                 cleanup['error'] = str(error)
         stack.callback(quit_primary)
+        if language:
+            report['language'] = startup.readback(language, before, xid, bus, dbus_call, out)
         instances = {marker['instance']}
         report['secondary'] = []
         for index, arguments in enumerate(([], ['--background']), start=1):
@@ -187,7 +221,7 @@ def run(report, inputs, out):
             leaf = out / ('second-background.log' if arguments else 'second-ordinary.log')
             trial = {'arguments': arguments, 'hiddenXid': xid, 'samples': 0}
             report['secondary'].append(trial)
-            child = checked_start(stack, [*command, *arguments], leaf)
+            child = checked_start(stack, [*command, *arguments], leaf, env=editor_env)
             deadline = time.monotonic() + 15
             while True:
                 trial['samples'] += 1
@@ -233,7 +267,10 @@ def run(report, inputs, out):
                     raise RuntimeError('The original hidden GUI or its bus proxy changed before menu Open')
 
             tray_menu.replace_watcher(stack, bus, dbus_call, watcher, watcher_log, log, target, out, menu, require_hidden)
-            tray_menu.read_layout(bus, dbus_call, menu)
+            if language:
+                tray_menu.read_layout(bus, dbus_call, menu, startup.MENU[language])
+            else:
+                tray_menu.read_layout(bus, dbus_call, menu)
             require_hidden()
             tray_menu.click(bus, menu['menuPath'], 1)
             menu['reopenedXid'] = wait_for(lambda: check_alive(primary, log) or display.visible(), 8,
