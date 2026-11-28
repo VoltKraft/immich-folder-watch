@@ -147,6 +147,26 @@ def focus_sample(desk, windows, hwnd):
                 focused=own_focus, queryError=0)
 
 
+def observe_focus(desk, windows, hwnd, record, *, required=True):
+    """Wait up to two seconds for foreground, active window and owned keyboard focus on this root."""
+    end = time.monotonic() + 2
+    record.update(applicable=True, observed=False, samples=0)
+    while True:
+        record["sameWindowVisible"] = windows.visible() == hwnd
+        if not record["sameWindowVisible"]:
+            break
+        sample = focus_sample(desk, windows, hwnd)
+        record.update(samples=record["samples"] + 1, lastSample=sample)
+        if sample["foreground"] and sample["active"] and sample["focused"]:
+            record["observed"] = True
+            return
+        if time.monotonic() >= end:
+            break
+        time.sleep(.05)
+    if required:
+        raise ValueError("The retained GUI did not acquire foreground and keyboard focus on its original input desktop")
+
+
 def graphics(log, record, *, before_quit=True):
     rows = log.splitlines()
     fields = {name: [line for line in rows if line.startswith(name + " ")]
@@ -423,19 +443,4 @@ class RetainedWindow:
         if self.name != "Default" and not named_input:
             record.update(applicable=False, reason="Private non-input desktop")
             return
-        end = time.monotonic() + 2
-        record.update(applicable=True, observed=False, samples=0)
-        while True:
-            record["sameWindowVisible"] = self.windows.visible() == self.hwnd
-            if not record["sameWindowVisible"]:
-                break
-            sample = focus_sample(self.desk, self.windows, self.hwnd)
-            record.update(samples=record["samples"] + 1, lastSample=sample)
-            if sample["foreground"] and sample["active"] and sample["focused"]:
-                record["observed"] = True
-                return
-            if time.monotonic() >= end:
-                break
-            time.sleep(.05)
-        if required:
-            raise ValueError("The retained GUI did not acquire foreground and keyboard focus on its original input desktop")
+        observe_focus(self.desk, self.windows, self.hwnd, record, required=required)

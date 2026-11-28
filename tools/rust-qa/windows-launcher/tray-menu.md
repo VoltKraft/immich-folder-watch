@@ -19,7 +19,9 @@ labels and item bounds. It compares all three labels against the shipping
 English and German resources. The left-button click requires a second
 readback of the same menu and a physical hit on the selected row.
 
-Open must show a visible editor owned by the original GUI. Restart must
+Open must show a visible editor owned by the original GUI. A passive check
+waits up to two seconds for its root to become the foreground and active
+window with keyboard focus on that root or one of its own children. Restart must
 drain its first native inventory worker before creating a second child,
 and the replacement must complete its initial inventory passes. Both
 workers are identified by their job, executable, PID, parent PID and
@@ -30,7 +32,9 @@ process job and restore Explorer's flyout and the cursor. The primary's
 control pipe stays open until its exit.
 
 Collect `artifacts/rust/windows-tray-menu/x86_64-pc-windows-msvc/` with its
-primary log, three provider logs and result. On a checkout containing the
+primary log, three provider logs, result and `observer-sources.zip`. The
+source archive identifies the exact observer revision and contains the
+SHA-256-verified observer files used on this guest. On a checkout containing the
 original compiler and observer sources, replay the original compiler ZIP
 and the downloaded evidence directory together.
 

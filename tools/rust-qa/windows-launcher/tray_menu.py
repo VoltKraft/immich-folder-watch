@@ -4,21 +4,46 @@ import argparse
 from contextlib import ExitStack
 import ctypes as c
 from ctypes import wintypes as w
+import hashlib
 import json
 from pathlib import Path
 import re
 import tempfile
+from zipfile import ZipFile, ZIP_DEFLATED
 
 import local_tray
 import native_tray as tray
 import observe as launcher
+from retained_window import observe_focus
 from tray_menu_input import ACTIONS, MenuInput, expected_menus, identify_menu
 
 RESOURCES = launcher.ROOT / "src/ImmichFolderWatch.App.Shared/Resources"
 OBSERVERS = [Path(__file__).resolve(), launcher.HERE / "tray_menu_input.py", tray.PROVIDER, launcher.HERE / "tray_msaa.cs",
              launcher.QA / "windows-services/tray-overflow.ps1", Path(tray.__file__), Path(local_tray.__file__),
              Path(launcher.__file__), launcher.HERE / "named_process.py", launcher.QA / "windows-desktop/win32.py",
+             launcher.HERE / "retained_window.py", launcher.QA / "windows-services/service_sources.py",
              RESOURCES / "Strings.resx", RESOURCES / "Strings.de.resx"]
+
+
+def archive_observers(out, report):
+    from runpy import run_path
+    verify = run_path(str(launcher.QA / "windows-services/service_sources.py"))["verify_checkout"]
+    head = report["observerRevision"]
+    checked = verify(launcher.ROOT, OBSERVERS, head)
+    if checked != report["observerInputs"]:
+        raise ValueError("The menu observers differ from their own Git revision")
+    with ZipFile(out / "observer-sources.zip", "x", compression=ZIP_DEFLATED) as archive:
+        archive.writestr("observer.json", json.dumps(dict(revision=head, files=checked)))
+        for name in checked:
+            archive.write(launcher.ROOT / name, name)
+
+
+def verify_focus(surface, row):
+    latest = row["lastSample"]
+    if (row["hwnd"] != int(surface["hwnd"], 16) or row["pid"] != surface["pid"] or latest["thread"] != surface["tid"]
+            or row["observed"] is not True or row["applicable"] is not True or row["sameWindowVisible"] is not True
+            or row["samples"] < 1 or latest["queryError"] != 0 or not all(latest[k] is True for k in ("foreground", "active", "focused"))):
+        raise ValueError("The original editor did not acquire foreground, activation and owned keyboard focus")
 
 
 def messages(text, pid, hwnd):
@@ -113,6 +138,13 @@ def replay(out, archive, digest):
         raise ValueError("The complete local menu run or its original standard-user desktop is missing")
     if report["observerInputs"] != {p.relative_to(launcher.ROOT).as_posix(): launcher.recorder.sha(p) for p in OBSERVERS}:
         raise ValueError("Use the original menu observer sources")
+    with ZipFile(out / "observer-sources.zip") as sources:
+        manifest = json.loads(sources.read("observer.json"))
+        if (manifest != dict(revision=report["observerRevision"], files=report["observerInputs"])
+                or sorted(sources.namelist()) != sorted(["observer.json", *report["observerInputs"]])
+                or any(hashlib.sha256(sources.read(path)).hexdigest() != digest for path, digest in manifest["files"].items())):
+            raise ValueError("The archived observer sources are not bound to their recorded revision")
+    verify_focus(report["openedWindow"], report["openFocus"])
     files = {p.relative_to(out).as_posix(): launcher.recorder.sha(p) for p in out.rglob("*") if p.is_file() and p != out / "result.json"}
     if files != report["evidenceFiles"]:
         raise ValueError("The native menu evidence files changed")
@@ -264,6 +296,9 @@ def select_actions(api, desk, gui, trial, env, out, result):
             if action == "open":
                 hwnd = wait(windows.visible, "Open GUI did not show the retained editor")
                 native.visible_window(proc, hwnd, result, "openedWindow")
+                focus = result["openFocus"] = dict(hwnd=hwnd, pid=proc.pid)
+                observe_focus(desk, windows, hwnd, focus)
+                verify_focus(result["openedWindow"], focus)
                 if worker_at(first_pid, "openedJob")[0] != first:
                     raise ValueError("Open GUI replaced the original worker")
             elif action == "restart":
@@ -308,6 +343,7 @@ def main():
     report = dict(target=local_tray.TARGET, status="failed")
     try:
         with local_tray.subject(launcher, args.local_archive, args.archive_sha256, report, OBSERVERS) as (api, desk, gui, inventory, _):
+            archive_observers(out, report)
             profile = report["caseProfile"] = {}
             with launcher.staged_profile(profile, api, gui, inventory, local_temp=Path(tempfile.gettempdir())) as (exe, trial, env):
                 env.update(IFW_QA_WINDOWS_TRAY="1", IFW_QA_MSAA_ICON="1")

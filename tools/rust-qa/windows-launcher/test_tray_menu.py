@@ -19,6 +19,17 @@ def rows(language="en"):
 
 
 class NativeMenuTests(unittest.TestCase):
+    def test_open_requires_foreground_and_keyboard_focus_on_original_editor(self):
+        surface = dict(hwnd="0x12", pid=23, tid=31)
+        sample = dict(thread=31, foreground=True, active=True, focused=True, queryError=0)
+        evidence = dict(hwnd=18, pid=23, observed=True, applicable=True, sameWindowVisible=True, samples=1, lastSample=sample)
+        tray_menu.verify_focus(surface, evidence)
+        for change in ({"hwnd":42}, {"pid":24}, {"sameWindowVisible":False}, {"samples":0},
+                       *({"lastSample":{**sample,key:False}} for key in ("foreground","active","focused")),
+                       {"lastSample":{**sample,"thread":33}}, {"lastSample":{**sample,"queryError":5}}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                tray_menu.verify_focus(surface, {**evidence,**change})
+
     def test_replay_binds_raw_provider_events_both_physical_buttons_and_selected_identifier(self):
         labels = expected_menus(tray_menu.RESOURCES)
         second = {**SURFACE, "rgb": COMPLEMENT}
