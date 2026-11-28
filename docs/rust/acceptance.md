@@ -44,6 +44,14 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+For RI-AC03, all four native targets at `9d4d550` preserved the complete
+original SQLite family for two refused version-99 profiles in the WAL
+and checked effective write access on a supported profile. Both Windows
+architectures and both Ubuntu architectures independently recovered the
+three committed version/value pairs. The x64 Windows trial ran in the
+local VM. Live-writer handoff and production migration remain open.
+[Quiescent WAL results](rw02-storage-inputs.md#schema-version-in-a-quiescent-wal).
+
 The ordinary visible Quit after tray loss passed on Fedora x64 at
 `c268a82`. The observer measured the focused button and pressed Space.
 The original worker had found a second file while hidden and exited

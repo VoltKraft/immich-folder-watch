@@ -8,6 +8,21 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+At `9d4d550`, the SQLite preflight read the committed version from the
+WAL on all four native targets. Two newer profiles retained every original
+byte and filename. A supported read-only file was also refused, and the
+writable control passed a real update and rollback. The 3 GiB Windows x64
+guest ran both Rust and C# and shut down after the trial. The separate
+Windows ARM64 FAT/recovery step failed. The local reinstalled WPF editor
+also showed the exact Unicode album from a returned native Rust document
+and preserved all four input files through an orderly tray Quit.
+The Fedora YAML reader matched the signed 3.0.4 reference for all 34
+ordinary profiles at `d9b9e72`, then for the 89 comparisons including
+explicit scalar tags at `c63d91c`.
+[Database evidence](rust/rw02-storage-inputs.md#schema-version-in-a-quiescent-wal) ·
+[Returned Windows profile](../tools/rust-qa/instance/cross-session/transaction/rust-return.md#local-windows-x64-result) ·
+[YAML comparisons](rust/rw02-yaml.md#explicit-scalar-tags-on-typed-properties).
+
 At `c268a82` the Fedora x64 editor showed the German and English notice
 after its tray watcher exited. A normal second launch reopened the same
 window after the worker found another synthetic JPEG. Pressing Space on

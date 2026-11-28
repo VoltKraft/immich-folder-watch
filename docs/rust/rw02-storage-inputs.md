@@ -264,6 +264,42 @@ assessment queries the main database's effective mode before handing it to
 the writer. The writable control updates a row inside a rolled-back
 transaction. C# then independently reads the original committed value.
 
+At `9d4d550` the Fedora x64 offline run verified 31 original crates, 2,214
+source files, the native graph, formatting and Clippy. Rust 1.100.0 and
+bundled SQLite 3.54.1 refused both version-99 profiles. Each had 8,272
+committed WAL bytes. The original main, WAL and optional 32,768-byte
+index kept their original digests. The supported connection wrote a row
+and rolled back. The shipping C# readers passed the 40 store assertions
+and independently recovered version/value pairs 99/99, 99/99 and 1/1.
+SQLite also returned a real read-only handle for a supported file with
+write permission removed. The handoff refused it and its sole main file
+kept SHA-256 `c9025554da20937e46278887e6f3d719d5f8f879c6df2b482a0ed35b33d565bf`.
+Independent review identified this read-only fallback and verified the fix.
+The final Fedora receipt is `artifacts/rust/storage-native/quiescent-wal-fedora-03/result.json`,
+SHA-256 `d0e3e104c39a59b7ff4476b91cf9eb56ef27742a4cb2cab92aff2a22351f6938`.
+All 286 evidence digests matched. The earlier Fedora -02 build overlapped
+a source edit and is excluded from revision-bound results.
+
+Native Ubuntu x64 and ARM64 had already passed the three committed-WAL
+profiles, the finalized PERSIST journal check and all four worker backup
+scenarios at `d13da92`. Replay verified the original job digest, all 379
+file hashes per archive, the archived Rust/C# sources and the exact files
+left by both refusals.
+[Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131445155/artifacts/15257419935) ·
+[Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131445155/artifacts/15258416414).
+
+All four native targets subsequently passed the effective write-access
+and committed-WAL checks at `9d4d550`. In each case the supported control
+wrote and rolled back, the read-only handle was refused, and the original
+files from the two version-99 WAL cases and the PERSIST case were intact.
+
+| Native target | Execution and replay |
+| --- | --- |
+| Windows x64 | Local 3 GiB Server 2025 guest, .NET 10.0.12. The original guest ZIP has SHA-256 `da5546036eac590a6dc307aa6310683886154e3a29ca9f85b542f452a051bfb4`. [Original files and guest readback](../../tools/rust-qa/windows-local/storage.md#read-only-database-and-writable-wal-control) |
+| Windows ARM64 | Native ARM64 Rust and C# (.NET 10.0.15). Replay verified all 379 file digests. The separate fault-recovery fixture failed to compile its copy of the storage source, before creating its FAT test volume. [Original worker and database archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131824393/artifacts/15258651693) · [Separate recovery job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131824393/job/140939177719) |
+| Linux x64 | Both Fedora and native Ubuntu passed. Replay verified all 380 Ubuntu file digests. [Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131824393/artifacts/15258162939) |
+| Linux ARM64 | Native Ubuntu passed with .NET 10.0.15. Replay verified all 380 file digests. [Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131824393/artifacts/15258282886) |
+
 ## Maintained native runner
 
 [`storage/Cargo.toml`](../../tools/rust-qa/storage/Cargo.toml) declares its own

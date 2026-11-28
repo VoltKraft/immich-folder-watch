@@ -230,6 +230,7 @@ to reconcile project decisions, defaults, and recorded state.
   original backups in the [two-language storage fault fixture](docs/rust/rw02-storage-faults.md).
   For a [schema version committed only in the WAL](docs/rust/rw02-storage-inputs.md#schema-version-in-a-quiescent-wal),
   keep the fixture writer stopped and verify the original database and sidecars after refusal.
+  On Windows x64 run the [original storage binaries in the local VM](tools/rust-qa/windows-local/storage.md).
   Bind hosted notices to the Actions digest of the native compiler receipt.
   For a [standard-user writer trial](docs/rust/rw02-cross-session.md),
   use the tested native writer and its identity oracle in two sessions of
