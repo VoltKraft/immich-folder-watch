@@ -16,6 +16,7 @@ from msi_sessions import (ADMIN, APP, APP_SHA, HERE, QA, WRITER_SHA, Accounts, S
                           interactive, measure, ordinary, peer, qualifies, require, wait, write)
 from handover_receipts import shutdown
 from native import wpf_tray_receiver
+from shared import backup
 
 ORDER = 'wpf-handover'
 ENDPOINT_SHA = 'e0f4aa779264f5bb33cf1ab0d8f94c34072765ff8c16af252b5b3233813b330e'
@@ -134,7 +135,8 @@ def record_sources(work):
     root = QA.parents[1]
     paths = {Path(__file__).resolve(), HERE / 'handover_quit.ps1',
              QA / 'windows-msi-interop/reverse/quit-source.ps1', root / 'packaging/windows/Test-InstalledUpgrade.ps1'}
-    for module in tuple(sys.modules.values()):
+    # These three file-based loaders intentionally do not insert their modules in sys.modules.
+    for module in (*sys.modules.values(), instance, peer, backup):
         name = getattr(module, '__file__', None)
         if name:
             p = Path(name).resolve()

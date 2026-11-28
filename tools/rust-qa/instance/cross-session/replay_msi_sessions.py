@@ -123,7 +123,7 @@ def unmarked(z):
             and not z.read('unmarked.stdout'), 'Missing ordinary unmarked refusal')
 
 
-def replay(guest, endpoint, expected, order, prior):
+def replay(guest, endpoint, expected, order, prior, supplement=None):
     require(digest(endpoint.read_bytes()) == expected, 'Native Actions ZIP digest differs')
     with ZipFile(guest) as original, ZipFile(endpoint) as native:
         z = GuestArchive(original)
@@ -136,11 +136,26 @@ def replay(guest, endpoint, expected, order, prior):
             required_sources.update('tools/rust-qa/instance/cross-session/' + f for f in (
                 'handover_msi.py', 'handover_receipts.py', 'handover_quit.ps1', 'config_guard_msi.py',
                 'standard.py', 'existing.py'))
-            required_sources.update(('tools/rust-qa/windows-msi-interop/reverse/quit-source.ps1',
+            required_sources.update(('tools/rust-qa/instance/run.py', 'tools/RustCompatibilityOracle/installed/interop/installed_backup.py',
+                                     'tools/rust-qa/windows-msi-interop/reverse/quit-source.ps1',
                                      'tools/rust-qa/windows-msi-interop/reverse/evidence.py',
                                      'tools/rust-qa/windows-performance/native.py', 'packaging/windows/Test-InstalledUpgrade.ps1'))
         if order == 'config-only':
             required_sources.add('tools/rust-qa/instance/cross-session/config_guard_msi.py')
+        if supplement:
+            require(order == 'wpf-handover' and observer['revision'] == 'bfd99b2648be5870cf707f55d8a8322c174e82ab',
+                    'Unexpected source supplement for this revision')
+            with ZipFile(supplement) as archive:
+                extra = GuestArchive(archive)
+                raw = read(extra, 'supplement.json')
+                loaded = {'tools/rust-qa/instance/run.py', 'tools/RustCompatibilityOracle/installed/interop/installed_backup.py',
+                          'tools/RustCompatibilityOracle/installed/interop/shipping_upload.py'}
+                require(set(raw['sources']) == loaded == required_sources - observer['sources'].keys()
+                        and raw['observerRevision'] == observer['revision'] and raw['guestSha256'] == digest(guest.read_bytes())
+                        and raw['originalObserverSha256'] == digest(z.read('handover-observer.json'))
+                        and all(digest(extra.read(path)) == value for path, value in raw['sources'].items()),
+                        'The separate post-run checkout observation does not belong to the original guest archive')
+                observer['sources'].update(raw['sources'])
         require(required_sources.issubset(observer['sources']) and all(digest(subprocess.check_output(
                 ['git', 'show', observer['revision'] + ':' + path])) == h for path, h in observer['sources'].items()),
                 'Changed guest observer sources')
@@ -201,7 +216,8 @@ def replay(guest, endpoint, expected, order, prior):
                 observation.update(installedExit=ended['exitCode'], orderlyQuit=drained,
                                    admittedPid=result['admitted']['endpoint']['pid'], guardPid=result['admitted']['writer']['pid'])
 
-        return {'guestSha256': digest(guest.read_bytes()), 'endpointSha256': expected, 'observerRevision': observer['revision'],
+        return {**({'postRunSourceSupplementSha256': digest(supplement.read_bytes())} if supplement else {}),
+                'guestSha256': digest(guest.read_bytes()), 'endpointSha256': expected, 'observerRevision': observer['revision'],
                 'observerSourceHashes': len(observer['sources']), 'nativeSourceHashes': len(build['sources']),
                 'controllerSession': controller['desktop']['sessionId'], 'peerSession': other['desktop']['sessionId'],
                 'case': observation, 'configGuard': config_guard, 'priorUnmarkedArchiveSha256': digest(prior.read_bytes()) if prior else None}
@@ -214,5 +230,6 @@ if __name__ == '__main__':
     parser.add_argument('actions_sha256')
     parser.add_argument('order', choices=(*ORDERS, 'config-only', 'wpf-handover'))
     parser.add_argument('--prior-unmarked', type=Path, help='Original observation ZIP from before the same guest was marked')
+    parser.add_argument('--source-supplement', type=Path, help='Separate post-run checkout ZIP from the original bfd99b2 guest')
     args = parser.parse_args()
-    print(json.dumps(replay(args.guest, args.endpoint, args.actions_sha256, args.order, args.prior_unmarked), indent=2))
+    print(json.dumps(replay(args.guest, args.endpoint, args.actions_sha256, args.order, args.prior_unmarked, args.source_supplement), indent=2))
