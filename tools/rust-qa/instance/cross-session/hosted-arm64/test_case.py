@@ -9,6 +9,7 @@ HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parent), str(HERE)]
 import worker
 from fixture import read
+from replay import replay_cleanup
 from standard import TEMPORARY
 
 
@@ -51,6 +52,36 @@ class TemporaryAccountTests(unittest.TestCase):
             self.assertTrue(result["passed"])
             self.assertEqual(result["osLogon"], evidence)
             self.assertEqual(read(Path(directory) / "scheduled-bootstrap.json")["sessionId"], 0)
+
+
+class CleanupReplayTests(unittest.TestCase):
+    def setUp(self):
+        self.host = {key: True for key in ("accountRemoved", "taskRemoved", "profileRemoved", "stageRemoved",
+                     "serviceRestored", "userProcessesExited", "taskFolderRemoved", "profileDirectoryRemoved")}
+        self.host["restore"] = {"before": ["SeBatchLogonRight"], "after": []}
+
+    def replay(self):
+        with patch("replay.read", return_value=self.host):
+            return replay_cleanup(Path("unused"))
+
+    def test_requires_all_cleanup_observations(self):
+        self.assertTrue(self.replay()["passed"])
+        del self.host["profileDirectoryRemoved"]
+        result = self.replay()
+        self.assertFalse(result["passed"])
+        self.assertIsNone(result["observations"]["profileDirectoryRemoved"])
+
+    def test_cleanup_exception_is_reported_even_with_positive_observations(self):
+        self.host["cleanupFailureProfile"] = "profile is loaded"
+        result = self.replay()
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["failures"], {"cleanupFailureProfile": "profile is loaded"})
+
+    def test_right_must_be_removed(self):
+        self.host["restore"]["after"] = ["SeBatchLogonRight"]
+        result = self.replay()
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["observations"]["batchRightRestored"])
 
 
 if __name__ == "__main__":

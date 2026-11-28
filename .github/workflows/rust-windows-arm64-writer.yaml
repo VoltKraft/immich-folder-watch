@@ -4,9 +4,29 @@ on:
   push:
     branches: [rewrite/rust]
     paths:
-      - '.github/workflows/rust-windows-arm64-writer.yaml'
-      - 'tools/rust-qa/instance/cross-session/hosted-arm64/*.py'
-      - 'tools/rust-qa/instance/cross-session/hosted-arm64/*.ps1'
+      # Replay and reporting changes can be checked against the original observation archives.
+      - 'tools/rust-qa/instance/cross-session/hosted-arm64/run.ps1'
+      - 'tools/rust-qa/instance/cross-session/hosted-arm64/case.py'
+      - 'tools/rust-qa/instance/cross-session/hosted-arm64/inputs.py'
+      - 'tools/rust-qa/instance/cross-session/hosted-arm64/logon.py'
+      - 'tools/rust-qa/instance/cross-session/hosted-arm64/batch_account.py'
+      - 'tools/rust-qa/instance/cross-session/batch.py'
+      - 'tools/rust-qa/instance/cross-session/console_levels.py'
+      - 'tools/rust-qa/instance/cross-session/fixture.py'
+      - 'tools/rust-qa/instance/cross-session/native_build.py'
+      - 'tools/rust-qa/instance/cross-session/observe.py'
+      - 'tools/rust-qa/instance/cross-session/scheduler.ps1'
+      - 'tools/rust-qa/instance/cross-session/scheduler_cleanup.ps1'
+      - 'tools/rust-qa/instance/cross-session/standard.py'
+      - 'tools/rust-qa/instance/cross-session/worker.py'
+      - 'tools/rust-qa/instance/*.rs'
+      - 'tools/rust-qa/instance/Program.cs'
+      - 'tools/rust-qa/instance/InstanceOracle.csproj'
+      - 'tools/rust-qa/instance/run.py'
+      - 'tools/rust-qa/instance/legacy-inputs.json'
+      - 'tools/rust-qa/gui/src/win32_instance.rs'
+      - 'src/ImmichFolderWatch.App/Services/SingleInstanceCoordinator.cs'
+      - 'global.json'
   workflow_dispatch:
 
 permissions:
@@ -35,12 +55,19 @@ jobs:
         run: python -I -B tools/rust-qa/instance/cross-session/hosted-arm64/inputs.py download
 
       - name: Exercise the new ordinary user's two local logons
+        id: observe
         shell: pwsh
         run: ./tools/rust-qa/instance/cross-session/hosted-arm64/run.ps1
 
-      - name: Replay the original lock events, tokens and cleanup
+      - name: Replay the original lock events and tokens
+        if: ${{ !cancelled() && steps.observe.outcome != 'skipped' }}
         shell: pwsh
-        run: python -I -B tools/rust-qa/instance/cross-session/hosted-arm64/replay.py artifacts/rust/arm64-standard-writer
+        run: python -I -B tools/rust-qa/instance/cross-session/hosted-arm64/replay.py artifacts/rust/arm64-standard-writer --check functional
+
+      - name: Verify disposable host cleanup
+        if: ${{ !cancelled() && steps.observe.outcome != 'skipped' }}
+        shell: pwsh
+        run: python -I -B tools/rust-qa/instance/cross-session/hosted-arm64/replay.py artifacts/rust/arm64-standard-writer --check cleanup
 
       - name: Retain the native archive and redacted test observations
         if: ${{ !cancelled() }}

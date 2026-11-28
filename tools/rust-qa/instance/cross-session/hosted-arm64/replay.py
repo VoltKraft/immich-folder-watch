@@ -1,4 +1,5 @@
-"""Independently compare both ordinary logons, five frozen ARM64 writers and all lock events."""
+"""Replay the two-logon writer protocol and the disposable host cleanup independently."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -22,7 +23,7 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def replay(folder):
+def replay_functional(folder):
     compiler = verify(folder / "writer.zip")
     sources = read(folder / "observer-sources.json")
     host, case = [read(folder / name) for name in ("host.json", "case.json")]
@@ -32,21 +33,18 @@ def replay(folder):
                 "scheduler_cleanup.ps1", "native_build.py", "console_levels.py", "hosted-arm64/case.py",
                 "hosted-arm64/logon.py", "hosted-arm64/inputs.py", "hosted-arm64/batch_account.py",
                 "hosted-arm64/run.ps1", "hosted-arm64/replay.py"}
-    require(all("tools/rust-qa/instance/cross-session/" + source in sources for source in required),
-            "Incomplete observer source manifest")
-    require(".github/workflows/rust-windows-arm64-writer.yaml" in sources, "Missing native workflow source")
+    expected = {"tools/rust-qa/instance/cross-session/" + source for source in required}
+    expected.update(compiler["source_sha256"])
+    expected.update((".github/workflows/rust-windows-arm64-writer.yaml", "global.json"))
+    require(set(sources) == expected, "Unexpected observer source manifest")
     # The native checkout uses CRLF for sources without an eol rule. Reconstruct the
     # exact bytes at the archived commit when the independent replay runs on Linux.
     for name, digest in sources.items():
         original = subprocess.check_output(["git", "-c", "core.autocrlf=true", "cat-file", "--filters",
                                             revision + ":" + name], cwd=ROOT)
         require(hashlib.sha256(original).hexdigest() == digest, f"Unexpected original observer source {name}")
-    require(all(host.get(k) is True for k in ("accountCreated", "accountRemoved", "taskRemoved", "profileRemoved",
-                    "stageRemoved", "serviceRestored", "userProcessesExited", "taskFolderRemoved",
-                    "profileDirectoryRemoved")) and not any(k.startswith("cleanupFailure") for k in host)
-            and "error" not in host and host["controllerExit"] == 0, "The isolated host or its cleanup failed")
-    require(host["grant"] == {"before":[], "after":["SeBatchLogonRight"]} and
-            host["restore"] == {"before":["SeBatchLogonRight"], "after":[]}, "Temporary assignment was not restored")
+    require(host.get("accountCreated") is True and "error" not in host and host["controllerExit"] == 0
+            and host["grant"] == {"before": [], "after": ["SeBatchLogonRight"]}, "Ordinary logon setup failed")
     require(all(case[k] == host[k] for k in ("revision", "runId", "runAttempt"))
             and re.fullmatch(r"[0-9a-f]{40}", case["revision"])
             and re.fullmatch(r"[0-9a-f]{64}", host["sidSha256"])
@@ -96,8 +94,33 @@ def replay(folder):
         if event != "HELD":
             expected["exitCode"] = 0
         require(actual == expected, "Unexpected lock event, file identity or writer identity")
-    return {"sessions":sessions, "writers":len(writers), "lockEvents":len(EVENTS), "originalArchive":DIGEST}
+    return {"passed": True, "sessions": sessions, "logonTypes": [2, 4], "writers": len(writers),
+            "lockEvents": len(EVENTS), "guard": guard, "participantsExited": case["participantsExited"],
+            "originalArchive": DIGEST}
+
+
+def replay_cleanup(folder):
+    host = read(folder / "host.json")
+    fields = ("accountRemoved", "taskRemoved", "profileRemoved", "stageRemoved", "serviceRestored",
+              "userProcessesExited", "taskFolderRemoved", "profileDirectoryRemoved")
+    # A missing observation in an older archive stays visible and cannot satisfy the cleanup gate.
+    observations = {key: host.get(key) for key in fields}
+    observations["batchRightRestored"] = host.get("restore") == {"before": ["SeBatchLogonRight"], "after": []}
+    failures = {key: value for key, value in host.items() if key.startswith("cleanupFailure")}
+    return {"passed": all(value is True for value in observations.values()) and not failures,
+            "observations": observations, "failures": failures, "profileStates": host.get("profileStates"),
+            "profileWaitSeconds": host.get("profileWaitSeconds")}
 
 
 if __name__ == "__main__":
-    print(json.dumps(replay(Path(sys.argv[1])), indent=2))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("folder", type=Path)
+    parser.add_argument("--check", choices=("functional", "cleanup", "all"), default="all")
+    args = parser.parse_args()
+    result = {}
+    if args.check in ("functional", "all"):
+        result["functional"] = replay_functional(args.folder)
+    if args.check in ("cleanup", "all"):
+        result["cleanup"] = replay_cleanup(args.folder)
+    print(json.dumps(result, indent=2))
+    sys.exit(0 if all(check["passed"] for check in result.values()) else 1)
