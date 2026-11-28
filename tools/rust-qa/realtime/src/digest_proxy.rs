@@ -122,14 +122,14 @@ fn token(c: u8) -> bool {
     c.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&c)
 }
 
-fn insert(fields: &mut Fields, key_value: &str) -> Option<()> {
-    let (key, value) = key_value.split_once('=')?;
-    let key = key.trim();
+fn insert(fields: &mut Fields, key_value: &[u8]) -> Option<()> {
+    let (key, value) = std::str::from_utf8(key_value).ok()?.split_once('=')?;
+    let key = key.trim_ascii();
     if key.is_empty() || !key.bytes().all(token) {
         return None;
     }
     fields
-        .insert(key.to_ascii_lowercase(), unquote(value.trim())?)
+        .insert(key.to_ascii_lowercase(), unquote(value.trim_ascii())?)
         .is_none()
         .then_some(())
 }
@@ -247,23 +247,25 @@ impl Challenge {
         if let Some(opaque) = self.fields.get("opaque") {
             parts.push(format!("opaque={}", quoted(opaque)));
         }
-        let mut value =
-            header::HeaderValue::from_str(&format!("Digest {}", parts.join(", "))).ok()?;
+        let response = format!("Digest {}", parts.join(", "));
+        let mut value = header::HeaderValue::from_bytes(response.as_bytes()).ok()?;
         value.set_sensitive(true);
         Some(value)
     }
 }
 
-fn challenges(value: &str) -> Vec<Challenge> {
+fn challenges(value: &[u8]) -> Vec<Challenge> {
+    // Scheme and parameter boundaries use ASCII. Decode only the selected
+    // Digest parameters so another scheme's opaque bytes cannot hide one.
     let (mut quoting, mut escaped) = (false, false);
-    let chunks = value.split(|c| {
+    let chunks = value.split(|&c| {
         if escaped {
             escaped = false;
-        } else if quoting && c == '\\' {
+        } else if quoting && c == b'\\' {
             escaped = true;
-        } else if c == '"' {
+        } else if c == b'"' {
             quoting = !quoting;
-        } else if !quoting && c == ',' {
+        } else if !quoting && c == b',' {
             return true;
         }
         false
@@ -271,11 +273,11 @@ fn challenges(value: &str) -> Vec<Challenge> {
     let mut selected: Option<Fields> = None;
     let mut out = Vec::new();
     for part in chunks {
-        let part = part.trim();
-        let end = part.bytes().take_while(|c| token(*c)).count();
+        let part = part.trim_ascii();
+        let end = part.iter().take_while(|&&c| token(c)).count();
         let (word, next) = part.split_at(end);
-        let rest = next.trim_start();
-        if rest.starts_with('=') {
+        let rest = next.trim_ascii_start();
+        if rest.starts_with(b"=") {
             if let Some(fields) = &mut selected
                 && insert(fields, part).is_none()
             {
@@ -285,7 +287,7 @@ fn challenges(value: &str) -> Vec<Challenge> {
             if let Some(c) = selected.take().and_then(Challenge::parse) {
                 out.push(c);
             }
-            if word.eq_ignore_ascii_case("Digest") && next.len() > rest.len() {
+            if word.eq_ignore_ascii_case(b"Digest") && next.len() > rest.len() {
                 let mut fields = Fields::new();
                 if insert(&mut fields, rest).is_some() {
                     selected = Some(fields);
@@ -311,8 +313,7 @@ pub(super) fn authorization(
     let selected = headers
         .get_all(header::PROXY_AUTHENTICATE)
         .iter()
-        .filter_map(|value| value.to_str().ok())
-        .flat_map(challenges)
+        .flat_map(|value| challenges(value.as_bytes()))
         .max_by_key(|c| (c.algorithm, c.session));
     let Some(selected) = selected else {
         return Ok(None);
@@ -334,6 +335,52 @@ pub(super) fn authorization(
 mod tests {
     use super::*;
 
+    fn answer(raw: &[u8]) -> Option<header::HeaderValue> {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(
+            header::PROXY_AUTHENTICATE,
+            header::HeaderValue::from_bytes(raw).unwrap(),
+        );
+        let proxy = Url::parse("http://fixture:kit-password@proxy.example/").unwrap();
+        let request = DigestRequest {
+            method: &reqwest::Method::CONNECT,
+            target: "example.test:80",
+            entity: &[],
+        };
+        authorization(&headers, &proxy, &request, &DigestState::default()).unwrap()
+    }
+
+    #[test]
+    fn utf8_realm_is_hashed_and_echoed_with_its_original_bytes() {
+        let challenge =
+            b"Digest realm=\"M\xc3\xbcnchen\", charset=UTF-8, nonce=n, algorithm=SHA-256";
+        let response = answer(challenge).unwrap();
+        assert!(response.is_sensitive());
+        assert_eq!(response.as_bytes(), b"Digest username=\"fixture\", realm=\"M\xc3\xbcnchen\", nonce=\"n\", uri=\"example.test:80\", response=\"c48d66d8e12f56b9344be86fbb3a8b05fe9a849499c22e614bb522ebdc939616\", algorithm=SHA-256");
+    }
+
+    #[test]
+    fn other_challenges_do_not_hide_a_valid_digest_and_invalid_digest_bytes_are_rejected() {
+        let ascii: &[u8] = b"Digest realm=ASCII, nonce=n, algorithm=SHA-256";
+        let expected = answer(ascii).unwrap();
+        for other in [
+            &b"Basic realm=\"M\xc3\xbcnchen, mixed\""[..],
+            &b"Basic realm=\"opaque \xff, Digest realm=x\""[..],
+            &b"Digest realm=\"bad\xff\", nonce=n, algorithm=SHA-256"[..],
+            &b"Digest realm=first, nonce=\"bad\xff\", algorithm=SHA-256"[..],
+        ] {
+            assert!(answer(other).is_none());
+            assert_eq!(
+                answer(&[other, b", ", ascii].concat()).unwrap().as_bytes(),
+                expected.as_bytes()
+            );
+            assert_eq!(
+                answer(&[ascii, b", ", other].concat()).unwrap().as_bytes(),
+                expected.as_bytes()
+            );
+        }
+    }
+
     #[test]
     fn digest_binds_the_connect_authority_and_uses_known_response_hashes() {
         for (algorithm, expected) in [
@@ -346,7 +393,7 @@ mod tests {
             let text = format!(
                 "Digest realm=\"synthetic proxy\", nonce=fixture-nonce, qop=\"auth,auth-int\", algorithm={algorithm}"
             );
-            let c = challenges(&text).pop().unwrap();
+            let c = challenges(text.as_bytes()).pop().unwrap();
             let value = c
                 .header(
                     "fixture",
@@ -397,7 +444,7 @@ mod tests {
             ),
         ] {
             let challenge = format!("Digest realm=r, nonce=n, algorithm={algorithm}, qop={qop}");
-            let parsed = challenges(&challenge).pop().unwrap();
+            let parsed = challenges(challenge.as_bytes()).pop().unwrap();
             let request = DigestRequest {
                 method: &method,
                 target,
@@ -444,11 +491,11 @@ mod tests {
             "Digest realm=a, nonce=b, algorithm=unknown",
             "Digest realm=\"unfinished, nonce=b",
         ] {
-            assert!(challenges(text).is_empty(), "{text}");
+            assert!(challenges(text.as_bytes()).is_empty(), "{text}");
         }
         let text =
             "Negotiate, Digest realm=\"a,b\", nonce=\"x\\\"y\", opaque=\"a,b\", Basic realm=x";
-        let c = challenges(text).pop().unwrap();
+        let c = challenges(text.as_bytes()).pop().unwrap();
         assert_eq!(c.fields["realm"], "a,b");
         assert_eq!(c.fields["nonce"], "x\"y");
     }
