@@ -275,6 +275,10 @@ to reconcile project decisions, defaults, and recorded state.
   use the [taskbar color comparison](docs/rust/rw02-windows-services.md#comparing-marker-colors-across-the-original-x64-taskbar).
   The [Windows Server 2022 check](https://github.com/VoltKraft/immich-folder-watch/blob/a051d46abf139c33bcd4e7c1f74f229b7fe5d6fe/.github/workflows/rust-windows-shell-2022.yaml)
   previously ran the same retained tray and canonical contrast subjects on its original desktop.
+  For [Quit after tray loss](tools/rust-qa/gui/tray-loss-quit.md), follow the
+  original worker through window close, ordinary reopen and keyboard Quit.
+  On Windows exercise the [visible fallback button](docs/rust/rw02-windows-services.md#partial-windows-tray-registration)
+  on a private input desktop after a genuine Shell refusal.
   Verify the primary GUI's [Shell callback and worker lifetime](docs/rust/rw02-windows-services.md#primary-gui-and-shell-callback)
   when changing the shared receiver or launcher. On the [classic x64 toolbar](docs/rust/rw02-windows-services.md#identifying-a-classic-notification-toolbar-button),
   match the accessible button and physical marker before its default action.

@@ -44,6 +44,15 @@ RW-08 is outside this goal. Success at an earlier row does not complete the goal
 
 ## Overall acceptance
 
+The ordinary visible Quit after tray loss passed on Fedora x64 at
+`c268a82`. The observer measured the focused button and pressed Space.
+The original worker had found a second file while hidden and exited
+successfully before the primary drained and released the bus name.
+The Windows partial-registration regression and the prepared private
+desktop window-Quit trial have separate evidence. RW-02 remains open.
+[Fedora X11 evidence](../../tools/rust-qa/gui/tray-loss-quit.md) ·
+[Windows adapter record](rw02-windows-services.md#partial-windows-tray-registration).
+
 On Fedora x64 the installed portal client at `c7c614f` opened both selected
 directory grants and retained the literal percent escape in the second
 folder name. After its revocation, a new process read the control grant

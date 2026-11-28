@@ -8,6 +8,18 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+At `c268a82` the Fedora x64 editor showed the German and English notice
+after its tray watcher exited. A normal second launch reopened the same
+window after the worker found another synthetic JPEG. Pressing Space on
+Quit ended the original worker and GUI and released the D-Bus name.
+The Windows editor exposes the same action when its tray is unavailable.
+At `a7d42dc` the Windows tray adapter also preserves the running GUI and
+tracks the outstanding icon after a failed version handshake and withdrawal.
+The three partial-registration API responses were exercised in the model.
+Native Windows window-Quit observations are pending.
+[Fedora desktop record](../tools/rust-qa/gui/tray-loss-quit.md) ·
+[Windows tray and shutdown trial](rust/rw02-windows-services.md#partial-windows-tray-registration).
+
 The Fedora x64 portal client now decodes a selected directory URI into
 the original Unix filename bytes. At `c7c614f` two installed Flatpak trials
 opened `Grüße #2 %2F` and lost access after revocation while the control

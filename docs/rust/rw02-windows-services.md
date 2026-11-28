@@ -727,6 +727,18 @@ sequences. The first combined native observations are recorded below.
 
 ### Partial Windows tray registration
 
+A background start also needs an ordinary way to quit when the Shell refuses
+the initial icon. The canonical editor exposes **Beenden** (German) or **Quit**
+(English) while the tray is unavailable. The button uses the existing owner
+shutdown path. The native Windows observer starts the paired editor and worker
+on a private input desktop, waits for two inventory passes and locates the
+visible German button on the primary window using UI Automation. It invokes
+that button with the launcher's command pipe still open and verifies the
+original worker exit, primary drain, profile cleanup and return to the
+original console. The observer requires the real Shell refusal, including its
+receiver and registration token. [Native observer](../../tools/rust-qa/windows-launcher/window_quit.py)
+· [UI Automation action](../../tools/rust-qa/windows-launcher/window-quit.ps1).
+
 Explorer can accept the icon before the separate version-4 handshake
 finishes. An isolated API model returned success for `NIM_ADD`, failure
 for `NIM_SETVERSION` and failure for the attempted `NIM_DELETE`. With
