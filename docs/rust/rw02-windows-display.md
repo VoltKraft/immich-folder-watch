@@ -108,6 +108,42 @@ filename trials passed on both hosts. Each architecture still requires
 a mixed-DPI desktop and an actual RDP session.
 [x64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996554328) · [ARM64 original](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45548715758/artifacts/14996337844).
 
+### ARM64 source-monitor focus at 3d55500
+
+On the Windows 11 ARM64 runner at `3d55500`, the canonical and retained
+GUI each reported one available and active 1024 × 768 target at 96 DPI,
+on the unlocked console in WTS session 2, protocol 0. Both field readers
+found the normal filename on the original window. Both initial focus
+trials failed at the guarded pointer click before the first image. The
+earlier reports did not record whether the point was covered, whether
+the cursor moved there, or whether Windows accepted the click. Their
+SHA-256 values were `020f5bfa5e7c4b00e1ed0a848eef787ad5f59fb58f8591cc95c2faf400e0becb`
+and `f8c9ff0a88db569821e26691c3df9c8e55ffe91846baf25a63a8d1da404c6135`.
+[Original ARM64 reports and logs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105348/artifacts/15244658835).
+
+The display supervisor now reads the window under the verified field
+center. If another window covers it, the supervisor can temporarily put
+the test window in the topmost band while the initial observer takes
+focus. It requires the same visible window, PID, input desktop, WTS
+transport, geometry and monitor. The supervisor restores the original
+non-topmost band before the frame capture, including on observer failure.
+The field observer records whether the foreground request and guarded
+click succeeded. The PNG comparison still requires focus, the real UI
+Automation text and unobstructed field pixels on the original HWND.
+[Display supervisor](../../tools/rust-qa/windows-display/run.py) ·
+[Field observer](../../tools/rust-qa/windows-display/field.ps1).
+
+The local Intel x64 KVM host has a Windows Server x64 guest. For native
+Windows ARM64 mixed-DPI and RDP measurements, Microsoft documents local
+Windows 11 guests on Arm hardware and Windows Arm64 VMs on Azure that
+accept a Remote Desktop connection. No such dedicated host or subscription
+has been provided for this project. GitHub documents the native Windows
+ARM64 runner label. The original observations above capture the display and
+transport actually supplied to this job.
+[Microsoft Windows on Arm VM options](https://learn.microsoft.com/en-us/windows/arm/iso) ·
+[Azure Arm64 VM and RDP](https://learn.microsoft.com/en-us/windows/arm/create-arm-vm) ·
+[GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
 ### Required observations on a disposable native desktop
 
 Use a dedicated Windows x64 or ARM64 test VM with the matching MSVC build

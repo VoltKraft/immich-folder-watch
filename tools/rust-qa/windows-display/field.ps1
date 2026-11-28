@@ -84,10 +84,13 @@ try {
     if ($Phase -ne 'Read') {
         if (-not [IfwObservedWindow]::OnInputDesktop()) { throw 'The observer is outside the current input desktop.' }
         if ($Phase -eq 'Prime') {
-            [void][IfwObservedWindow]::SetForegroundWindow($handle)
+            $result.foregroundRequest = [IfwObservedWindow]::SetForegroundWindow($handle)
             try { $field.SetFocus() } catch { $result.setFocusUnavailable=$true }
             if (-not (Field-Focused)) {
-                if (-not [IfwObservedWindow]::ClickOwnedControl($handle,$SubjectId,[int]($r.Left+$r.Width/2),[int]($r.Top+$r.Height/2))) {
+                $x=[int]($r.Left+$r.Width/2); $y=[int]($r.Top+$r.Height/2)
+                $result.pointOwnedBeforeClick=[IfwObservedWindow]::SubjectAt($handle,$SubjectId,$x,$y)
+                $result.ownedClick=$result.pointOwnedBeforeClick -and [IfwObservedWindow]::ClickOwnedControl($handle,$SubjectId,$x,$y)
+                if (-not $result.ownedClick) {
                     throw 'The owned foreground field could not acquire focus.'
                 }
             }

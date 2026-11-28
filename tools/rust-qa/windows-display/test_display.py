@@ -13,7 +13,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 import zlib
 
 DRIVER = runpy.run_path(str(Path(__file__).with_name("run.py")))
@@ -32,6 +32,66 @@ def png(path, width, height, changed):
 
 
 class DisplayTests(unittest.TestCase):
+    def source_desktop(self, hit, *, topmost=False, expose=True):
+        api = Mock()
+        state = {"hit": hit, "topmost": topmost}
+        def owner(window, out):
+            out._obj.value = {100: 42, 101: 42, 200: 43}.get(window, 0)
+            return int(out._obj.value != 0)
+        def order(window, pid, value):
+            self.assertEqual((window, pid), (100, 42))
+            state["topmost"] = value
+            if value and expose:
+                state["hit"] = 101
+            return True
+        api.owner.side_effect = owner
+        api.point_window.side_effect = lambda _: state["hit"]
+        api.ancestor.side_effect = lambda h, _: 100 if h == 101 else h
+        api.style.side_effect = lambda *_: 8 if state["topmost"] else 0
+        api.order_subject.side_effect = order
+        return api
+
+    def test_only_a_covered_owned_subject_is_raised_and_original_band_returns_on_failure(self):
+        for failed in (False, True):
+            with self.subTest(failed=failed):
+                api = self.source_desktop(200)
+                proof = {}
+                def observe():
+                    with DRIVER["source_field_order"](api, 100, 42, [11.5, 40, 50, 61], lambda: True, proof):
+                        self.assertEqual(proof["pointAfterRaise"], "subject")
+                        self.assertEqual(proof["point"], [31, 50])
+                        if failed:
+                            raise ValueError("fixture observer exited")
+                if failed:
+                    with self.assertRaisesRegex(ValueError, "observer exited"):
+                        observe()
+                else:
+                    observe()
+                self.assertEqual(api.order_subject.call_args_list, [call(100, 42, True), call(100, 42, False)])
+                self.assertIs(proof["bandRestored"], True)
+
+    def test_visible_missing_or_already_topmost_points_keep_the_original_band(self):
+        for point, topmost, classification in ((101, False, "subject"), (0, False, "unavailable"), (200, True, "other")):
+            with self.subTest(point=point, topmost=topmost):
+                api = self.source_desktop(point, topmost=topmost)
+                proof = {}
+                with DRIVER["source_field_order"](api, 100, 42, [5, 10, 25, 20], lambda: True, proof):
+                    self.assertEqual(proof["initialPointOwner"], classification)
+                api.order_subject.assert_not_called()
+
+    def test_changed_input_session_or_subject_cannot_receive_the_order_request(self):
+        for pid, availability in ((99, [True]), (42, [False]), (42, [True, False]), (42, [True, True, False])):
+            with self.subTest(pid=pid, availability=availability):
+                api = self.source_desktop(200)
+                proof = {}
+                with self.assertRaisesRegex(RuntimeError, "changed"):
+                    with DRIVER["source_field_order"](api, 100, pid, [5, 10, 25, 20], Mock(side_effect=availability), proof):
+                        self.fail("The observer ran on a changed desktop")
+                if len(availability) == 3:
+                    self.assertIs(proof["bandRestored"], True)
+                else:
+                    api.order_subject.assert_not_called()
+
     def test_display_and_text_import_the_hash_used_by_the_field_capture(self):
         shell = (Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
                  if os.name == "nt" else shutil.which("pwsh"))

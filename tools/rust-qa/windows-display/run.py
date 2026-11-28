@@ -1,7 +1,7 @@
 """Measure the selected Windows GUI on the displays and transport of an existing test session."""
 
 import argparse
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 import ctypes as c
 from ctypes import wintypes as w
 import json
@@ -21,7 +21,7 @@ QA, ROOT = HERE.parent, HERE.parents[2]
 sys.path[:0] = [str(QA / "windows-text"), str(QA / "windows-desktop"), str(QA / "windows-performance"), str(QA)]
 from native import Win32, pin_path, start_owned_subject
 from storage.evidence import sha256, write_json
-from win32 import Desktop, check, rect_values
+from win32 import Desktop, GA_ROOT, GWL_EXSTYLE, WS_EX_TOPMOST, check, rect_values
 from worker import hosted, powershell, shared_windows
 from windows_observer import private_gui_environment as environment, private_profile, select_powershell
 from topology import Topology, active_input, contains, physical_coordinates, protocol
@@ -39,6 +39,47 @@ def wait_for(read, label, timeout=35):
             return value
         time.sleep(.075)
     raise TimeoutError("Waiting for " + label)
+
+
+@contextmanager
+def source_field_order(api, hwnd, pid, rect, available, evidence):
+    """Expose a covered source field while priming it, then restore the subject's window band."""
+    x, y = round((rect[0] + rect[2]) / 2), round((rect[1] + rect[3]) / 2)
+
+    def point_owner():
+        hit = api.point_window(w.POINT(x, y))
+        root = api.ancestor(hit, GA_ROOT) if hit else None
+        owner = w.DWORD()
+        if not root or not api.owner(hit, c.byref(owner)):
+            return "unavailable"
+        return "subject" if root == hwnd and owner.value == pid else "other"
+
+    owner = w.DWORD()
+    if not available() or not api.owner(hwnd, c.byref(owner)) or owner.value != pid:
+        raise RuntimeError("The original source window, geometry or input desktop changed")
+    topmost = bool(api.style(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST)
+    evidence.update(point=[x, y], initialPointOwner=point_owner(), originallyTopmost=topmost, raised=False)
+    try:
+        if evidence["initialPointOwner"] == "other" and not topmost:
+            if not available():
+                raise RuntimeError("The source window changed before exposing its covered field")
+            if api.order_subject(hwnd, pid, True) is not True:
+                raise RuntimeError("Windows could not expose the owned source window")
+            evidence["raised"] = True
+            def exposed():
+                if not available():
+                    raise RuntimeError("The input desktop or source geometry changed while exposing the field")
+                evidence["pointAfterRaise"] = point_owner()
+                return evidence["pointAfterRaise"] == "subject"
+            wait_for(exposed, "the source HWND at its field center", timeout=1.5)
+        yield
+    finally:
+        if evidence["raised"]:
+            # order_subject checks the owning PID again, including after a failed observer process.
+            evidence["bandRestored"] = (api.order_subject(hwnd, pid, False) is True and
+                                        not (api.style(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST))
+            if not evidence["bandRestored"]:
+                raise RuntimeError("Windows could not restore the source window's original non-topmost band")
 
 
 def owned_layout(api, display, hwnd, pid):
@@ -257,7 +298,7 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
                 record.update(field_geometry(record, layout, monitor, expected))
                 return record
             initial = TEXT["PLAN"]["initial"]
-            stage("Read", base, source, initial)
+            field = stage("Read", base, source, initial)
             config = inventory["displayConfig"]
             if (config["status"] == "failed" or (config["status"] == "observed" and
                     not any(row.get("monitor") == source["index"] and row["active"] for row in config["paths"]))):
@@ -292,7 +333,11 @@ def measure(target, build_dir, output, profile, report, *, require_interactive, 
                     report["rdpRenderingObserved"] = False
                 report["sourceFrameObserved"] = False
                 try:
-                    prime = stage("Prime", base, source, initial)
+                    order = report["sourceFieldOrder"] = {}
+                    def source_available():
+                        return visible() == hwnd and input_available() and owned_layout(api, display, hwnd, child.pid) == base
+                    with source_field_order(api, hwnd, child.pid, field["rect"], source_available, order):
+                        prime = stage("Prime", base, source, initial)
                     if not prime["focusAtExit"] or prime["textAfter"] != FIRST:
                         raise RuntimeError("Could not establish native filename focus and initial text")
                     on_source = record_frame("SourceFrame", base, source)
