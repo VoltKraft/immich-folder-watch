@@ -932,3 +932,56 @@ restored databases matched the producer bytes, including committed WAL
 data. The incomplete trailing frame after the volume filled did not
 become a committed transaction. Product migration and rollback after
 synchronization remain open. [Native FAT16 adapter results](rw02-filesystem.md#ordinary-fat16-adapter-on-native-windows-2026-11-22).
+
+## Recovery through the existing-profile opener at fc2738f (2026-11-28)
+
+At `9d4d550` the Windows ARM64 recovery job stopped during Clippy with exit
+101. The generated entry point lacked its `preflight` and
+`wal_preflight_cases` siblings and still called the removed
+`initialize_wal` helper. The original result recorded zero recovery cases.
+Its 6,402,165-byte ZIP has SHA-256
+`e2e4278c879f756b3850abf6c6ec804e17d08b8fb04d6775851c38c2b4ef760b`.
+[Failed job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131824393/job/140939177719) · [Original archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46131824393/artifacts/15258197269).
+
+At `fc2738ffb9e59370d24d29b560b190bcf12a7694`, the fault worker closes the
+seed connections and opens the restored database through the reviewed
+existing-profile adapter before its first transaction. On Fedora x64 the six
+portable cases passed all 38 expected command outcomes and 144 C# assertions.
+All six original backups still matched the producer after both readers finished.
+The 172 archived first-party inputs matched Git byte-for-byte, including 76
+shipping Core files. Both debug and release compiler outputs contained the two
+unchanged sibling modules. All 458 hashes in
+`artifacts/rust/storage-faults/module-reconstruction-02/evidence-hashes.json`
+matched. The result and index SHA-256 values are
+`1f92092f2f16831626669d60b433f7de38984f62598460700438ffb4a2750902` and
+`99e9c2426f20ed2e64adedb0946d45ff5295b22a69c0333be5c9b14d1d89d85a`.
+
+On Windows 11 ARM64 build 26200, both readers recovered all eight cases.
+The 48 command outcomes and 208 C# assertions matched expectations. All eight
+original backups retained their producer hashes. The 6,912,390-byte ZIP matched
+the Actions SHA-256
+`47c9d867d9877540d8adaf7aa15d385a1788a1bd5e1e519c76b324920035c02f`.
+All 525 indexed files matched. Of the 172 archived recovery sources, 89
+matched Git directly and 83 matched with Windows checkout line endings. All
+ten provider sources and both compiled copies of each sibling module matched.
+[Native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46133265148/job/140942910321) · [Original recovery ZIP](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46133265148/artifacts/15257629708).
+
+| FAT16 case | Volume serial | Detached image SHA-256 |
+| --- | ---: | --- |
+| Sensitive | 652312112 | `8004b49fc79a822f2e1eecf3969fead2821c61f99594d21ba3469888bd9b5a4e` |
+| Insensitive | 503728800 | `006f114a18037a90b2fa7af94d992ad1fdc03886cd86afe46a32d80340faf3f7` |
+
+Each 16-MiB virtual disk reached zero free bytes, Win32 error 112 and SQLite
+error 13. After the owned filler was released, the restored database on each
+volume matched its 45,056-byte original backup. Both detach calls returned
+zero and both volume GUIDs disappeared. An offline read of each final image
+confirmed the disk signature, FAT serial, free cluster count and restored
+database bytes. Reconstruction of each initial image from the archived FAT16
+template and per-run identity reproduced its original hash.
+
+The final provider opened and reopened file ID 232000 on volume 503728800
+across the rename. The GUID read back through the private NTFS mount matched
+the owned volume. After cleanup, its file inventory and 15,499,264 free bytes
+matched the baseline and the detached image. The probe, mount directory and
+volume mount paths were gone. The provider receipt has SHA-256
+`7ca6cb4b85512b9b451ef0aca94e6d213d38f9c881dba68f299ac122300146f0`.
