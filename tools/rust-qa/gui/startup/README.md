@@ -107,8 +107,9 @@ and source-reconstruction contracts.
 ## Full source, feature and notice audits
 
 The [report driver](full_audit.py) runs the existing full GUI audit twice per
-target. The ordinary path first reproduces the checked-in report SHA-256,
-including unpacked archive comparisons. The opt-in `--startup-vendor` path
+target. It reconstructs the ordinary GUI from `c63d91c` and compares its
+full report, including unpacked archives, with that revision's pinned
+SHA-256. The opt-in `--startup-vendor` path
 then checks the staged manifest, lock, three first-party source trees and
 the 385-package directory-source receipt. For the local YAML dependency it
 records the Rust library target, `src/lib.rs`, the manifest SHA-256 and the
@@ -152,3 +153,31 @@ README. The staged verifier rejected an additional README change in a
 private copy and a substituted YAML manifest path. These are source audits
 for four Cargo targets on Fedora x64. The runtime measurements retain
 the platform scope described above.
+
+### Current YAML library at bb3afd5
+
+Add `--current-yaml` to the command above and select a fresh output
+directory. The driver reconstructs the composed GUI twice from Git, first
+with the library at `c63d91c`, then with the library at `bb3afd5`.
+The two source trees differ in `yaml/src/anchors.rs` and `yaml/src/model.rs`.
+Both runs use the original 385-package registry and the same composed lock.
+
+| Cargo target | Packages | Current full report SHA-256 |
+| --- | ---: | --- |
+| Linux x64 | 251 | `9e254bf981615bc4f473a9e7c0aa131226274fc3be1fee5a74075b38ebbba286` |
+| Linux ARM64 | 250 | `7125d9c1a9e2531973e7596f4df6072c660064c715c37003e234b0b1d51cc96d` |
+| Windows x64 | 135 | `79a0ed7a1e0ca41324862e43a95fa17182140a36a18af5726f90b9249e7d5763` |
+| Windows ARM64 | 135 | `1e74eb803d67b0f21e7e9545bc1705ef0673ceb789f60284036d7b854734ab89` |
+
+Fedora x64 resolved all four Cargo targets offline. The two Linux reports
+changed only the source revision and source tree digest in the first-party
+YAML library row. Its source SHA-256 is
+`7c317d1ec009960a6ec7c279539c5380358de956b9846fde7a18ddc0b579f450`.
+The Windows reports reproduced their controls byte-for-byte. All eight
+reports passed the package and feature exclusions.
+The local comparison is
+`artifacts/rust/combined-profile/editor-language-updated-audits-01/results.json`,
+SHA-256 `a74296e184c2beb765fc5c40df93f97e493ed48f63fc1435d2b0f4df2ac1c3c3`.
+A separate reconstruction of the ordinary and staged historical controls
+also passed in `editor-language-original-replay-02/results.json`,
+SHA-256 `241940404be98ef5427830997f3319990babb3387faef138a54b0cd9b373db68`.

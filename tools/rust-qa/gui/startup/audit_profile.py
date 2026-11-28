@@ -7,8 +7,15 @@ from gui.startup.vendor import RECEIPT_SHA256
 from sources import yaml_prepare
 
 QA = Path(__file__).resolve().parents[2]
+ROOT = QA.parents[1]
 BASE = "c63d91c42eae9f71f07a2d1816214a1e16609ef8"
+UPDATED = "bb3afd5bb27becb6ab1143861196acc004b9556a"
+UPDATED_YAML = "7c317d1ec009960a6ec7c279539c5380358de956b9846fde7a18ddc0b579f450"
 LOCK = "bdda6dc843f34b90bbe9efd99c84e994fd293a5d6ad88c52f6c70ceb8ea97679"
+ORDINARY_LOCK = "6716b1cc5835c1fbec9c9485773bdacfd63c4f5d01568a9aa94a8839c2e81d25"
+ORDINARY_GUI = ("tools/rust-qa/gui", "aa1d480aebc839c4c5a742be3a547af19273739bcd6634c36afd556a353139ed",
+                "04a43e887aa4440b29a87b9d36e545e51dbc39f36c388a4bc24b3544ba2d6205")
+ORDINARY_LINUX_FEATURES = (235, "657eb6625ab78dad9cc9c2da0fe9714c880dd2b4b61345f540ac358def514ce0")
 # Release compiler source snapshots in the reviewed native.json from 75283a3.
 LOCAL = {
     "native-gui-assessment": ("tools/rust-qa/gui", "40293313b276c9023e69b75741d356af9388c29f80566a892a2e08c0201d85fb",
@@ -27,14 +34,40 @@ FEATURES = {
 
 
 class StartupAudit:
-    def __init__(self, manifest, vendor, target):
+    @classmethod
+    def for_canonical(cls, manifest, vendor, target):
+        """Require this checkout's composed manifest and the reviewed current YAML library."""
+        return cls(manifest, vendor, target, canonical=True)
+
+    def __init__(self, manifest, vendor, target, *, canonical=False):
         self.gui = manifest.parent
         self.project = self.gui.parents[2]
         self.vendor = vendor.resolve(strict=True)
+        valid_root = self.project == ROOT if canonical else (
+            self.project.name == "project" and self.project.is_relative_to(ROOT / "artifacts/rust"))
         if (target not in FEATURES or manifest != self.project / "tools/rust-qa/gui/Cargo.toml"
-                or not self.project.is_relative_to(QA.parents[1] / "artifacts/rust")
-                or source_profile.sha(self.gui / "Cargo.lock") != LOCK):
-            raise ValueError("Expected the previously qualified staged editor and lock")
+                or self.project.resolve() != self.project or not valid_root):
+            raise ValueError("Expected the selected canonical GUI or an isolated staged project")
+        lock = source_profile.sha(self.gui / "Cargo.lock")
+        allowed = LOCAL.copy()
+        count, digest = FEATURES[target]
+        self.yaml_revision = BASE
+        if lock == ORDINARY_LOCK and not canonical:
+            allowed.pop("ifw-yaml-assessment")
+            allowed["native-gui-assessment"] = ORDINARY_GUI
+            if "linux" in target:
+                count, digest = ORDINARY_LINUX_FEATURES
+        elif lock == LOCK:
+            path, manifest_sha, _ = LOCAL["ifw-yaml-assessment"]
+            actual = source_profile.tree_info(self.project / path / "src")["sha256"]
+            if actual == UPDATED_YAML:
+                self.yaml_revision = UPDATED
+                allowed["ifw-yaml-assessment"] = (path, manifest_sha, actual)
+            elif canonical:
+                raise ValueError("The canonical GUI requires the reviewed current YAML sources")
+        else:
+            raise ValueError("The GUI lock differs from the reviewed source profile")
+        self.local_sources = allowed
         if self.vendor.parts[-3:] != ("registry", "src", "reviewed"):
             raise ValueError("Use the reviewed startup registry directory")
         inventory = self.vendor.parents[2] / "registry-sources.json"
@@ -42,7 +75,7 @@ class StartupAudit:
             raise ValueError("Wrong original 385-package source inventory")
         self.registry = json.loads(inventory.read_bytes())
         self.source_roots = {}
-        for name, (path, manifest_sha, source_sha) in LOCAL.items():
+        for name, (path, manifest_sha, source_sha) in allowed.items():
             root = self.project / path
             if (root.resolve() != root or (root / "Cargo.toml").is_symlink()
                     or source_profile.sha(root / "Cargo.toml") != manifest_sha
@@ -50,7 +83,6 @@ class StartupAudit:
                     or (root / "build.rs").exists()):
                 raise ValueError(f"The staged first-party sources differ for {name}")
             self.source_roots[name] = root
-        count, digest = FEATURES[target]
         self.features = {"packages": count, "nativeFeatureSetsSha256": digest}
 
     def local(self, package):
@@ -61,13 +93,14 @@ class StartupAudit:
             raise ValueError(f"Unexpected first-party dependency {name}")
         if name == "native-gui-assessment":
             return {"assessmentWorkspaceMember": True}
-        row = {"repositoryManifest": LOCAL[name][0] + "/Cargo.toml"}
+        path, manifest_sha, source_sha = self.local_sources[name]
+        row = {"repositoryManifest": path + "/Cargo.toml"}
         if name == "ifw-yaml-assessment":
             libraries = [(t["name"], Path(t["src_path"]).resolve()) for t in package["targets"] if t["kind"] == ["lib"]]
             if libraries != [("ifw_yaml_assessment", root / "src/lib.rs")]:
                 raise ValueError("Cargo did not select the reviewed YAML library")
-            row["firstPartyLibrary"] = {"revision": BASE, "manifestSha256": LOCAL[name][1],
-                                        "sourcesSha256": LOCAL[name][2], "entry": "src/lib.rs"}
+            row["firstPartyLibrary"] = {"revision": self.yaml_revision, "manifestSha256": manifest_sha,
+                                        "sourcesSha256": source_sha, "entry": "src/lib.rs"}
         return row
 
     def filtered(self, package, checksum):
