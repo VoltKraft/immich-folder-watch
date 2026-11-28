@@ -489,6 +489,22 @@ The SHA-256 of its evidence manifest is
 
 ### Tray watcher replacement and menu delivery through the installed Flatpak
 
+At `e772fd0` the installed GUI-only trial passed on native Ubuntu x64 and
+ARM64. On both desktops the original proxy (PID 54, `:1.6`) registered the
+item with two successive watchers. Two secondary launches and the new
+watcher's Open action reopened XID 4194306. Quit ended the four original
+processes and uninstall emptied each private installation. The observed
+Open and Quit request serials were 59 and 64 on x64, and 53 and 58 on ARM64.
+Independent readback verified all 21 evidence manifest entries per target,
+the original executable against its compiler receipt and the 31 compiler
+and 14 observer inputs against the Git revision. Both loaded Vulkan driver
+hashes and both ICD hashes matched their signed native graphics deployments.
+
+| Native Ubuntu archive | Original ZIP SHA-256 |
+| --- | --- |
+| [x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46115612832/artifacts/15252316088) | `528e839d75494ae617e30a3481cf7972b39cbf7e17cf576ed5b299ad87585061` |
+| [ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46115612832/artifacts/15251393684) | `44ac0bcd8f5f6f56f607fe3d75602585c8b60856a8a6e5d603775819d40d8ae5` |
+
 The optional menu trial runs after the two installed second launches. It
 closes the original X11 window again, waits for the original watcher to exit
 and starts a new watcher process on the same private session bus. A separate

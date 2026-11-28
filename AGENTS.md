@@ -324,6 +324,8 @@ to reconcile project decisions, defaults, and recorded state.
   Verify [tray delivery across watcher replacement](docs/rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak)
   against the original proxy and reopened window. The [native Plasma menu](docs/rust/rw02-plasma.md#native-ubuntu-tray-menu-and-worker-restart-at-9487dbe)
   also exercises worker restart on Ubuntu x64 and ARM64.
+  For an [installed tray restart with live inventory](docs/rust/rw02-instance.md#restart-and-quit-from-the-installed-rust-tray-with-live-inventory),
+  verify both worker identities, the replacement scans and the return to the signed GUI.
   Run [old/new activation checks](docs/rust/rw02-instance.md) against the pinned
   shipping sources. The actual Windows IPC names require a disposable runner.
   For [Windows WPF-primary activation](tools/rust-qa/windows-msi-interop/reverse/README.md),

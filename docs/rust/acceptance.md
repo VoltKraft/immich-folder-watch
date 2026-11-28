@@ -84,6 +84,14 @@ restored the original window and Quit ended the GUI, its wrappers and
 the proxy. The private installation was empty after uninstall.
 [Installed Flatpak menu and process evidence](rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak).
 
+The same GUI-only trial passed on native Ubuntu x64 and ARM64 at
+`e772fd0`. Each original ZIP, signed runtime and loaded driver matched
+its receipt. The separate installed Fedora trial replaced its live worker
+through the exported menu, verified both scans by the new worker and
+returned the original profile to the signed 3.0.4 GUI after Quit.
+[Ubuntu archives](rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak) ·
+[Fedora worker lifetimes](rw02-instance.md#restart-and-quit-from-the-installed-rust-tray-with-live-inventory).
+
 Windows Server 2022 x64 at `47fe26d` showed the registered background-start
 icon and its acknowledged color change at the same point. At `3c4d62c` the
 same hosted image delivered the Shell callback, showed and focused the

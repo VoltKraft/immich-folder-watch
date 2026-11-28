@@ -175,7 +175,11 @@ against the checkout's Git objects and the worker against its native build
 digest. It verifies the detached signatures before the two applications
 share a disposable profile and loopback peer.
 
-The workflow passes `--hosted-runtime` with the verified Platform
+The workflow passes `--tray-worker-restart` to exercise the exported Restart
+and Quit actions while the installed Rust GUI inventories the two synthetic
+files. The [installed tray observation](rust/rw02-instance.md#restart-and-quit-from-the-installed-rust-tray-with-live-inventory)
+identifies the original and replacement workers and the return to the signed GUI.
+The workflow also passes `--hosted-runtime` with the verified Platform
 deployment and `--rust-backup` with the completed offline storage result
 to the preceding `assess.py` command. In the `rust-installed-handover`
 artifact, `inputs.json` identifies the executables, signed release and

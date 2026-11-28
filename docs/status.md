@@ -87,6 +87,15 @@ X11 window through the exported menu and Quit ended all four original
 processes. Both installed second launches and the final uninstall passed.
 [Installed Flatpak menu and native identities](rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak).
 
+At `e772fd0` the installed GUI-only trial also passed on Ubuntu x64 and
+ARM64. Both original archives matched their Actions digests. On Fedora
+the separate worker-enabled trial replaced the original worker through
+the installed menu, observed two scans and returned to the signed 3.0.4
+GUI after Quit. The Ubuntu installed handover now requests this additional
+worker trial.
+[Ubuntu artifacts](rust/rw02-instance.md#tray-watcher-replacement-and-menu-delivery-through-the-installed-flatpak) ·
+[Fedora worker result](rust/rw02-instance.md#restart-and-quit-from-the-installed-rust-tray-with-live-inventory).
+
 On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
 GUI from a background start and reopened its original window after close.
 Both windows gained keyboard focus and kept their inventory worker.

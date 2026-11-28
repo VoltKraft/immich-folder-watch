@@ -505,7 +505,7 @@ jobs:
           /usr/bin/python3 -B -m unittest discover -s tools/RustCompatibilityOracle/installed/interop -p test_assess.py
           /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/interop/assess.py \
             --gui-build artifacts/rust/gui-build --inventory-subject artifacts/rust/performance/subjects/graphics-ci \
-            --shipping-upload --rust-backup "artifacts/rust/storage-native/installed-$NATIVE_TARGET" \
+            --tray-worker-restart --shipping-upload --rust-backup "artifacts/rust/storage-native/installed-$NATIVE_TARGET" \
             --hosted-runtime "$PLATFORM_DEPLOYMENT"
 
       - name: Retain the installed handover, original WAL and returned database
