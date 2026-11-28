@@ -65,6 +65,14 @@ def native_results(databases, inputs):
     if (actual.keys() != {'state.db', 'state.db-journal'} or journal['RejectedVersion'] != 99
             or journal['SourceBefore'] != actual or journal['SourceAfter'] != actual):
         raise ValueError('The refused schema or finalized rollback journal bytes differ')
+    protected = rust['ReadOnlyExisting']
+    actual = {p.name: sha256(p) for p in (databases / 'supported-read-only').iterdir() if p.is_file()}
+    if (protected['Observed'] is not True or 'state.db' not in actual
+            or protected['SourceBefore'] != actual or protected['SourceAfter'] != actual):
+        raise ValueError('The supported read-only database or its original bytes differ')
+    supported = [row for row in rust['QuiescentWalPreflight'] if row['Case'] == 'supported-without-index']
+    if len(supported) != 1 or supported[0]['OpenedValue'] != 1 or supported[0]['WriteRolledBack'] is not True:
+        raise ValueError('The writable WAL profile did not roll back its provisional update')
     expected = [{'Case': name, 'Version': version, 'Value': version} for name, version in
                 [('newer-with-index', 99), ('newer-without-index', 99), ('supported-without-index', 1)]]
     if (rust['Os'] != 'windows' or rust['Arch'] != 'x86_64' or rust['SQLiteSourceId'] != inputs['sqlite']['source_id']
