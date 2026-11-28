@@ -2,6 +2,8 @@
 
 The [Server 2025 x64 console and RDP trial](#standard-user-console-and-rdp-handover-on-windows-server-2025-x64)
 passed under an ordinary account. The corresponding ARM64 result remains open.
+The [installed 3.0.4 comparison](#installed-304-worker-in-another-session)
+found that admission also depends on which version starts first.
 
 The native writer opens one pre-existing empty file and calls Rust’s `File::try_lock`. The test requires two processes with the same account SID in distinct Windows OS sessions, refusal in both directions and orderly release followed by reacquisition. The historical old/new coordinator and installed handover have their own evidence. [Rust guard](../../tools/rust-qa/instance/main.rs) · [Old/new activation](rw02-instance.md)
 
@@ -414,3 +416,123 @@ contains both attempts, the original build ZIP, guest session receipts and
 | Original observation ZIP | `bea955d0b5fc9c60afc84723c728020fccfbbed624e1daebc3e1d03fd1b1a94f` |
 | Guest `result.json` | `fffc44bd377fce4c996ed4e49d92a2d00de057a2ae41dee1bbb15357836b968c` |
 | Independent `replay.json` | `e490c9afa9d4e17251d36a82a37d48adf343602f99b636f16c932308eb6fd517` |
+
+## Installed 3.0.4 worker in another session
+
+On November 27–28, 2026, the original 3.0.4 x64 MSI ran on a local Windows
+Server 2025 VM. The same ordinary user had an active console (session 3)
+and RDP desktop (session 2). WTS confirmed both desktops and each process
+token confirmed the SID, session, medium integrity and ordinary privileges.
+The MSI SHA-256 was
+`419938c3fec0c113bf0f33dbf1a9bd4a6748df1e7930acb20fec5fc3f265a187`.
+The installed executable SHA-256 was
+`b8354424bd6c6eba133bb7939ce0de42afbe234bcbb77853b30c25dd645f8675`.
+The native Rust probe used the shared GUI admission functions. An
+administrator provisioned the synthetic VM. Both applications ran as
+the test user. [Shared admission code](../../tools/rust-qa/gui/src/win32_instance.rs)
+· [Native probe](../../tools/rust-qa/instance/cross-session/msi_endpoint.rs).
+
+| First process | Observed outcome |
+| --- | --- |
+| Rust in the console | Rust PID 4488 owned the admission endpoint and Rust PID 8388 held the separate writer guard. While both were alive, the installed WPF process in RDP (PID 6808) uploaded the synthetic PNG. The loopback peer returned HTTP 201 and the installed worker committed the matching SQLite row. |
+| Installed WPF in RDP | During the original WPF upload, the Rust process in the console (PID 9136) observed Win32 error 231 (`ERROR_PIPE_BUSY`). Windows identified the existing pipe server as PID 8728, the installed process which owned the active upload. That worker completed the request and committed the matching row. |
+
+The detached readback decoded the native TCP owner rows, parsed the original
+multipart bodies, verified the 69-byte PNG, and reopened each captured
+SQLite database with its original WAL. It matched the MSI installer log,
+observer sources and native executables to each archive. The initial WPF-first
+observer stopped when it encountered error 231. The repeat also checked the
+existing server PID before accepting that result.
+[Observer](../../tools/rust-qa/instance/cross-session/msi_sessions.py)
+· [Detached readback](../../tools/rust-qa/instance/cross-session/replay_msi_sessions.py).
+
+| Launch order | Original native compiler ZIP SHA-256 | Original VM observation ZIP SHA-256 |
+| --- | --- | --- |
+| Rust first | [`f14e064f7246e5e386dc2b4d0d793ea80f28e5293d5f90445d6dc3b967b6b31d`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46066266349/artifacts/15230643789) | `88595311660227babaa15d749288ab91a917d75e34ccdb544279d3b1909611c6` |
+| WPF first | [`c0ebe49184496b7b18e6146e4cf0fcaedae24d6a68ea39fbad5654ea6a38cfaf`](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46096614452/artifacts/15242684323) | `080b802b519132f1da1fe526d6f77f68502873277df8b542a39cd3310ca9b424` |
+
+To verify the preserved evidence, run these commands from the rewrite checkout.
+The original ZIPs retain their Windows member paths. The verifier reads
+them directly and writes its report to standard output.
+
+```bash
+qa=tools/rust-qa/instance/cross-session
+base=artifacts/rust/local-windows-server-2025-x64
+first=$base/20261127/msi-cross-session
+second=$base/20261128/msi-cross-session
+python3 "$qa/replay_msi_sessions.py" "$first/initial-observations.zip" "$first/endpoint.zip" \
+  f14e064f7246e5e386dc2b4d0d793ea80f28e5293d5f90445d6dc3b967b6b31d rust-first
+python3 "$qa/replay_msi_sessions.py" "$second/first-config-observer/observations.zip" "$second/endpoint.zip" \
+  c0ebe49184496b7b18e6146e4cf0fcaedae24d6a68ea39fbad5654ea6a38cfaf wpf-first
+```
+
+The shipping WPF executable decides primary ownership through a
+session-local mutex. It starts its pipe listener and its host separately.
+A new session can therefore pass the mutex check even while another
+session owns the Rust endpoint. A migration which enables Rust sync for
+an existing profile must first drain and close every old worker that can
+use that profile. The installer must also complete the transactional
+replacement of the old launch paths before enabling the new worker.
+If either prerequisite cannot be confirmed, leave synchronization with
+the existing installation and keep Rust sync disabled. Preserve the
+user's configuration and database and verify a rollback with the
+original installed worker. This is a proposed release gate. The two
+process observations cover admission and the synthetic upload.
+[Shipping coordinator](../../src/ImmichFolderWatch.App/Services/SingleInstanceCoordinator.cs)
+· [WPF startup](../../src/ImmichFolderWatch.App/App.xaml.cs)
+· [Installer upgrade and rollback contract](../../packaging/windows/README.md#upgrade-process-safety).
+
+### An exclusive configuration handle during WPF startup
+
+On November 28, 2026, a separate local test used the original installed
+3.0.4 executable, the same x64 native compiler archive at `868739f`, and
+the observer at `da25bf2`. The native probe opened the existing synthetic
+`config.yaml` for reading with Windows share mode zero. It held the same
+handle until the observer explicitly released it. Both participants used
+ordinary tokens for the same account on active console 3 and RDP 5.
+[Native handle](../../tools/rust-qa/instance/cross-session/msi_endpoint.rs)
+· [Configured WPF comparison](../../tools/rust-qa/instance/cross-session/config_guard_msi.py).
+
+| Phase | Observed outcome |
+| --- | --- |
+| Rust held the original config | Windows returned `ERROR_SHARING_VIOLATION` (32) for independent read and read/write opens. The installed WPF process (PID 1132) showed its normal window. Across 12.002 seconds after the window appeared, the peer received zero asset POSTs and the profile contained no sync database. |
+| The Rust probe released the config | A fresh WPF process (PID 5540) on the same RDP desktop uploaded the original PNG to the same local peer. Its TCP owner, HTTP 201 response, exact multipart payload and one committed SQLite row matched. |
+
+The 429-byte config retained volume ID `13001045781266693700`, file ID
+`844424930294279`, and SHA-256
+`d43d39ac31ab7e7bff00cfbd3ed904a5c5a6a11b1bd2cb2eeb43c3478db2e987`
+before the native open, after release and after the positive control.
+The initial observer stopped when the Python runtime returned only
+`EACCES`. Another attempt timed out waiting for the next RDP login.
+The recorded comparison used Win32 `CreateFileW` directly and waited for the
+normal RDP startup hook. Both observers exited zero. The fixture ended only
+its own identified WPF processes after preserving each observation.
+After the evidence was copied and replayed, the guest shut down through
+ACPI. The host confirmed the QEMU process had exited, the loopback RDP
+port was closed, and the scratch disks had no open handles before disposal.
+
+The guest archive SHA-256 is
+`9e7c32042e40d162a89a4a442eaba9c98b2ed02ce3395edc1165fc4fa7f9ac01`.
+The detached readback SHA-256 is
+`3449724f36c3ace3364cfccceebab87c6422cd5746e9d7d122724a55be33244e`.
+The pre-marker refusal came from the earlier run in this installation.
+The readback checks the same original MSI log, ordinary account and native
+binary across the two guest archives. Run it with the shell variables from
+the previous command.
+
+```bash
+python3 "$qa/replay_msi_sessions.py" "$second/config-guard/guard4-observations.zip" "$second/endpoint.zip" \
+  c0ebe49184496b7b18e6146e4cf0fcaedae24d6a68ea39fbad5654ea6a38cfaf config-only \
+  --prior-unmarked "$second/first-config-observer/observations.zip"
+```
+
+The result applies to starting a new WPF process with an existing config.
+The shipping code reads that file before it starts its host. A worker
+which already loaded its configuration can keep running. Applying settings
+also writes the file before restarting the worker. The comparison did not
+exercise Apply, an absent config, or Rust's own atomic config replacement.
+An exclusive handle also denies delete sharing, which an atomic replacement
+of its path needs. Releasing that handle introduces a transition that this
+test did not measure. Keep the installer and worker-drain gate above for
+real profiles. [Shipping config reader](../../src/ImmichFolderWatch.Core/Configuration/AppConfigLoader.cs)
+· [Shipping Apply path](../../src/ImmichFolderWatch.App.Shared/Services/ConfigApplyService.cs).
