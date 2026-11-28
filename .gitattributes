@@ -32,6 +32,7 @@ tools/rust-qa/appearance/** text eol=lf
 tools/rust-qa/plasma/** text eol=lf
 tools/rust-qa/gui/** text eol=lf
 tools/rust-qa/gui/src/tray-icon.argb -text
+tools/rust-qa/gui/flatpak/references/*.bgra.xz binary
 tools/rust-qa/instance/** text eol=lf
 tools/rust-qa/font-coverage/** text eol=lf
 tools/rust-qa/realtime/** text eol=lf
