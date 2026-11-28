@@ -10,8 +10,14 @@ class ProfileReadbackTests(unittest.TestCase):
         ui = {'pid': 45, 'fieldPid': 45, 'created': 80, 'session': 2, 'hwnd': 63,
               'image': r'C:\Program Files\Immich Folder Watch\bin\ImmichFolderWatch.exe',
               'windowName': 'Immich Folder Watch', 'sourceSha256': 'source', 'status': 'read',
-              'sourceCount': 1, 'label': 'Immich-Albumname', 'album': ALBUM, 'runtimeId': [1, 83]}
+              'sourceCount': 1, 'method': 'UIA FocusedElement', 'label': 'Immich-Albumname', 'album': ALBUM, 'runtimeId': [1, 83]}
         verify_ui(ui, wpf, 'source')
+        copied = {**ui, 'method': 'WPF Copy on original window', 'point': [120, 440], 'focus': {'pid': 45},
+                  'clipboard': {'pid': 45, 'owner': 105, 'before': 6, 'after': 7}}
+        verify_ui(copied, wpf, 'source')
+        for clip in ({'pid': 44}, {'owner': 0}, {'after': 6}):
+            with self.subTest(clip=clip), self.assertRaises(ValueError):
+                verify_ui({**copied, 'clipboard': {**copied['clipboard'], **clip}}, wpf, 'source')
         for change in ({'fieldPid': 46}, {'created': 81}, {'hwnd': 62}, {'session': 1}, {'album': ''},
                        {'album': 'Pictures'}, {'sourceCount': 0}, {'sourceSha256': 'other'}):
             with self.subTest(change=change), self.assertRaises(ValueError):

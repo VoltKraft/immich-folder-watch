@@ -10,17 +10,29 @@ from rust_return import ALBUM, ARCHIVE, EXECUTABLE, MEMBERS, REVISION, SCRIPTS, 
 
 def verify_ui(ui, wpf, script_hash):
     token, window = wpf['token'], wpf['window']
-    check(ui['pid'] == ui['fieldPid'] == token['pid'] and ui['created'] == token['created100ns']
+    check(ui['pid'] == token['pid'] and ui['created'] == token['created100ns']
           and ui['hwnd'] == window['window'] and ui['session'] == token['sessionId']
           and ui['image'].lower() == r'c:\program files\immich folder watch\bin\immichfolderwatch.exe'
           and ui['windowName'] == 'Immich Folder Watch' and ui['sourceSha256'] == script_hash
-          and ui['status'] == 'read' and ui['sourceCount'] == 1 and ui['label'] == 'Immich-Albumname'
-          and ui['album'] == ALBUM and bool(ui['runtimeId']), 'The original WPF did not show the edited Rust album')
+          and ui['status'] == 'read' and ui['sourceCount'] == 1 and ui['album'] == ALBUM, 'The original WPF did not show the edited Rust album')
+
+
+    if ui['method'] == 'WPF Copy on original window':
+        clip = ui['clipboard']
+        check(ui['focus']['pid'] == ui['pid'] == clip['pid'] and len(ui['point']) == 2 and clip['owner'] > 0
+              and clip['before'] != clip['after'], 'Missing WPF clipboard ownership or pointer evidence')
+    else:
+        check(ui['method'] in ('UIA FromPoint', 'UIA FocusedElement') and ui['label'] == 'Immich-Albumname'
+              and ui['fieldPid'] == ui['pid'] and bool(ui['runtimeId']), 'Missing original UIA field')
 
 
 def returned(guest, compiler, donor, checkout, yaml):
     receipt = replay(guest, compiler, donor, checkout, require_running_veto=True)
     docs = documents(yaml)
+    with ZipFile(donor) as donor_zip:
+        donor_yaml = GuestArchive(donor_zip).read('wpf-handover/finished-profile/config.yaml')
+        check(ALBUM.encode() not in donor_yaml and donor_yaml not in docs.values(),
+              'The original WPF donor already contained the returned value')
     with ZipFile(guest) as archive:
         z = GuestArchive(archive)
         manifest = read(z, 'guest.json')['obsdvdFiles']
@@ -45,9 +57,11 @@ def returned(guest, compiler, donor, checkout, yaml):
               'The WPF configuration after Quit differs')
         ui = read(z, 'rust-return/uia.json')
         verify_ui(ui, read(z, 'result.json')['restoredWpf'], prepared['scripts']['read_return.ps1'])
+        check(z.read('rust-return/returned-window.png').startswith(b'\x89PNG\r\n\x1a\n'),
+              'Missing native WPF editor capture')
         receipt['rustYamlReturn'] = {'producer': REVISION, 'archive': ARCHIVE, 'sourceDocuments': MEMBERS,
                                      'window': ui['hwnd'], 'album': ui['album'], 'sourceCount': ui['sourceCount'],
-                                     'afterQuit': saved['afterQuit'], 'originalReturned': True}
+                                     'readMethod': ui['method'], 'afterQuit': saved['afterQuit'], 'originalReturned': True}
     return receipt
 
 
