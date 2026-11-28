@@ -114,9 +114,9 @@ def repository_members():
     }
 
 
-def private_gui_input(root, name, approved):
+def private_gui_input(root, name, approved, *, source_root=None):
     from gui import source_profile
-    expected = source_profile.SOURCES / name
+    expected = (source_root or source_profile.SOURCES) / name
     if root != expected or source_profile.tree_info(root) != approved["trees"][name]:
         raise ValueError(f"Private GUI package is outside its reviewed path or changed: {name}")
     extras = {"native": [], "shaders": [], "fonts": []}
@@ -153,20 +153,30 @@ def main():
     parser.add_argument("output", type=Path, help="JSON report in an evidence directory")
     parser.add_argument("--verify-unpacked", action="store_true",
                         help="compare the selected compiler input trees to the authenticated crate archives")
+    parser.add_argument("--startup-vendor", type=Path, metavar="DIRECTORY",
+                        help="audit the qualified staged Linux startup profile using its filtered directory source")
     args = parser.parse_args()
+    if args.startup_vendor and not args.verify_unpacked:
+        parser.error("--startup-vendor requires --verify-unpacked")
     lock = args.manifest.parent / "Cargo.lock"
     entries = tomllib.loads(lock.read_text(encoding="utf-8"))["package"]
     locked = {(p["name"], p["version"], p["source"]): p["checksum"] for p in entries if "checksum" in p}
     manifest = args.manifest.resolve()
     approved = None
-    if manifest == REPOSITORY / "tools/rust-qa/gui/Cargo.toml":
+    staged = None
+    if args.startup_vendor:
+        from gui.startup.audit_profile import StartupAudit
+        from gui import source_profile
+        staged = StartupAudit(manifest, args.startup_vendor, args.target)
+        approved = source_profile.validate()
+    elif manifest == REPOSITORY / "tools/rust-qa/gui/Cargo.toml":
         from gui import source_profile
         approved = source_profile.validate()
     metadata = json.loads(subprocess.check_output(
         ["cargo", "metadata", "--frozen", "--format-version", "1", "--manifest-path", str(manifest)]
     ))
     active = active_features(manifest, args.target)
-    members = repository_members()
+    members = {} if staged else repository_members()
     packages = []
     exclusions = []
     for package in sorted(metadata["packages"], key=lambda p: (p["name"], p["version"])):
@@ -186,17 +196,24 @@ def main():
         if approved is not None and name in approved["trees"]:
             if package["source"] is not None:
                 raise ValueError(f"Expected the reconstructed GUI source for {name}")
-            entry.update(private_gui_input(Path(package["manifest_path"]).resolve().parent, name, approved))
+            entry.update(private_gui_input(Path(package["manifest_path"]).resolve().parent, name, approved,
+                                           source_root=staged.gui / "artifacts/text" if staged else None))
         elif name == "hyper-util" and manifest == REPOSITORY / "tools/rust-qa/realtime/Cargo.toml":
             from realtime import hyper_util_source
             if package["source"] is not None:
                 raise ValueError("Expected the reconstructed hyper-util package")
             entry.update(private_hyper_input(Path(package["manifest_path"]).resolve().parent, hyper_util_source.ARCHIVE))
         elif package["source"] and package["source"].startswith("registry+"):
-            entry.update(archive_inputs(package, locked, args.verify_unpacked))
+            key = name, package["version"], package["source"]
+            filtered = staged.filtered(package, locked[key]) if staged else None
+            entry.update(archive_inputs(package, locked, args.verify_unpacked and filtered is None))
+            if filtered is not None:
+                entry["filteredCompilerSource"] = filtered
         elif package["source"] is None:
             path = Path(package["manifest_path"]).resolve()
-            if members.get(path) == (name, package["version"]):
+            if staged:
+                entry.update(staged.local(package))
+            elif members.get(path) == (name, package["version"]):
                 entry["repositoryManifest"] = path.relative_to(REPOSITORY).as_posix()
             elif package["id"] in metadata["workspace_members"]:
                 entry["assessmentWorkspaceMember"] = True
@@ -213,7 +230,8 @@ def main():
         feature_record = {f"{name} v{version}": sorted(sets) for (name, version), sets in active.items()}
         feature_bytes = json.dumps(feature_record, sort_keys=True, separators=(",", ":")).encode()
         features = {"packages": len(feature_record), "nativeFeatureSetsSha256": hashlib.sha256(feature_bytes).hexdigest()}
-        if features != approved["nativeFeatureReports"][args.target]:
+        expected = staged.features if staged else approved["nativeFeatureReports"][args.target]
+        if features != expected:
             raise ValueError(f"Selected GUI features differ from the reviewed {args.target} inputs")
         report["desktopFontAssets"] = approved["fonts"]
         report["textNotices"] = approved["noticeFiles"]

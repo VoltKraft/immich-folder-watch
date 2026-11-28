@@ -103,3 +103,52 @@ This staged integration leaves adoption by the ordinary cross-platform
 compiler entry points open. The current normal renderer profile, retained
 Windows variants and Linux headless renderer each have their own compiler
 and source-reconstruction contracts.
+
+## Full source, feature and notice audits
+
+The [report driver](full_audit.py) runs the existing full GUI audit twice per
+target. The ordinary path first reproduces the checked-in report SHA-256,
+including unpacked archive comparisons. The opt-in `--startup-vendor` path
+then checks the staged manifest, lock, three first-party source trees and
+the 385-package directory-source receipt. For the local YAML dependency it
+records the Rust library target, `src/lib.rs`, the manifest SHA-256 and the
+digest of the eight-file source tree at `c63d91c`. For `base64 0.23.1` it
+reconstructs the two approved changes from the original archive and checks
+all 38 compiler files and their Cargo checksum manifest. Other registry
+inputs retain the ordinary unpacked-archive check. Both paths verify the
+three separately reconstructed GUI text packages. [Full dependency audit](../../audit-graph.py).
+
+After preparing the stage and directory source above, run the eight audits
+serially with an isolated, offline Cargo home.
+
+```sh
+python3 -B tools/rust-qa/gui/startup/full_audit.py \
+  --stage "$area/startup-build" \
+  --vendor "$area/startup-vendor/registry/src/reviewed" \
+  --output "$area/startup-full-audit"
+```
+
+| Target | Ordinary packages | Staged packages | Staged full report SHA-256 |
+| --- | ---: | ---: | --- |
+| Linux x64 | 235 | 251 | `3e84d4df1f4e63cbac21b98b36d9ab79aa14bafd12702ae5f3b9b9897837b48e` |
+| Linux ARM64 | 235 | 250 | `b2f22a81c6d3683cc124ce751f20187d7c5b90ccd35a5ad5e8c7268d133b2cd6` |
+| Windows x64 | 135 | 135 | `79a0ed7a1e0ca41324862e43a95fa17182140a36a18af5726f90b9249e7d5763` |
+| Windows ARM64 | 135 | 135 | `1e74eb803d67b0f21e7e9545bc1705ef0673ceb789f60284036d7b854734ab89` |
+
+All four ordinary reports reproduced byte-for-byte. Both staged Windows
+reports changed only the top-level lock digest, from `6716b1cc…` to
+`bdda6dc8…`. Every package row, original notice, native file, font and
+shader entry matched its control. Among the existing Linux packages,
+`serde_core 1.0.229` gained a second feature group comprising `default`,
+`result` and `std`. Of the newly selected Linux packages, `core_detect 1.0.0`
+was specific to x64. All eight reports had zero excluded packages or features.
+
+Local originals are under
+`artifacts/rust/combined-profile/editor-language-full-audits-01/`.
+The comparison `results.json` has SHA-256
+`aea72a8efa7c1786e488347f779223e4353f4b1f0e9087db8dd2fcb7c8b35e8d`.
+As negative controls, the ordinary unpacked verifier rejected the filtered
+README. The staged verifier rejected an additional README change in a
+private copy and a substituted YAML manifest path. These are source audits
+for four Cargo targets on Fedora x64. The runtime measurements retain
+the platform scope described above.
