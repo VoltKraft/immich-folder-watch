@@ -41,8 +41,9 @@ python3 -B tools/rust-qa/gui/flatpak-accessibility/build.py \
 ```
 
 For a warm build, `--seed-target` copies the original Cargo target cache into
-the new trial directory. The build uses two jobs and frozen dependencies in
-private offline namespaces. Cargo resolves the source override through
+the new trial directory. The historical build used two jobs and frozen
+dependencies in private offline namespaces. The driver defaults to one
+compiler job. Cargo resolves the source override through
 `metadata --offline`. A structural check allows exactly the replacement of
 the adapter's registry identity in the lock. Comparing every compiled target
 and feature group to the stock stream yielded 310 matching units and verified
@@ -57,6 +58,45 @@ executable are under `artifacts/rust/flatpak-accessibility/second/`.
 | Patched 28-file compiler tree | `5d2c0ad1d4ca2534018a9ede877a77c1c3fd9470c01707ef4bf493ed1ad34f0f` |
 | Derived GUI Cargo.lock | `32398824dd5f297f465cc0809542d828a24cd180c552acfec1180396720c7b76` |
 | Native candidate receipt | `c21f6d98033b6574cc887bc393bf0e7ea77a4845630c9be721acc21194d1d909` |
+
+## Original-source reconstruction for the ordinary language editor
+
+[The shared adapter reconstruction](accesskit_source.py) takes the original
+crate archive, a fresh compiler directory and a fresh notice directory.
+It verifies the published archive and Git revision, applies the existing
+patch, and checks the complete source tree against the
+[measured before-and-after hashes](source-review.json). Both modified Rust
+files match the historically exercised candidate byte-for-byte. The other
+26 original files and the three supplemental notice texts also match. A
+second reconstruction from the archived crate reproduced the same 28 files.
+A truncated archive failed before the helper created either output directory.
+
+The ordinary Fedora x64 editor at `c361c69` supplies its original release
+executable, native compiler stream, full GUI graph, directory-source
+receipt and 40 first-party inputs. Run the candidate with a copy of the
+ordinary release cache and a new output directory.
+
+```sh
+area=artifacts/rust
+registry=1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3
+python3 -B tools/rust-qa/gui/flatpak-accessibility/build.py \
+  --stock "$area/gui-build" --seed-target "$area/gui-build" --jobs 1 \
+  --vendor "$area/gui-registry/$registry/registry/src/reviewed" \
+  --output "$area/flatpak-accessibility/current-replay"
+```
+
+The ordinary upstream executable had SHA-256
+`5357b1f9c71edbd2409257ed503db61e3da50805147de4c07d6c6b6c043677f2`,
+with compiler receipt
+`b01ed1ba88ee393d4184426e1697b7cc5f8bf4c25914ed8b10f0cb55187b58b0`.
+The private relink rebuilt the adapter and the GUI. All 310 compile units
+and feature sets matched the upstream editor after accounting for the
+adapter's source identity. Among the 40 copied first-party inputs only the
+private GUI manifest and its lock changed. The YAML library at `bb3afd5`
+and all editor source files were identical. The private executable had
+SHA-256 `f1e5dd1c830e4ad66292f22c9c6fdc061c9cb4eead40c017331d512a40d6d08c`.
+Its compiler receipt is `artifacts/rust/flatpak-accessibility/current-a4d967d/native.json`,
+SHA-256 `68d808ae984b4e8684df87ce8048b479fe795eed14506300d7354b392eabb3e9`.
 
 ## Installed observations on Fedora x64
 

@@ -1,6 +1,7 @@
 """Reconstruct the private Flatpak AT-SPI trial from the original source-bound editor."""
 import argparse
 from collections import Counter
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -19,12 +20,15 @@ VENDOR = AREA / "combined-profile/editor-language-clean-vendor-01/registry/src/r
 SCOPE = AREA / "flatpak-accessibility"
 RECEIPT = "bfde3d81b0948a70d55221591ec3b57d3a7707a497d889d3758ccbdfbfd1fac0"
 CRATE = "accesskit_unix-0.24.1"
+CURRENT_RECEIPT = "b01ed1ba88ee393d4184426e1697b7cc5f8bf4c25914ed8b10f0cb55187b58b0"
 ARCHIVE = "30d5192871228c54f1b0fb4a85cef000e11a3804f25d2165f14afa0daa67f3f6"
 PATCH = HERE / "application-bus.patch"
 PRIVATE = "artifacts/accesskit_unix"
 TARGET = "x86_64-unknown-linux-gnu"
-sys.path[:0] = [str(QA), str(QA / "combined-profile")]
-from sources import locked, read, sha256, source_config, source_profile, write, yaml_prepare
+sys.path[:0] = [str(HERE), str(QA), str(QA / "combined-profile")]
+import accesskit_source
+from gui.compiler_inputs import linux_project_sources, verify_gui_units
+from sources import locked, read, sha256, source_config, source_profile, write
 from gui.startup import vendor as supply
 
 
@@ -42,58 +46,69 @@ def check_stock(stock):
     return record
 
 
+@dataclass(frozen=True)
+class Original:
+    root: Path
+    units: Path
+    sources: dict
+    receipt_sha: str
+
+
+def original(stock):
+    if (stock / "native.json").is_file():
+        data = check_stock(stock)
+        return Original(stock / "project", stock / "compiler.jsonl", data["sources"], RECEIPT)
+    binary = stock / "release/native-gui-assessment"
+    receipt = binary.with_suffix(".inputs.json")
+    if sha256(receipt) != CURRENT_RECEIPT:
+        raise ValueError("Expected the reviewed ordinary Fedora x64 editor compiler receipt")
+    data = read(receipt)
+    stream, graph = stock / "gui-compiler.jsonl", stock / "gui-graph.json"
+    source_hashes = {p.relative_to(ROOT).as_posix(): sha256(p) for p in linux_project_sources(ROOT)}
+    fonts = ROOT / "rust/assets/fonts"
+    if (data["target"] != TARGET or sha256(binary) != data["binary_sha256"]
+            or sha256(stream) != data["compilerStreamSha256"] or sha256(graph) != data["graphSha256"]
+            or sha256(stock / "gui-registry-sources.json") != supply.RECEIPT_SHA256
+            or data["registryReceiptSha256"] != supply.RECEIPT_SHA256 or data["sources"] != source_hashes
+            or {p.name: sha256(p) for p in fonts.glob("*.ttf")} != data["fonts"]
+            or sha256(fonts / "OFL-1.1.txt") != data["font_notice"]):
+        raise ValueError("The ordinary upstream editor, compiler inputs or feature report changed")
+    features = {p["name"] + " v" + p["version"]: p["featureSets"] for p in read(graph)["packages"]}
+    if verify_gui_units(stream, features) != data["compilerUnits"]:
+        raise ValueError("The ordinary compiler has a different set of units")
+    return Original(ROOT, stream, source_hashes, CURRENT_RECEIPT)
+
+
 def stage(stock, directory, out):
-    record = check_stock(stock)
     project = out / "project"
-    for name in record["sources"]:
+    for name, digest in stock.sources.items():
         dest = project / name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(stock / "project" / name, dest)
+        shutil.copyfile(stock.root / name, dest)
+        if sha256(dest) != digest:
+            raise ValueError(f"Original source differs for {name}")
     gui = project / "tools/rust-qa/gui"
     approved = source_profile.validate()
     for name, expected in approved["trees"].items():
         relative = Path("tools/rust-qa/gui/artifacts/text") / name
-        original = stock / "project" / relative
+        original = stock.root / relative
         if source_profile.tree_info(original) != expected:
             raise ValueError(f"Original text source differs for {name}")
         shutil.copytree(original, project / relative)
     inventory = directory.parents[2] / "registry-sources.json"
     if sha256(inventory) != supply.RECEIPT_SHA256:
         raise ValueError("Expected the source-bound GUI and YAML directory registry")
-    supply.verify_sources(directory, locked(gui) | locked(gui.parent / "yaml"), read(inventory))
+    selected = locked(gui)
+    catalog = read(inventory)
+    if {name + "-" + version for name, version in selected} != set(catalog):
+        raise ValueError("The composed GUI lock must select the complete reviewed registry")
+    supply.verify_sources(directory, selected, catalog)
     archive = directory.parents[1] / "cache/reviewed" / (CRATE + ".crate")
-    files, unexpected = yaml_prepare.source_files(archive, CRATE, ARCHIVE)
-    if unexpected:
-        raise ValueError("The original adapter unexpectedly needs a source filter")
-    crate = gui / PRIVATE
-    for name, data in files.items():
-        path = crate / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-    before = source_profile.tree_info(crate)
-    env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(out)}
-    subprocess.run(["git", "apply", "--no-index", "--whitespace=error", str(PATCH)], cwd=crate, env=env, check=True)
-    changed = {name: {"before": yaml_prepare.digest(data), "after": sha256(crate / name)}
-               for name, data in files.items() if (crate / name).read_bytes() != data}
-    if set(changed) != {"src/context.rs", "src/atspi/bus.rs"}:
-        raise ValueError("Expected only the application connection and activation changes")
-    notices = {}
-    for row in read(ROOT / "rust/audit/gui-inputs.json")["files"]:
-        if Path(row["path"]).name.startswith("accesskit-"):
-            file = ROOT / "rust" / row["path"]
-            if sha256(file) != row["sha256"]:
-                raise ValueError(f"Upstream notice changed: {file.name}")
-            (out / "notices").mkdir(exist_ok=True)
-            shutil.copyfile(file, out / "notices" / file.name)
-            notices[file.name] = row["sha256"]
-    if len(notices) != 3:
-        raise ValueError("Expected the original AccessKit MIT, Apache and Chromium notices")
+    adapter = accesskit_source.reconstruct(archive, gui / PRIVATE, out / "notices")
     with (gui / "Cargo.toml").open("a", encoding="utf-8", newline="\n") as manifest:
         manifest.write(f'accesskit_unix = {{ path = "{PRIVATE}" }}\n')
-    write(out / "adapter.json", {"crate": CRATE, "archiveSha256": ARCHIVE, "sourceRevision": read(crate / ".cargo_vcs_info.json"),
-          "patchSha256": sha256(PATCH), "originalTree": before, "compilerTree": source_profile.tree_info(crate),
-          "files": changed, "notices": notices, "originalReceiptSha256": RECEIPT,
-          "vendorReceiptSha256": sha256(inventory)})
+    write(out / "adapter.json", {**adapter, "originalReceiptSha256": stock.receipt_sha,
+                                 "vendorReceiptSha256": sha256(inventory)})
     return gui
 
 
@@ -143,7 +158,10 @@ def verify_candidate(binary, receipt, expected_sha):
     native = read(receipt)
     adapter = read(out / "adapter.json")
     gui = out / "project/tools/rust-qa/gui"
-    if (native["target"] != TARGET or native["originalReceiptSha256"] != RECEIPT
+    pins = read(accesskit_source.REVIEW)
+    if (native["target"] != TARGET or native["originalReceiptSha256"] not in (RECEIPT, CURRENT_RECEIPT)
+            or adapter != {**pins, "originalReceiptSha256": native["originalReceiptSha256"],
+                           "vendorReceiptSha256": supply.RECEIPT_SHA256}
             or sha256(binary) != native["binarySha256"] or sha256(out / "compiler.jsonl") != native["unitsSha256"]
             or sha256(out / "adapter.json") != native["adapterSha256"] or sha256(PATCH) != adapter["patchSha256"]
             or source_profile.tree_info(gui / PRIVATE) != adapter["compilerTree"]
@@ -153,7 +171,8 @@ def verify_candidate(binary, receipt, expected_sha):
     return binary, receipt, native["sources"]
 
 
-def build(stock, directory, out, seed):
+def build(stock, directory, out, seed, jobs):
+    stock = original(stock)
     gui = stage(stock, directory, out)
     toolchain = AREA / "toolchain/bin"
     compiler = subprocess.check_output([sys.executable, QA / "check-toolchain.py", TARGET, "--rustc",
@@ -161,14 +180,14 @@ def build(stock, directory, out, seed):
     target = out / "target"
     target.mkdir()
     if seed:
-        subprocess.run(["cp", "-a", "--reflink=auto", str(seed) + "/.", str(target)], check=True)
+        subprocess.run(["cp", "-a", "--reflink=auto", str(seed / "release"), str(target)], check=True)
     home = out / "cargo-home"
     home.mkdir()
     env = {**os.environ, "CARGO_HOME": str(home), "CARGO_NET_OFFLINE": "true", "CARGO_TARGET_DIR": str(out / "layout"),
            "PATH": str(toolchain) + os.pathsep + os.environ["PATH"]}
     subprocess.run([toolchain / "cargo", "metadata", "--format-version", "1", "--offline",
                     *source_config(directory)], cwd=gui, env=env, stdout=subprocess.DEVNULL, check=True)
-    check_lock(stock / "project/tools/rust-qa/gui/Cargo.lock", gui / "Cargo.lock")
+    check_lock(stock.root / "tools/rust-qa/gui/Cargo.lock", gui / "Cargo.lock")
     cmd = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv", "--ro-bind", "/usr", "/usr",
            "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/cargo", "--dir", "/test-home"]
     for name in ("/bin", "/lib", "/lib64", "/etc/alternatives", "/etc/ld.so.cache"):
@@ -177,9 +196,11 @@ def build(stock, directory, out, seed):
             cmd += ["--symlink", str(p.readlink()), name]
         elif p.exists():
             cmd += ["--ro-bind", name, name]
+    (out / "passwd").write_text(f"qa:x:{os.getuid()}:{os.getgid()}:Synthetic GUI:/test-home:/bin/false\n")
+    (out / "group").write_text(f"qa:x:{os.getgid()}:\n")
     for local, mount in ((out / "project", "/project"), (directory, "/vendor"), (toolchain.parent, "/toolchain"),
                          (ROOT / "rust/assets/fonts", "/fonts"), (source_profile.FONTS, "/fallback-fonts"),
-                         (stock / "passwd", "/etc/passwd"), (stock / "group", "/etc/group")):
+                         (out / "passwd", "/etc/passwd"), (out / "group", "/etc/group")):
         cmd += ["--ro-bind", str(local), mount]
     for key, value in {"PATH": "/toolchain/bin:/usr/bin", "CARGO_HOME": "/cargo", "HOME": "/test-home",
                        "CARGO_NET_OFFLINE": "true", "CARGO_TARGET_DIR": "/build", "IFW_QA_FONT_DIR": "/fonts",
@@ -187,16 +208,15 @@ def build(stock, directory, out, seed):
         cmd += ["--setenv", key, value]
     cmd += ["--bind", str(target), "/build", "--chdir", "/project/tools/rust-qa/gui", "--", "/toolchain/bin/cargo"]
     with (out / "compiler.jsonl").open("xb") as output:
-        subprocess.run([*cmd, "build", "--release", "--frozen", "--jobs", "2", "--message-format=json-render-diagnostics",
+        subprocess.run([*cmd, "build", "--release", "--frozen", "--jobs", str(jobs), "--message-format=json-render-diagnostics",
                         *source_config("/vendor")], stdout=output, check=True)
     native_units = units(out / "compiler.jsonl", True)
-    if native_units != units(stock / "compiler.jsonl", False):
+    if native_units != units(stock.units, False):
         raise ValueError("Compiler inputs or active features outside the private adapter changed")
     binary = target / "release/native-gui-assessment"
-    data = check_stock(stock)
-    sources = {name: sha256(out / "project" / name) for name in data["sources"]}
+    sources = {name: sha256(out / "project" / name) for name in stock.sources}
     write(out / "native.json", {"target": TARGET, "compiler": compiler, "binarySha256": sha256(binary),
-          "adapterSha256": sha256(out / "adapter.json"), "originalReceiptSha256": RECEIPT,
+          "adapterSha256": sha256(out / "adapter.json"), "originalReceiptSha256": stock.receipt_sha,
           "unitsCount": native_units.total(), "unitsSha256": sha256(out / "compiler.jsonl"), "sources": sources})
     print(binary, flush=True)
 
@@ -206,6 +226,7 @@ if __name__ == "__main__":
     parser.add_argument("--stock", type=Path, default=STOCK)
     parser.add_argument("--vendor", type=Path, default=VENDOR)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--jobs", type=int, choices=(1, 2), default=1)
     parser.add_argument("--seed-target", type=Path, help="Copy the original measured build cache into the private trial")
     args = parser.parse_args()
     out = args.output.resolve()
@@ -215,4 +236,4 @@ if __name__ == "__main__":
     if seed and not seed.is_relative_to(AREA):
         parser.error("Use only an existing private build cache below artifacts/rust")
     out.mkdir(parents=True)
-    build(args.stock.resolve(strict=True), args.vendor.resolve(strict=True), out, seed)
+    build(args.stock.resolve(strict=True), args.vendor.resolve(strict=True), out, seed, args.jobs)
