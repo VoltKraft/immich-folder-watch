@@ -749,12 +749,13 @@ def staged_images(api, root, built_gui, inventory, result):
 
 
 @contextmanager
-def staged_profile(result, api, built_gui, inventory, *, token=None):
+def staged_profile(result, api, built_gui, inventory, *, token=None, local_temp=None):
     token = uuid.uuid4().hex if token is None else token
     if not re.fullmatch(r"[0-9a-f]{32}", token):
         raise ValueError("Expected a synthetic launcher profile token")
     result["profile"] = token
-    with profile_resources(api, Path(os.environ["RUNNER_TEMP"]), token, result) as (root, stack):
+    parent = local_temp if local_temp is not None else Path(os.environ["RUNNER_TEMP"])
+    with profile_resources(api, parent, token, result) as (root, stack):
         pin_new_marker(stack, api, root / "inventory.owner", token)
         # Keep the deny-delete handle throughout election, delivery and shutdown.
         pid_file = api.create_file(str(root / "launcher.pid"), 0x80000000, 3, None, 1, 0x00200000, None)
@@ -773,6 +774,8 @@ def staged_profile(result, api, built_gui, inventory, *, token=None):
             if key.startswith("IFW_QA_WINDOWS_"):
                 del env[key]
         env.update(IFW_QA_WINDOWS_LAUNCHER="1", IFW_QA_LAUNCHER_SID=recorder.sid())
+        if local_temp is not None:
+            env.update(IFW_QA_LOCAL_WINDOWS="1", IFW_QA_LOCAL_TEMP=str(local_temp))
         result["stagedProfile"] = dict(gui=inventory["gui"], worker=inventory["worker"], trial=trial.name,
                                        configSha256=recorder.sha(trial / "config.yaml"), inventoryToken=token)
         yield gui, trial, env

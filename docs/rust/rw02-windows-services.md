@@ -1238,6 +1238,31 @@ the original message-queue bounds for queued callbacks. A posted message
 with an indistinguishable queue time still has an unresolved order.
 [Windows performance-counter ordering](https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps).
 
+### Retained Explorer activation on the local Windows x64 VM
+
+The [tray compiler](../../.github/workflows/rust-windows-x64-tray-build.yaml)
+packages the canonical and retained GUI, both retained library units and
+their compiler stream, plus the matching inventory worker. Copy the original
+`rust-tray-windows-x64-<revision>` ZIP and its Actions SHA-256 to the
+disposable Server 2025 x64 guest. Use a checkout with the recorded compiler
+sources and an empty output directory location. On the active, unlocked
+console, run this command as the dedicated standard user.
+
+```powershell
+python -B tools/rust-qa/windows-launcher/native_tray.py x86_64-pc-windows-msvc --subject retained --reopen-first --local-archive D:\tray.zip --archive-sha256 $digest
+```
+
+The observer authenticates the local host, account, console and hypervisor.
+It verifies the archive digest before reading either executable, replays
+the compiler records for the application and both libraries, verifies the
+source and graph checksums, and stages the GUI and worker in each new
+token-owned profile. After the private desktop control, it measures first
+the visible start and close, then the background start. Preserve the
+original logs and `result.json` under
+`artifacts/rust/windows-gui-tray-retained/x86_64-pc-windows-msvc/`.
+Each Shell result reports its own provider, callback, window and worker
+observations, including any ordinary-launch fallback.
+
 ## Shipping WPF tray lookup
 
 The shipping WPF application creates a message-only window named

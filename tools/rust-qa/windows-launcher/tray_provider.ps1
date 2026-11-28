@@ -5,14 +5,19 @@ param([Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{32}$')][string]$Token,
       [Parameter(Mandatory)][int64]$Bar)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or
-    $env:RUNNER_OS -cne 'Windows' -or $env:GITHUB_REPOSITORY -cne 'VoltKraft/immich-folder-watch' -or
-    $env:GITHUB_REF -cne 'refs/heads/rewrite/rust' -or $env:IFW_QA_WINDOWS_TRAY -cne '1' -or
+$hosted = $env:GITHUB_ACTIONS -ceq 'true' -and $env:RUNNER_ENVIRONMENT -ceq 'github-hosted' -and
+    $env:RUNNER_OS -ceq 'Windows' -and $env:GITHUB_REPOSITORY -ceq 'VoltKraft/immich-folder-watch' -and
+    $env:GITHUB_REF -ceq 'refs/heads/rewrite/rust'
+$localVm = $env:IFW_QA_LOCAL_WINDOWS -ceq '1' -and !$env:GITHUB_ACTIONS -and !$env:RUNNER_ENVIRONMENT -and
+    [Environment]::MachineName -ieq 'IFW-QA25' -and
+    [Security.Principal.WindowsIdentity]::GetCurrent().Name -ieq 'IFW-QA25\ifw-test'
+if ((!$hosted -and !$localVm) -or $env:IFW_QA_WINDOWS_TRAY -cne '1' -or
     $env:IFW_QA_ISOLATED -cne '1' -or $env:IFW_QA_WINDOWS_LAUNCHER -cne '1' -or
     $env:IFW_QA_BENCHMARK -cne '1' -or $env:IFW_QA_INVENTORY_TOKEN -cne $Token) {
-    throw 'The provider observer requires the isolated hosted launcher trial'
+    throw 'The provider observer requires the isolated native launcher trial'
 }
-$area = Join-Path $env:RUNNER_TEMP "ifw-rw02-$Token"
+$temp = if ($localVm) { $env:IFW_QA_LOCAL_TEMP } else { $env:RUNNER_TEMP }
+$area = Join-Path $temp "ifw-rw02-$Token"
 if ([IO.Path]::GetFullPath($env:IFW_QA_INVENTORY_ROOT) -ine $area -or
     [IO.File]::ReadAllText((Join-Path $area 'inventory.owner')) -cne $Token) { throw 'Unexpected isolated profile' }
 

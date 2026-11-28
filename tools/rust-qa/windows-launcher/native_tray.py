@@ -1019,14 +1019,23 @@ def trial_order(target, subject, reopen_first=False):
     return ("shellLess", "inputDesktop", "inputDesktopReopen") if subject == "retained" else ("shellLess", "inputDesktop")
 
 
-def assess(target, out, result, *, subject="canonical", reopen_first=False):
+def assess(target, out, result, *, subject="canonical", reopen_first=False, local_archive=None):
     files = (Path(__file__).resolve(), PROVIDER, launcher.HERE / "tray_msaa.cs", launcher.HERE / "tray_retry.py",
              launcher.QA / "windows-services/tray-overflow.ps1", launcher.QA / "windows-inventory/scan.py",
              launcher.QA / "windows-inventory/subject.py")
     cases = trial_order(target, subject, reopen_first)
     result["caseOrder"] = list(cases)
     result["startedCases"] = []
-    with launcher.native_subject(target, out, result, files, subject=subject) as (api, desk, built_gui, inventory, _revision):
+    if local_archive:
+        import local_tray
+        import tempfile
+        profile_options = {"local_temp": Path(tempfile.gettempdir())}
+        assets = local_tray.subject(launcher, *local_archive, result, (*files, Path(local_tray.__file__),
+                                    launcher.HERE / "observe.py", launcher.HERE / "retained_window.py"))
+    else:
+        profile_options = {}
+        assets = launcher.native_subject(target, out, result, files, subject=subject)
+    with assets as (api, desk, built_gui, inventory, _revision):
         for index, case in enumerate(cases):
             result["startedCases"].append(case)
             state = result[case] = dict(cleanupConfirmed=False)
@@ -1035,7 +1044,7 @@ def assess(target, out, result, *, subject="canonical", reopen_first=False):
                 if case == "inputDesktopReopen":
                     case_out = out / case
                     case_out.mkdir()
-                with launcher.staged_profile(state, api, built_gui, inventory) as (gui, trial, env):
+                with launcher.staged_profile(state, api, built_gui, inventory, **profile_options) as (gui, trial, env):
                     env["IFW_QA_WINDOWS_TRAY"] = "1"
                     env["IFW_QA_TRAY_REOPEN"] = "1" if case == "inputDesktopReopen" else "0"
                     env["IFW_QA_MSAA_ICON"] = "1" if (
@@ -1084,8 +1093,14 @@ def main():
     parser.add_argument("--subject", choices=launcher.SUBJECTS, default="canonical")
     parser.add_argument("--reopen-first", action="store_true",
                         help="Run the retained x64 visible-start, close and reopen case before the background start")
+    parser.add_argument("--local-archive", type=Path, help="original paired tray compiler ZIP on the local QA console")
+    parser.add_argument("--archive-sha256", help="Actions SHA-256 of the complete paired tray compiler archive")
     options = parser.parse_args()
     target = options.target
+    if bool(options.local_archive) != bool(options.archive_sha256):
+        parser.error("--local-archive and --archive-sha256 must be supplied together")
+    if options.local_archive and (target, options.subject) != ("x86_64-pc-windows-msvc", "retained"):
+        parser.error("the local console requires the retained x64 GUI and worker")
     try:
         trial_order(target, options.subject, options.reopen_first)
     except ValueError as exc:
@@ -1095,7 +1110,9 @@ def main():
     out.mkdir(parents=True, exist_ok=False)
     result = {"target": target, "subject": options.subject, "status": "failed"}
     try:
-        result["status"] = assess(target, out, result, subject=options.subject, reopen_first=options.reopen_first)
+        local_archive = (options.local_archive, options.archive_sha256) if options.local_archive else None
+        result["status"] = assess(target, out, result, subject=options.subject, reopen_first=options.reopen_first,
+                                  local_archive=local_archive)
     except Exception as exc:
         result["failures"] = launcher.failures(exc)
     finally:
