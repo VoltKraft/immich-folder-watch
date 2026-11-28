@@ -88,11 +88,8 @@ impl Control {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum ControlId {
-    Filename,
-    Password,
-    Language,
+fn editor_ids() -> [egui::Id; 2] {
+    [egui::Id::unique("filename"), egui::Id::unique("password")]
 }
 
 struct Model {
@@ -113,7 +110,8 @@ struct Model {
     german: bool,
     passes: u64,
     graphics: graphics::Graphics,
-    last_focus: Option<ControlId>,
+    last_focus: Option<egui::Id>,
+    selections: [Option<egui::text::CCursorRange>; 2],
     restore_focus: bool,
 }
 
@@ -265,11 +263,23 @@ impl Drop for Window {
         {
             self.model.borrow_mut().root_window = std::sync::Weak::new();
         }
-        *self
+        let wake = self
             .control
             .window
             .lock()
-            .expect("window wake mutex poisoned") = None;
+            .expect("window wake mutex poisoned")
+            .take();
+        let mut model = self.model.borrow_mut();
+        if model.lifecycle.shutdown() == Shutdown::Running
+            && let Some(wake) = wake
+        {
+            // Only carry character positions across window destruction. Undo history stays with the widget.
+            model.selections = editor_ids().map(|id| {
+                egui::TextEdit::load_state(&wake.context, id)
+                    .and_then(|state| state.cursor.char_range())
+            });
+            model.restore_focus = model.last_focus.is_some();
+        }
     }
 }
 
@@ -334,6 +344,21 @@ impl eframe::App for Window {
         windows_style::apply(ui, palette);
         let mut model = self.model.borrow_mut();
         model.passes += 1;
+        if model.restore_focus && ui.input(|input| input.focused) {
+            if let Some(id) = model.last_focus {
+                ui.memory_mut(|memory| memory.request_focus(id));
+            }
+            // TextEdit collapses an unfocused selection. Restore the ranges
+            // on the pass that gives the active editor its keyboard focus.
+            for (id, selection) in editor_ids().into_iter().zip(model.selections) {
+                if let Some(range) = selection {
+                    let mut state = egui::text_edit::TextEditState::default();
+                    state.cursor.set_char_range(Some(range));
+                    state.store(ui.ctx(), id);
+                }
+            }
+            model.restore_focus = false;
+        }
         ui.ctx()
             .accesskit_node_builder(egui::accesskit_root_id(), |root| {
                 root.set_label("Desktop input probe")
@@ -343,55 +368,56 @@ impl eframe::App for Window {
             if let Some(notice) = model.graphics.notice(de) {
                 ui.label(notice);
             }
-            let label = ui.label(if de { "Dateiname" } else { "Filename" });
-            let field = egui::TextEdit::singleline(&mut model.filename);
-            #[cfg(windows)]
-            let field = windows_style::control(palette, windows_style::TextRole::Window, field);
-            let filename = ui.add(field).labelled_by(label.id);
-            #[cfg(target_os = "windows")]
-            if let Some(sample) = model.ime_sample.take() {
-                native_gui_assessment::report_filename_mode(
-                    _frame,
-                    sample,
-                    de && filename.has_focus() && ui.input(|input| input.focused),
-                    ui.output(|output| output.ime.is_some()),
-                );
-            }
-            let label = ui.label(if de { "Kennwort" } else { "Password" });
-            let field = egui::TextEdit::singleline(&mut model.password).password(true);
-            #[cfg(windows)]
-            let field = windows_style::control(palette, windows_style::TextRole::Window, field);
-            let password = ui.add(field).labelled_by(label.id);
-            if password.changed() {
-                println!("EDIT masked chars={}", model.password.chars().count());
-            }
-            let button = egui::Button::new(if de { "English" } else { "Deutsch" });
-            #[cfg(windows)]
-            let button = windows_style::control(palette, windows_style::TextRole::Button, button);
-            let language = ui.add(button);
-            if language.clicked() {
-                model.german = !de;
-                if let Some(language) = model.tray_language.as_ref() {
-                    language.set_german(model.german);
-                }
-            }
-            let controls = [
-                (ControlId::Filename, filename),
-                (ControlId::Password, password),
-                (ControlId::Language, language),
-            ];
-            if model.restore_focus && ui.input(|input| input.focused) {
-                if let Some((_, response)) = controls
-                    .iter()
-                    .find(|(id, _)| Some(*id) == model.last_focus)
-                {
-                    response.request_focus();
-                }
-                model.restore_focus = false;
-            }
-            if let Some((id, _)) = controls.iter().find(|(_, response)| response.has_focus()) {
-                model.last_focus = Some(*id);
-            }
+            ui.scope_builder(
+                egui::UiBuilder::new().scope_id(egui::Id::unique("editor-controls")),
+                |ui| {
+                    let [filename_id, password_id] = editor_ids();
+                    let label = ui.label(if de { "Dateiname" } else { "Filename" });
+                    let field = egui::TextEdit::singleline(&mut model.filename).id(filename_id);
+                    #[cfg(windows)]
+                    let field =
+                        windows_style::control(palette, windows_style::TextRole::Window, field);
+                    let filename = ui.add(field).labelled_by(label.id);
+                    #[cfg(target_os = "windows")]
+                    if let Some(sample) = model.ime_sample.take() {
+                        native_gui_assessment::report_filename_mode(
+                            _frame,
+                            sample,
+                            de && filename.has_focus() && ui.input(|input| input.focused),
+                            ui.output(|output| output.ime.is_some()),
+                        );
+                    }
+                    let label = ui.label(if de { "Kennwort" } else { "Password" });
+                    let field = egui::TextEdit::singleline(&mut model.password)
+                        .password(true)
+                        .id(password_id);
+                    #[cfg(windows)]
+                    let field =
+                        windows_style::control(palette, windows_style::TextRole::Window, field);
+                    let password = ui.add(field).labelled_by(label.id);
+                    if password.changed() {
+                        println!("EDIT masked chars={}", model.password.chars().count());
+                    }
+                    let button = egui::Button::new(if de { "English" } else { "Deutsch" });
+                    #[cfg(windows)]
+                    let button =
+                        windows_style::control(palette, windows_style::TextRole::Button, button);
+                    let language = ui.add(button);
+                    if language.clicked() {
+                        model.german = !de;
+                        if let Some(language) = model.tray_language.as_ref() {
+                            language.set_german(model.german);
+                        }
+                    }
+                    if !model.restore_focus
+                        && let Some(focused) = [filename, password, language]
+                            .iter()
+                            .find(|response| response.has_focus())
+                    {
+                        model.last_focus = Some(focused.id);
+                    }
+                },
+            );
         });
         model.graphics.finish_ui_for_test();
     }
@@ -558,6 +584,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         passes: 0,
         graphics: graphics::Graphics::new(),
         last_focus: None,
+        selections: [None; 2],
         restore_focus: false,
     }));
     let result = supervise(

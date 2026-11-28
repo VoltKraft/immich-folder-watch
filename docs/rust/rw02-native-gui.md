@@ -1032,6 +1032,55 @@ and assistive technology on the remaining targets still require observations.
 [Source-bound desktop evidence](../../tools/rust-qa/gui/evidence/native-linux-x64.sha256)
 and [native speech observer](../../tools/rust-qa/gui/screen_reader.py).
 
+## Filename selection after a normal close and second launch
+
+On 2026-11-28 the Fedora x64 Mutter observer selected `üße` backwards in
+`Grüße – Sommer.jpg` using Home, Right and Shift+Left. AT-SPI reported the
+focused filename, caret 2 and range [2, 5). After Alt+F4 and an ordinary
+second launch, the earlier executable kept the draft but lost widget focus,
+reported caret -1 and exposed no selection. Its primary PID and D-Bus owner
+survived and the second process exited with status zero. A first repair
+restored focus and caret but still lost the selection. The pinned egui
+TextEdit collapses a selection painted before its widget receives focus.
+
+The [window implementation](../../tools/rust-qa/gui/src/main.rs) saves the
+directional character ranges when the native window is released. On the
+first pass with native input focus it requests the stored widget and
+restores the ranges before drawing the controls. The [AT-SPI observer](../../tools/rust-qa/gui/desktop_input.py)
+reads the filename again, extends the selection with Shift+Left, and types
+`x`. Both backends retained the focused filename, caret 2 and range [2, 5)
+on reopening. Shift+Left moved the caret to 1 and extended the range to
+[1, 5). Typing produced `Gx – Sommer.jpg`, caret 2 and an empty selection.
+Mutter assigned native focus to its replacement surface. The private X
+server has no window manager, so the observer gave the same reopened X11
+window keyboard focus before reading the widget. Orca produced audio on
+both desktops. Anthy committed `あ` through XIM on X11 and through
+`zwp_text_input_v3` on GNOME Wayland.
+
+The previous executable has SHA-256
+`8c8bfba1496d0b74424e6c316de6f8d58a488e6ebec6e89643384de88aecfb12`.
+The fixed executable has SHA-256
+`322179b55c18912b694d713418a42832b0ace67d5b8c3422c5e216da9a9b8e7f`.
+The native evidence below is retained under `artifacts/rust/gui-run`.
+
+| Observation | File | SHA-256 |
+| --- | --- | --- |
+| Earlier Mutter selection loss | `wayland-v8f2336q/selection-reopen.json` | `5343d41e0a371b2661ccd9794da0507586da965dac3f984caf7d495c3dc51e70` |
+| Fixed Mutter input and Orca | `wayland-fythrjvq/results.json` | `70ac1ccb3b54cef91d9a2b3af211c9a534865432794ed1752ad383a7bd00a03a` |
+| Fixed X11 input, Orca and Anthy | `x11-c13jbqjr/results.json` | `05a63a382f4b0532a723d8cac9c4fd55260217b9241309a43ab5f0fa930de6af` |
+| Fixed GNOME Wayland Anthy | `wayland-bbswld7p/results.json` | `e52bc56e5bb2076916bd267102baf2895aedb9016cf93eb1f0131b5d0265e84e` |
+
+Run the three observers with the same native release binary.
+
+```sh
+gui_build=artifacts/rust/gui-editor-selection
+python3 -B tools/rust-qa/gui/build.py --output "$gui_build" --jobs 2
+gui_binary="$gui_build/release/native-gui-assessment"
+python3 -B tools/rust-qa/gui/native.py --binary "$gui_binary" --backend wayland --input --screen-reader
+python3 -B tools/rust-qa/gui/native.py --binary "$gui_binary" --backend x11 --input --ime --screen-reader
+python3 -B tools/rust-qa/gui/native.py --binary "$gui_binary" --backend wayland --wayland-ime
+```
+
 ## Reproduction
 
 At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed
