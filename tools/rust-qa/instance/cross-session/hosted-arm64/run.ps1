@@ -18,6 +18,7 @@ if (!(Test-Path -LiteralPath $original -PathType Leaf) -or (Test-Path -LiteralPa
 }
 $uid = [guid]::NewGuid().ToString('N')
 $name = 'ifwqa' + $uid.Substring(0,12)
+$description = "IFW writer $uid"
 $folder = Join-Path $env:ProgramData "IfwWriterArm_$uid"
 $work = Join-Path $folder 'work'
 $taskName = 'IfwQaCross_' + [guid]::NewGuid().ToString('N')
@@ -80,7 +81,7 @@ function Cleanup([scriptblock]$Action, [string]$Label) {
 }
 try {
     $created = New-Item -ItemType Directory -Path $folder -ErrorAction Stop
-    $user = New-LocalUser -Name $name -Password $pwdChars -Description "Disposable IFW writer $uid" -AccountExpires ([DateTime]::Now.AddHours(1))
+    $user = New-LocalUser -Name $name -Password $pwdChars -Description $description -AccountExpires ([DateTime]::Now.AddHours(1))
     $report.accountCreated = $true
     $report.sidSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
         [Text.Encoding]::ASCII.GetBytes($user.SID.Value))).ToLowerInvariant()
@@ -204,7 +205,7 @@ try {
         } 'Profile'
         Cleanup {
             $owned = Get-LocalUser -SID $user.SID
-            if ($owned.Name -cne $name -or $owned.Description -cne "Disposable IFW writer $uid") {throw 'Temporary user identity differs.'}
+            if ($owned.Name -cne $name -or $owned.Description -cne $description) {throw 'Temporary user identity differs.'}
             Remove-LocalUser -SID $user.SID
             $report.accountRemoved = -not (Get-LocalUser | Where-Object SID -eq $user.SID)
         } 'User'
