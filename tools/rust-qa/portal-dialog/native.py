@@ -146,8 +146,12 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
     apps = Path.home() / '.local/share/applications'
     apps.mkdir(parents=True)
     (apps / (APP + '.desktop')).write_text('[Desktop Entry]\nType=Application\nName=Portal assessment\nExec=/probe/portal-dialog-assessment\n')
-    (Path('/tmp/selection') / 'album').mkdir(parents=True)
-    Path('/tmp/selection/album/fixture').write_text('Synthetic portal dialog directory\n')
+    selections = {'select': Path('/tmp/selection/album'),
+                  'select-escaped': Path('/tmp/selection/Grüße #2 %2F')}
+    markers = {'select': 'fixture', 'select-escaped': 'escaped-name-fixture'}
+    for action, folder in selections.items():
+        folder.mkdir(parents=True)
+        (folder / markers[action]).write_text('Synthetic portal dialog directory\n')
     output = Path('/qa/results.json')
     result = {'backend': backend,
         'app_identity': ('installed temporary Flatpak' if flatpak else
@@ -249,7 +253,15 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
             capture = screen(stack, bus)
             exercise(stack, bus, display, record, app, outcome, capture, notification_only)
             return
-        for action in ('cancel', 'select'):
+        service = 'org.freedesktop.portal.Documents'
+        documents_path = '/org/freedesktop/portal/documents'
+        def document_info(doc_id):
+            path, rights = bus.call_sync(service, documents_path, service, 'Info', GLib.Variant('(s)', (doc_id,)),
+                                         None, Gio.DBusCallFlags.NONE, 2000, None).unpack()
+            return os.fsdecode(bytes(path).removesuffix(b'\x00')), rights.get(APP, [])
+
+        grants = {}
+        for action in ('cancel', *selections):
             task, log = app(action)
 
             def parenting():
@@ -259,7 +271,7 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
             link = wait_for(parenting, 6, f'{backend} backend did not parent its {action} dialog')
             record(action, {'parenting': link})
             input_action(display, action)
-            if action == 'select':
+            if action in selections:
                 try:
                     task.wait(timeout=0.7)
                 except subprocess.TimeoutExpired:
@@ -267,29 +279,47 @@ def inside(backend, flatpak, shell, chooser_only, notification_only=False):
             lines = outcome(task, log)
             if chooser_only and 'CHOOSER_UNREGISTERED_HOST' not in lines:
                 raise RuntimeError('The client did not use the unregistered FileChooser-only path')
-            if action == 'select' and (not flatpak) and ('CHOOSER_SELECTED file:///tmp/selection/album' not in lines):
-                raise RuntimeError(f'GTK returned an unexpected selection: {lines}')
-            if action == 'select' and flatpak:
-                grant = next((l for l in lines if l.startswith('DOCUMENT_GRANT '))).split()
-                service = 'org.freedesktop.portal.Documents'
-                path, rights = bus.call_sync(service, '/org/freedesktop/portal/documents', service, 'Info',
-                    GLib.Variant('(s)', (grant[1],)), None, Gio.DBusCallFlags.NONE, 2000, None).unpack()
-                host = os.fsdecode(bytes(path).removesuffix(b'\x00'))
-                if host != '/tmp/selection/album' or 'read' not in rights.get(APP, []):
+            if action in selections:
+                uri, = [line.removeprefix('CHOOSER_SELECTED ') for line in lines
+                        if line.startswith('CHOOSER_SELECTED ')]
+                if not flatpak and uri != selections[action].as_uri():
+                    raise RuntimeError(f'GTK returned an unexpected selection: {lines}')
+            if action in selections and flatpak:
+                _, doc_id, reported_path = next(line for line in lines if line.startswith('DOCUMENT_GRANT ')).split(' ', 2)
+                app_path = Path(os.environ['XDG_RUNTIME_DIR']) / 'doc' / doc_id / selections[action].name
+                if (reported_path != str(app_path) or uri != app_path.as_uri()
+                        or 'DOCUMENT_ENTRY ' + markers[action] not in lines):
+                    raise RuntimeError('The chooser URI and the decoded application view disagree')
+                host, rights = document_info(doc_id)
+                if host != str(selections[action]) or 'read' not in rights:
                     raise RuntimeError('Documents portal backing or grant recipient disagreed')
-                record('documents',
-                    {'id': grant[1], 'application_view': grant[2], 'backing': host, 'permissions': rights[APP]})
-                bus.call_sync(service, '/org/freedesktop/portal/documents', service, 'RevokePermissions',
-                    GLib.Variant('(ssas)', (grant[1], APP, rights[APP])), None, Gio.DBusCallFlags.NONE, 2000, None)
-                denied = subprocess.run(flatpak_fixture.command('recheck-revoked', grant[1]), capture_output=True,
-                    text=True, check=True, timeout=8)
-                if 'GRANT_REVOKED ' not in denied.stdout:
-                    raise RuntimeError('Fresh Flatpak process did not confirm revoked root')
-                record('revoked', {'fresh_process': denied.stdout.splitlines()})
+                suffix = '-escaped' if action == 'select-escaped' else ''
+                grant = {'id': doc_id, 'uri': uri, 'application_view': reported_path,
+                         'backing': host, 'permissions': rights}
+                grants[suffix] = grant
+                record('documents' + suffix, grant)
             result['steps'][action]['client'] = lines
             record(action, result['steps'][action])
         if chooser_only:
             return
+        for suffix, grant in reversed(grants.items()):
+            bus.call_sync(service, documents_path, service, 'RevokePermissions',
+                GLib.Variant('(ssas)', (grant['id'], APP, grant['permissions'])), None, Gio.DBusCallFlags.NONE, 2000, None)
+            host, remaining = document_info(grant['id'])
+            if host != grant['backing'] or 'read' in remaining:
+                raise RuntimeError('The Documents service did not revoke read access to the selected grant')
+            control = grants[''] if suffix else None
+            args = [control['uri']] if control else []
+            denied = subprocess.run(flatpak_fixture.command('recheck-revoked', grant['uri'], *args),
+                                    capture_output=True, text=True, check=True, timeout=8)
+            observed = denied.stdout.splitlines()
+            if not any(line.startswith('GRANT_REVOKED ') for line in observed):
+                raise RuntimeError('Fresh Flatpak process did not confirm revoked root')
+            if control and ('DOCUMENT_ENTRY ' + markers['select'] not in observed
+                            or f"DOCUMENT_GRANT {control['id']} {control['application_view']}" not in observed):
+                raise RuntimeError('The same Flatpak process could not read the surviving control grant')
+            record('revoked' + suffix, {'uri': grant['uri'], 'remaining_permissions': remaining,
+                                        'fresh_process': observed})
 
         def simple(action):
             task, log = app(action)

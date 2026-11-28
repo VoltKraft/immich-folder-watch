@@ -4,7 +4,7 @@
 use futures_lite::{StreamExt, future};
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use zbus::{
     Connection, MatchRule, MessageStream,
@@ -21,23 +21,9 @@ pub const APP: &str = "org.example.IfwPortalDialog";
 type Options<'a> = HashMap<&'a str, Value<'a>>;
 type Failure = Box<dyn Error>;
 
-fn inspect_grant(uri: &str) -> Result<(), Failure> {
-    let runtime =
-        PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or("No application runtime")?);
-    let mount = runtime.join("doc");
-    let path = Path::new(
-        uri.strip_prefix("file://")
-            .ok_or("Expected a local Documents URI")?,
-    );
-    let parts: Vec<_> = path.strip_prefix(&mount)?.components().collect();
-    let [Component::Normal(id), Component::Normal(basename)] = parts.as_slice() else {
-        return Err(
-            "An application grant requires its document ID and granted directory name".into(),
-        );
-    };
-    if *basename != "album" || id.is_empty() || *id == "by-app" {
-        return Err("Unexpected granted directory identity".into());
-    }
+pub(crate) fn documents_mount() -> Result<PathBuf, Failure> {
+    let mount = PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or("No application runtime")?)
+        .join("doc");
     let mounted = mount.canonicalize()?;
     let mounts = std::fs::read_to_string("/proc/self/mountinfo")?;
     let visible: Vec<_> = mounts
@@ -51,15 +37,22 @@ fn inspect_grant(uri: &str) -> Result<(), Failure> {
     {
         return Err("Returned application directory has no Documents FUSE mount".into());
     }
-    let root = safe_fs::Directory::open_root(path)?;
+    Ok(mount)
+}
+
+pub(crate) fn inspect_grant(uri: &str) -> Result<(), Failure> {
+    let grant = crate::document_uri::parse(uri, &documents_mount()?)?;
+    let root = safe_fs::Directory::open_root(&grant.path)?;
     let entries = root.entries(8)?;
-    if entries.len() != 1
-        || entries[0].name != "fixture"
-        || entries[0].kind != safe_fs::EntryKind::File
-    {
+    if entries.len() != 1 || entries[0].kind != safe_fs::EntryKind::File {
         return Err("Portal directory does not contain the expected synthetic entry".into());
     }
-    println!("DOCUMENT_GRANT {} {}", id.to_string_lossy(), path.display());
+    println!("DOCUMENT_ENTRY {}", entries[0].name.to_string_lossy());
+    println!(
+        "DOCUMENT_GRANT {} {}",
+        grant.id.to_string_lossy(),
+        grant.path.display()
+    );
     Ok(())
 }
 
@@ -104,10 +97,10 @@ async fn request(bus: &Connection, parent: &str, action: &str) -> Result<(), Fai
     } else {
         options.insert("directory", Value::from(true));
         options.insert("multiple", Value::from(false));
-        if action == "select" {
+        if let Some(folder) = selection_folder(action) {
             options.insert(
                 "current_folder",
-                Value::from(b"/tmp/selection/album\0".to_vec()),
+                Value::from(std::ffi::CString::new(folder)?.into_bytes_with_nul()),
             );
             options.insert("accept_label", Value::from("_Use folder"));
         }
@@ -181,7 +174,7 @@ async fn request(bus: &Connection, parent: &str, action: &str) -> Result<(), Fai
             .transpose()?
             .unwrap_or_default();
         println!("CHOOSER_RESPONSE code={code} uri_count={}", uris.len());
-        if action == "select" {
+        if selection_folder(action).is_some() {
             if code != 0 {
                 return Err(
                     format!("Expected accepted folder chooser, got response {code}").into(),
@@ -204,10 +197,20 @@ async fn request(bus: &Connection, parent: &str, action: &str) -> Result<(), Fai
     Ok(())
 }
 
+fn selection_folder(action: &str) -> Option<&'static str> {
+    match action {
+        "select" => Some("/tmp/selection/album"),
+        "select-escaped" => Some("/tmp/selection/Grüße #2 %2F"),
+        _ => None,
+    }
+}
+
 pub async fn run(action: &str, parent: &str) -> Result<(), Failure> {
     let installed = Path::new("/.flatpak-info").is_file();
     let chooser_only = action.strip_prefix("unregistered-host-");
-    if chooser_only.is_some_and(|name| installed || !matches!(name, "cancel" | "select")) {
+    if chooser_only
+        .is_some_and(|name| installed || (name != "cancel" && selection_folder(name).is_none()))
+    {
         return Err("The unregistered host mode accepts only FileChooser actions".into());
     }
     let action = chooser_only.unwrap_or(action);
@@ -228,7 +231,7 @@ pub async fn run(action: &str, parent: &str) -> Result<(), Failure> {
         .await?;
     }
     match action {
-        "cancel" | "select" | "background" | "background-off" => {
+        "cancel" | "select" | "select-escaped" | "background" | "background-off" => {
             request(&bus, parent, action).await?
         }
         "notify" => {

@@ -1,4 +1,4 @@
-name: Rust Linux ARM64 GNOME notification
+name: Rust Linux ARM64 portal grants and GNOME notification
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends bubblewrap dbus python3-gi gir1.2-glib-2.0 \
-            xvfb libxtst6 libxdamage1 libxres1 libwayland-dev libxkbcommon-x11-0 pkg-config \
+            xvfb x11-utils libxtst6 libxdamage1 libxres1 libwayland-dev libxkbcommon-x11-0 pkg-config \
             gnome-shell mutter xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome \
             flatpak ostree fuse3 gnupg mesa-vulkan-drivers libgl1-mesa-dri \
             pipewire wireplumber gstreamer1.0-tools gstreamer1.0-pipewire gstreamer1.0-plugins-good gstreamer1.0-plugins-base \
@@ -53,6 +53,7 @@ jobs:
           export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
           /usr/bin/python3 -B -m unittest discover -s tools/rust-qa/portal-dialog -p 'test_notification.py'
           /usr/bin/python3 -B tools/rust-qa/portal-dialog/build.py --fetch
+          /usr/bin/python3 -B tools/rust-qa/portal-dialog/build.py --test
           /usr/bin/python3 -B tools/rust-qa/portal-dialog/build.py
 
       - name: Install the signed Platform in the disposable runner profile
@@ -74,6 +75,18 @@ jobs:
             --arch aarch64 --revision "$GITHUB_SHA" --run "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
             > "$area/notification-readback.json"
 
+      - name: Open and revoke the two installed X11 directory grants
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: /usr/bin/python3 -B tools/rust-qa/portal-dialog/native.py x11 --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
+      - name: Open and revoke the two installed Wayland directory grants
+        if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: /usr/bin/python3 -B tools/rust-qa/portal-dialog/native.py wayland --flatpak --hosted-runtime "$PLATFORM_DEPLOYMENT"
+
       - name: Retain native observations and sender
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -85,6 +98,10 @@ jobs:
             artifacts/rust/portal-dialog/build-inputs.json
             artifacts/rust/portal-dialog/native-packages.txt
             artifacts/rust/portal-dialog/build/release/portal-dialog-assessment
+            artifacts/rust/portal-dialog/x11-flatpak-*/*.json
+            artifacts/rust/portal-dialog/x11-flatpak-*/*.log
+            artifacts/rust/portal-dialog/wayland-flatpak-*/*.json
+            artifacts/rust/portal-dialog/wayland-flatpak-*/*.log
             artifacts/rust/portal-dialog/gnome-wayland-flatpak-*/*.json
             artifacts/rust/portal-dialog/gnome-wayland-flatpak-*/*.log
             artifacts/rust/portal-dialog/gnome-wayland-flatpak-*/*.png

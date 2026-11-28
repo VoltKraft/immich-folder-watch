@@ -1,6 +1,7 @@
 //! A local native parent window and portal caller for a synthetic session.
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod document_uri;
 mod parent;
 mod portal;
 
@@ -86,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if std::env::var("IFW_QA_ISOLATED").as_deref() != Ok("1") {
         return Err("Use the isolated portal assessment launcher".into());
     }
-    if std::path::Path::new("/tmp/selection/album").try_exists()? {
+    if std::path::Path::new("/tmp/selection").try_exists()? {
         return Err("The portal client could see the private producer path".into());
     }
     let action = std::env::args().nth(1).ok_or("Missing portal action")?;
@@ -97,21 +98,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         println!("APPLICATION_FLATPAK {id}");
         if action == "recheck-revoked" {
-            let id = std::env::args()
+            let uri = std::env::args()
                 .nth(2)
-                .ok_or("Missing revoked document ID")?;
-            if id.is_empty()
-                || id == "by-app"
-                || std::path::Path::new(&id).file_name() != Some(id.as_ref())
-            {
-                return Err("Invalid revoked document ID".into());
+                .ok_or("Missing revoked document URI")?;
+            let grant = document_uri::parse(&uri, &portal::documents_mount()?)?;
+            if let Some(still_granted) = std::env::args().nth(3) {
+                portal::inspect_grant(&still_granted)?;
             }
-            let path =
-                std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").ok_or("No runtime")?)
-                    .join("doc")
-                    .join(id)
-                    .join("album");
-            return match safe_fs::Directory::open_root(&path) {
+            return match safe_fs::Directory::open_root(&grant.path) {
                 Err(error)
                     if matches!(
                         error.kind(),

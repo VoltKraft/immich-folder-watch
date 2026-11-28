@@ -1,5 +1,6 @@
 """Verify reused native dependency inputs and build the isolated application offline."""
 
+import argparse
 import hashlib
 import json
 import os
@@ -24,7 +25,7 @@ def checked_dependencies(path):
         p['version']): p['checksum'] for p in tomllib.loads(path.read_text())['package'] if 'source' in p}
 
 
-def build(lint):
+def build(mode, jobs):
     target = f'{platform.machine()}-unknown-linux-gnu'
     toolchain = ART / 'toolchain'
     info = subprocess.check_output([sys.executable, ROOT / 'tools/rust-qa/check-toolchain.py', target, '--rustc',
@@ -56,10 +57,13 @@ def build(lint):
         'CARGO_HOME', '/cargo', '--setenv', 'CARGO_TARGET_DIR', '/build', '--chdir',
         '/project/tools/rust-qa/portal-dialog', '--', '/toolchain/bin/cargo']
     records = checked_sources(cmd, target, graph)
-    flags = ['clippy', '--all-targets', '--frozen', '--', '-D', 'warnings'] if lint else ['build', '--frozen',
-        '--release', '-j', '8']
+    flags = [mode, '--frozen', '--jobs', str(jobs)]
+    if mode == 'clippy':
+        flags += ['--all-targets', '--', '-D', 'warnings']
+    elif mode == 'build':
+        flags += ['--release']
     subprocess.run([*cmd, *flags], check=True)
-    if lint:
+    if mode != 'build':
         return
     safe = ROOT / 'rust/crates/safe-fs'
     src = [HERE / 'Cargo.toml', HERE / 'Cargo.lock', HERE / 'build.py', *sorted((HERE / 'src').glob('*.rs')),
@@ -69,14 +73,21 @@ def build(lint):
         'binary': digest(output / 'release/portal-dialog-assessment')}
     (OUT / 'build-inputs.json').write_text(json.dumps(report, indent=2) + '\n')
 if __name__ == '__main__':
-    if sys.argv[1:] == ['--fetch']:
+    parser = argparse.ArgumentParser(description=__doc__)
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--fetch', dest='mode', action='store_const', const='fetch')
+    modes.add_argument('--lint', dest='mode', action='store_const', const='clippy')
+    modes.add_argument('--test', dest='mode', action='store_const', const='test')
+    parser.add_argument('--jobs', type=int, default=8)
+    args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error('--jobs must be positive')
+    if args.mode == 'fetch':
         sys.path.insert(0, str(HERE.parent))
         from gui import source_profile
         env = dict(os.environ, CARGO_HOME=str(ART / 'assessment-cache'))
         source_profile.CACHE.mkdir(parents=True, exist_ok=True)
         source_profile.fetch_replay_registry(env)
         subprocess.run(['cargo', 'fetch', '--locked', '--manifest-path', str(HERE / 'Cargo.toml')], env=env, check=True)
-    elif sys.argv[1:] in ([], ['--lint']):
-        build(bool(sys.argv[1:]))
     else:
-        raise SystemExit('Usage: build.py [--fetch | --lint]')
+        build(args.mode or 'build', args.jobs)

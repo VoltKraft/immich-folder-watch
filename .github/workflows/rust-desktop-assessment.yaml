@@ -398,6 +398,7 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' && steps.gui.outcome == 'success' }}
         run: |
           python3 tools/rust-qa/portal-dialog/build.py --lint
+          python3 tools/rust-qa/portal-dialog/build.py --test
           python3 tools/rust-qa/portal-dialog/build.py
 
       - name: Observe X11 folder chooser parenting, selection and refusal
