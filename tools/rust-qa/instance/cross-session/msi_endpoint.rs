@@ -7,6 +7,8 @@ use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle};
 use std::path::PathBuf;
 use std::time::Duration;
 
+mod atomic_config;
+
 #[allow(dead_code)]
 #[path = "../../gui/src/win32_instance.rs"]
 mod local;
@@ -185,6 +187,9 @@ fn main() -> io::Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() == 1 && args[0] == "--hold-synthetic-config" {
         return hold_synthetic_configuration();
+    }
+    if args.len() == 1 && args[0] == "--save-own-synthetic-config" {
+        return atomic_config::trial();
     }
     if !args.is_empty() {
         return Err(io::ErrorKind::InvalidInput.into());

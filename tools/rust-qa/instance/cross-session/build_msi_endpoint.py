@@ -27,7 +27,7 @@ def main():
     source = HERE / "msi_endpoint.rs"
     subject = out / "msi-session-endpoint.exe"
     subprocess.run([rustc, "--edition=2024", "-C", "opt-level=2", "--target", target, source, "-o", subject], check=True)
-    inputs = (source, Path(__file__).resolve(), HERE.parents[1] / "gui/src/win32_instance.rs")
+    inputs = (source, HERE / "atomic_config.rs", Path(__file__).resolve(), HERE.parents[1] / "gui/src/win32_instance.rs")
     receipt = {"revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                "target": target, "executableSha256": sha(subject), "sources": {p.relative_to(ROOT).as_posix(): sha(p) for p in inputs},
                "rustc": subprocess.check_output([rustc, "-vV"], text=True)}
