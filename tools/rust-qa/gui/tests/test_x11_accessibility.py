@@ -62,7 +62,7 @@ class X11TreeTests(unittest.TestCase):
                   self.assertRaises(ui.GLib.Error) as raised):
                 ui.read_x11_tree(120)
             self.assertIs(raised.exception, error)
-            read.assert_called_once_with(120)
+            read.assert_called_once_with(120, False)
             sleep.assert_not_called()
 
     def test_persistent_stale_node_and_absent_or_mislabelled_filename_do_not_pass(self):

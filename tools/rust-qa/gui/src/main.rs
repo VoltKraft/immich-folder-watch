@@ -25,7 +25,7 @@ mod linux;
 mod linux_appearance;
 mod native_window;
 
-use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, WindowIntent};
+use desktop_lifecycle::{DesktopLifecycle, HostCommand, Shutdown, TrayAvailability, WindowIntent};
 use eframe::egui;
 use std::cell::RefCell;
 use std::error::Error;
@@ -415,6 +415,28 @@ impl eframe::App for Window {
                             .find(|response| response.has_focus())
                     {
                         model.last_focus = Some(focused.id);
+                    }
+                    let tray_unavailable = model.lifecycle.tray() == TrayAvailability::Unavailable;
+                    #[cfg(target_os = "linux")]
+                    if tray_unavailable {
+                        ui.label(if model.german {
+                            "Kein Tray-Symbol verfügbar. Beim Schließen läuft die Überwachung weiter. Öffnen Sie das Fenster über den App-Starter erneut."
+                        } else {
+                            "No tray icon is available. Closing the window keeps the watcher running. Reopen the window from the app launcher."
+                        });
+                    }
+                    if cfg!(target_os = "linux") || tray_unavailable {
+                        let button = egui::Button::new(if model.german { "Beenden" } else { "Quit" });
+                        #[cfg(windows)]
+                        let button =
+                            windows_style::control(palette, windows_style::TextRole::Button, button);
+                        let quit = ui.add(button);
+                        if quit.has_focus() && !model.restore_focus {
+                            model.last_focus = Some(quit.id);
+                        }
+                        if quit.clicked() && model.command(Command::Quit) == Some(HostCommand::StopBackground) {
+                            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
                     }
                 },
             );

@@ -244,6 +244,10 @@ def check_input(stack, observer, backend, ime, screen_reader=False):
     details = {"backend": backend, "initial": initial, "tab_order": traversal, "password_accessible_text": masked,
                "after_keyboard_language_switch": english}
     tap(observer, 0xff09)
+    if any(n["name"] == "Quit" and n["role"] in ("push button", "button") for n in english):
+        wait_for(lambda: any(n["name"] == "Quit" and n["focused"] for n in tree()), 3, "Quit focus missing")
+        traversal.append("Quit")
+        tap(observer, 0xff09)
     wait_for(lambda: any(n["name"] == "Filename" and n["focused"] for n in tree()), 3, "Filename focus missing")
     if reader:
         reader.wait_label("Filename")
