@@ -1,4 +1,5 @@
 """Observe a disposable MSI cutover from the original profile owner's RDP session."""
+import argparse
 import os
 from pathlib import Path
 import shutil
@@ -28,7 +29,7 @@ def wait_for_admin(phase):
         time.sleep(.25)
 
 
-def stock_launch(accounts, own, sid, work, *, running_trial=None):
+def stock_launch(accounts, own, sid, work, *, running_trial=None, observer=None):
     with (work / 'wpf.log').open('xb') as output:
         proc = subprocess.Popen([APP], cwd=APP.parent, stdout=output, stderr=subprocess.STDOUT)
         try:
@@ -46,6 +47,12 @@ def stock_launch(accounts, own, sid, work, *, running_trial=None):
                 require(after == active and instance.sha(APP) == APP_SHA,
                         'The refused upgrade disturbed the original WPF desktop or installation')
                 write(work / 'after-refusal.json', after)
+            observation_error = None
+            if observer is not None:
+                try:
+                    observer(work, proc, token, active)
+                except Exception as error:
+                    observation_error = error
             quit_area = work / 'wpf-handover'
             quit_area.mkdir()
             subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-STA', '-File', HERE / 'handover_quit.ps1',
@@ -55,6 +62,8 @@ def stock_launch(accounts, own, sid, work, *, running_trial=None):
                            stdout=output, stderr=subprocess.STDOUT, timeout=45, check=True)
             code = proc.wait(timeout=30)
             require(code == 0, 'The restored WPF failed its ordinary tray Quit')
+            if observation_error is not None:
+                raise observation_error
             return {'token': token, 'window': active, 'exit': code}
         finally:
             if proc.poll() is None:
@@ -62,7 +71,7 @@ def stock_launch(accounts, own, sid, work, *, running_trial=None):
                 proc.wait(timeout=15)
 
 
-def run(disc, work):
+def run(disc, work, *, rust_yaml_return=False):
     profile = Path(os.environ['LOCALAPPDATA']) / 'Immich Folder Watch'
     require(os.name == 'nt' and os.environ['COMPUTERNAME'] == 'IFW-QA25'
             and profile.parent == Path(r'C:\Users\ifw-test\AppData\Local')
@@ -122,7 +131,13 @@ def run(disc, work):
         snapshot = {'profile': hashes, 'preflight': preflight.returncode, 'probeSha256': instance.sha(command),
                     'oldExeSha256': None if absent else APP_SHA, 'oldLaunchWin32Error': 2 if absent else None}
         result['phases'][phase] = snapshot
-        if phase == 'restored':
+        if rust_yaml_return and phase == 'committed':
+            from rust_return import prepare
+            prepare(disc, profile, work, original)
+        if rust_yaml_return and phase == 'restored':
+            from rust_return import reopen
+            result['restoredWpf'] = reopen(accounts, own, sid, profile, work, original, stock_launch)
+        elif phase == 'restored':
             result['restoredWpf'] = stock_launch(accounts, own, sid, work)
         write(work / 'result.json', result)
         (work / (phase + '.ok')).touch(exist_ok=False)
@@ -132,4 +147,9 @@ def run(disc, work):
 
 
 if __name__ == '__main__':
-    run(Path(sys.argv[1]), Path(sys.argv[2]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('disc', type=Path)
+    parser.add_argument('work', type=Path)
+    parser.add_argument('--rust-yaml-return', action='store_true')
+    args = parser.parse_args()
+    run(args.disc, args.work, rust_yaml_return=args.rust_yaml_return)
