@@ -77,6 +77,7 @@ public sealed class IfwIconSurface : IfwSyntheticShellObserver, IDisposable {
     readonly IntPtr receiver, bar;
     readonly long creation, shellCreation;
     IntPtr primaryHandle, shellHandle, originalDpi;
+    bool onlyRestoreShell;
 
     public sealed class Sample {
         public uint pid, shellPid, id = 23;
@@ -160,13 +161,21 @@ public sealed class IfwIconSurface : IfwSyntheticShellObserver, IDisposable {
     public void CheckOriginal() {
         DefaultInput();
         uint status;
-        Require(GetExitCodeProcess(primaryHandle, out status) && status == 259 && GetExitCodeProcess(shellHandle, out status) && status == 259,
-                "One of the retained process identities exited");
-        var cls = new StringBuilder(128);
-        Require(WindowOwner(receiver) == pid && GetClassName(receiver, cls, cls.Capacity) > 0 && cls.ToString() == "IFW RW02 synthetic tray receiver",
-                "The integrated callback window changed");
+        Require(GetExitCodeProcess(shellHandle, out status) && status == 259, "The original Explorer exited");
+        if (!onlyRestoreShell) {
+            Require(GetExitCodeProcess(primaryHandle, out status) && status == 259, "The retained primary exited");
+            var cls = new StringBuilder(128);
+            Require(WindowOwner(receiver) == pid && GetClassName(receiver, cls, cls.Capacity) > 0 && cls.ToString() == "IFW RW02 synthetic tray receiver",
+                    "The integrated callback window changed");
+        }
         Require(FindWindow("Shell_TrayWnd", null) == bar && IsWindowVisible(bar) && WindowOwner(bar) == shellPid && WindowOwner(GetShellWindow()) == shellPid,
                 "The original visible Explorer taskbar changed");
+    }
+    public void RestoreAfterMenuQuit() {
+        uint status;
+        Require(GetExitCodeProcess(primaryHandle, out status) && status == 0, "Expected the original primary to have exited normally through Quit");
+        onlyRestoreShell = true;
+        CheckOriginal();
     }
     static bool Present(IntPtr hwnd) {
         uint cloaked;
@@ -772,6 +781,11 @@ try {
               164 + ([Convert]::ToInt32($Token.Substring(2, 2), 16) -band 63)
               48 + ([Convert]::ToInt32($Token.Substring(4, 2), 16) -band 63))
     $contrast = @($orig | ForEach-Object { 255 - $_ })
+    $menuAction = $env:IFW_QA_LOCAL_TRAY_MENU
+    if ($menuAction -and (!$localVm -or $menuAction -cnotin @('open','restart','quit'))) {
+        throw 'Menu observation requires the local tray comparison.'
+    }
+    if ($menuAction -cin @('restart','quit')) { $orig = $contrast }
     try { $first = Get-Marker $guard $orig $null }
     catch {
         $reason = $_.Exception.GetBaseException()
@@ -877,7 +891,10 @@ try {
         }
     } while ($true)
     Write-Event 'ready' @{surface = $second; provider = $provider.descriptor}
-    if ([Console]::In.ReadLine() -cne 'invoke') { return }
+    $request = [Console]::In.ReadLine()
+    if ($menuAction) {
+        if ($request -cne ('menu-' + $menuAction)) { return }
+    } elseif ($request -cne 'invoke') { return }
     $fresh = Get-Marker $guard $contrast $first
     $current = Get-SelectedProvider $fresh $label $provider.descriptor.method
     if (($current.descriptor | ConvertTo-Json -Compress) -cne ($provider.descriptor | ConvertTo-Json -Compress)) {
@@ -893,6 +910,13 @@ try {
         throw [InvalidOperationException]::new('The exact accessibility provider changed after the attempt receipt')
     }
     $invocationSurface = Get-InvocationSurface $actual $guard $lease.pane $fresh
+    if ($menuAction) {
+        $lease.iconAttempted = $true
+        Write-Event 'menu-target' @{action=$menuAction; surface=$invocationSurface; provider=$actual.descriptor}
+        $finished = [Console]::In.ReadLine()
+        if ($menuAction -ceq 'quit' -and $finished -ceq 'menu-quit-exited') { $guard.RestoreAfterMenuQuit() }
+        return
+    }
     $invoking = $true
     $returnedTick=Invoke-OriginalIcon $lease $actual.pattern { [IfwIconSurface]::GetTickCount64() }
     Write-Event 'invoked' @{startTick=$lease.startTick; returnedTick=$returnedTick; startQpc=$lease.startQpc

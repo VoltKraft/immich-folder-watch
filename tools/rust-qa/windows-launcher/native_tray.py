@@ -143,6 +143,9 @@ def replay_shutdown(log, key, token, report):
                 outstanding = False
                 withdrawals.append(action)
                 awaiting_add = True
+        elif action == "menu.focus" and outstanding:
+            # NIM_SETFOCUS returns focus to the notification area without changing icon ownership.
+            continue
         elif action == "change" and outstanding:
             marker_acks += int(outcome)
         elif action == "shutdown" and outstanding:
