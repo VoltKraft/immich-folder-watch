@@ -384,7 +384,8 @@ mod tests {
     #[test]
     fn private_bus_disconnect_preserves_the_shipping_endpoint_until_supervisor_shutdown()
     -> Result<(), Box<dyn std::error::Error>> {
-        use crate::linux::Primary;
+        use crate::Control;
+        use crate::linux::{Primary, menu, watcher::Watcher};
         use std::io::{BufRead, BufReader};
         use std::process::{Child, Command, Stdio};
         struct Bus(Child);
@@ -416,10 +417,28 @@ mod tests {
             zbus::connection::Builder::address(announced.trim())?.build(),
         )?;
         let guard = dir.runtime()?.claim()?;
+        let (sender, _commands) = std::sync::mpsc::sync_channel(1);
+        let control = Control {
+            sender,
+            window: Default::default(),
+            graphics_attention: Default::default(),
+            appearance: Default::default(),
+        };
+        let watcher = futures_lite::future::block_on(Watcher::start(
+            &connection,
+            control,
+            crate::linux::INSTALLED_NAME,
+        ));
+        let publisher = menu::Publisher::new(connection.clone(), Default::default());
         let primary = Primary {
             connection,
             installed_socket: Some(guard),
+            publisher,
+            watcher,
         };
+        // Retaining a language control across bus loss must allow the primary to drain.
+        let language = primary.tray_language();
+        language.set_german(false);
         bus.0.kill()?;
         bus.0.wait()?;
         futures_lite::future::block_on(primary.closed());
@@ -428,6 +447,7 @@ mod tests {
         probe.set_read_timeout(Some(Duration::from_secs(2)))?;
         assert_eq!(probe.read(&mut [0])?, 0);
         futures_lite::future::block_on(primary.graceful_shutdown());
+        language.set_german(true);
         assert!(!leaf.try_exists()?);
         fs::remove_file(config)?;
         // The deliberately terminated daemon may leave its private bus socket.
