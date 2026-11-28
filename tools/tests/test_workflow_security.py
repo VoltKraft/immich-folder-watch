@@ -140,18 +140,34 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         source = (WORKFLOWS / "rust-windows-arm64-display.yaml").read_text()
         self.assertEqual(re.findall(r"runs-on: (\S+)", source), ["windows-11-arm"])
         self.assertIn("NATIVE_TARGET: aarch64-pc-windows-msvc", source)
-        steps = source.split("      - name: ")
-        canonical, retained, private, private_retained, archive = steps[-5:]
+        default, job = source.split("\njobs:\n", 1)
+        self.assertNotIn("actions: read", default)
+        self.assertIn("    permissions:\n      contents: read\n      actions: read\n", job)
+        steps = dict(step.split("\n", 1) for step in job.split("      - name: ")[1:])
+        canonical = steps["Observe the canonical source-monitor edit"]
+        retained = steps["Observe the retained source-monitor edit"]
+        private = steps["Measure the canonical source frame on a private input desktop"]
+        private_retained = steps["Measure the retained source frame on a private input desktop"]
+        selection = steps["Select the current or requested original ARM64 selection subject"]
+        reopened = steps["Reopen the selected filename in the original ARM64 primary"]
+        archive = steps["Retain both measurements and the original compiler outputs"]
         self.assertIn("windows-display/run.py $env:NATIVE_TARGET --require source-frame", canonical)
         self.assertIn("windows-display/run.py $env:NATIVE_TARGET --retained --require source-frame", retained)
         self.assertIn("windows-display/private_source.py\n", private)
         self.assertIn("windows-display/private_source.py --retained", private_retained)
-        for step in (retained, private, private_retained, archive):
+        for step in (canonical, retained, private, private_retained, selection, archive):
             self.assertIn("!cancelled() && steps.inputs.outcome == 'success'", step)
-        self.assertIn("windows-display/archive_pair.py", steps[-7])
-        self.assertIn("windows-display/venue.py", steps[-6])
+        self.assertIn("windows-display/selection_archive.py $id", selection)
+        self.assertIn("GH_TOKEN: ${{ github.token }}", selection)
+        self.assertEqual(job.count("GH_TOKEN:"), 1)
+        self.assertIn("!cancelled() && steps.selection.outcome == 'success'", reopened)
+        self.assertIn("windows-display/private_selection.py --archive", reopened)
+        self.assertIn("windows-display/private_selection.py\n", reopened)
+        self.assertIn("windows-display/archive_pair.py", steps["Compile both native GUI subjects and archive the corresponding worker"])
+        self.assertIn("windows-display/venue.py", steps["Read the existing Remote Desktop settings and aggregate WTS session states"])
         for path in ("windows-display-inputs/", "windows-display-runs/", "windows-display-retained-runs/",
-                     "windows-display-private/", "windows-display-retained-private/", "windows-display-venue/"):
+                     "windows-display-private/", "windows-display-retained-private/", "windows-display-venue/",
+                     "windows-selection-private/"):
             self.assertIn(path, archive)
 
     def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):

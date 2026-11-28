@@ -24,12 +24,14 @@ on:
         type: string
 
 permissions:
-  actions: read
   contents: read
 
 jobs:
   observe:
     if: github.ref == 'refs/heads/rewrite/rust'
+    permissions:
+      contents: read
+      actions: read
     runs-on: windows-11-arm
     timeout-minutes: 70
     env:
