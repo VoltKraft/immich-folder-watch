@@ -176,12 +176,13 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         combined_compiler = "rust-windows-x64-combined-build.yaml"
         tray_compiler = "rust-windows-x64-tray-build.yaml"
         storage_compiler = "rust-windows-x64-storage-build.yaml"
+        yaml_compiler = "rust-windows-x64-yaml-build.yaml"
         for path in WORKFLOWS.glob("rust-*.yaml"):
             source = path.read_text()
             # Look at runner selections, including inline matrix rows.
             windows = re.findall(r"(?:runs-on|runner|os):\s*['\"]?(windows-[\w.-]+)", source)
             allowed = {"windows-2025"} if path.name in (
-                compiler, gui_compiler, combined_compiler, tray_compiler, storage_compiler) else {"windows-11-arm"}
+                compiler, gui_compiler, combined_compiler, tray_compiler, storage_compiler, yaml_compiler) else {"windows-11-arm"}
             self.assertLessEqual(set(windows), allowed, path.name)
         source = (WORKFLOWS / compiler).read_text()
         commands = re.findall(r"^          python -B (.+)$", source, re.M)
@@ -209,6 +210,12 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
             "--output artifacts/rust/local-vm-inputs/storage",
         ])
         self.check_rust_workflow(storage_compiler, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        yaml_build = (WORKFLOWS / yaml_compiler).read_text()
+        self.assertEqual(re.findall(r"^          python -B (.+)$", yaml_build, re.M), [
+            "tools/rust-qa/yaml/run.py x86_64-pc-windows-msvc --compile-for-local-vm "
+            "--output artifacts/rust/yaml-assessment/runs/local-x64-inputs",
+        ])
+        self.check_rust_workflow(yaml_compiler, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
         ci = (WORKFLOWS / "ci.yaml").read_text().split("  build-windows:\n", 1)[1].split("    steps:", 1)[0]
         self.assertIn("github.ref != 'refs/heads/rewrite/rust'", ci)
         self.assertIn("github.head_ref == 'rewrite/rust'", ci)

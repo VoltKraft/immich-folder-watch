@@ -31,6 +31,10 @@ run_guest(args, cwd=work, check=True)
 Stage new DVDs, result disks and writable guest overlays on the local SSD.
 On this test host `/tmp` is a RAM-backed filesystem.
 
+For the standalone YAML loader, run the [native YAML guest driver](yaml.md).
+It uses the original compiler ZIP for both Rust test harnesses and the
+C# export, Rust comparison and C# readback.
+
 ## Workspace and network
 
 Download the original artifact ZIP without extracting or repacking it.

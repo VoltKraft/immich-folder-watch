@@ -16,7 +16,8 @@ from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[3]
 TARGET = "x86_64-pc-windows-msvc"
-LOCKS = {"workspace": ROOT / "rust/Cargo.lock", "gui": ROOT / "tools/rust-qa/gui/Cargo.lock"}
+LOCKS = {"workspace": ROOT / "rust/Cargo.lock", "gui": ROOT / "tools/rust-qa/gui/Cargo.lock",
+         "yaml": ROOT / "tools/rust-qa/yaml/Cargo.lock"}
 
 
 def digest(path):

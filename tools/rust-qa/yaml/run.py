@@ -33,9 +33,10 @@ def isolated(path: Path, scope: Path = SCOPE) -> Path:
     return path
 
 
-def record_sources(output: Path, fixtures: Path) -> None:
+def record_sources(output: Path, fixtures: Path, extra=()) -> None:
     paths = [ROOT / name for name in ["global.json", "Directory.Build.props", "NuGet.Config",
                                       "rust/toolchain-inputs.json", "tools/rust-qa/check-toolchain.py"]]
+    paths.extend(extra)
     for root in (HERE, ROOT / "src/ImmichFolderWatch.Core", fixtures):
         paths += [path for path in root.rglob("*") if path.is_file()
                   and not {"bin", "obj", "target", "__pycache__"}.intersection(path.relative_to(root).parts)]
@@ -213,6 +214,27 @@ def verify_file_inputs(reference: Path, rust_output: Path, exported: dict, rust:
             raise ValueError(f"Raw YAML file and reader observations differ: {name}")
 
 
+def exchange(binary, dotnet, assembly, fixtures, original, output, target, command):
+    """Export with the native C# loader, move the original profile, then run both readers."""
+    reference = output / "reference"
+    command("csharp-reference", [dotnet, str(assembly), "export", str(fixtures), str(original)])
+    # Replay the archived files after the producer's absolute directory has ceased to exist.
+    shutil.move(original, reference)
+    exported = json.loads((reference / "reference.json").read_text(encoding="utf-8"))
+    if file_digest(reference / "casing.json") != exported["casingSha256"]:
+        raise ValueError("native string reference checksum mismatch")
+    command("rust-roundtrip", [str(binary), str(reference), str(output / "rust-output")])
+    command("csharp-readback", [dotnet, str(assembly), "verify", str(reference), str(output / "rust-output")])
+    rust = json.loads((output / "rust-output/result.json").read_text(encoding="utf-8"))
+    csharp = json.loads((output / "rust-output/csharp-readback.json").read_text(encoding="utf-8"))
+    verify_scalar_fields(exported)
+    verify_file_inputs(reference, output / "rust-output", exported, rust, csharp)
+    if (rust["platform"] != ("windows" if "windows" in target else "linux") or rust["architecture"] != target.split("-")[0]
+            or exported["corpusAssertions"] != 10):
+        raise ValueError("incomplete native YAML results")
+    return exported, rust, csharp
+
+
 def main() -> int:
     inputs = json.loads((HERE / "inputs.json").read_text(encoding="utf-8"))
     parser = argparse.ArgumentParser(description=__doc__)
@@ -221,7 +243,14 @@ def main() -> int:
     parser.add_argument("--cargo-home", type=Path, default=SCOPE / "private-cache")
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--compile-for-local-vm", action="store_true",
+                        help="package native Windows x64 inputs for execution on the local guest")
     args = parser.parse_args()
+    if args.compile_for_local_vm:
+        import local_vm
+        local_vm.require_compiler(args.target)
+    elif args.target == "x86_64-pc-windows-msvc" and os.getenv("GITHUB_ACTIONS"):
+        parser.error("Windows x64 runtime comparisons belong on the local guest")
     identity = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:12]
     output = isolated(args.output or SCOPE / "runs" / f"{args.target}-{identity}")
     acquisition = isolated(args.cargo_home, ROOT / "artifacts/rust")
@@ -267,7 +296,8 @@ def main() -> int:
 
     try:
         command("native-compiler", [sys.executable, str(ROOT / "tools/rust-qa/check-toolchain.py"), args.target])
-        command("filter-tests", [sys.executable, str(HERE / "test_prepare.py")])
+        if not args.compile_for_local_vm:
+            command("filter-tests", [sys.executable, str(HERE / "test_prepare.py")])
         if file_digest(HERE / "Cargo.lock") != inputs["lock_sha256"]:
             raise ValueError("generated YAML lockfile differs from reviewed inputs")
         manifest = json.loads((fixtures / "manifest.json").read_text(encoding="utf-8"))
@@ -277,7 +307,7 @@ def main() -> int:
             path = (fixtures / name).resolve()
             if not path.is_relative_to(fixtures.resolve()) or file_digest(path) != expected:
                 raise ValueError("reviewed fixture checksum or path mismatch")
-        record_sources(output, fixtures)
+        record_sources(output, fixtures, local_vm.build_inputs() if args.compile_for_local_vm else ())
         cargo_manifest = ["--manifest-path", str(HERE / "Cargo.toml")]
         redirect = "import subprocess,sys; p=subprocess.run(sys.argv[2:],stdout=subprocess.PIPE); open(sys.argv[1],'wb').write(p.stdout); sys.exit(p.returncode)"
         acquisition_arguments = ["cargo", "metadata", *cargo_manifest, "--locked", "--format-version", "1"]
@@ -308,10 +338,15 @@ def main() -> int:
             if package["source"] and not Path(package["manifest_path"]).resolve().is_relative_to(vendor.resolve()):
                 raise ValueError("offline build resolved an unfiltered source")
         result["nativeGraphPackages"] = len(graph(metadata))
-        command("format", ["cargo", "fmt", *cargo_manifest, "--", "--check"])
+        if not args.compile_for_local_vm:
+            command("format", ["cargo", "fmt", *cargo_manifest, "--", "--check"])
         common = [*cargo_manifest, *config, "--frozen", "--target", args.target]
         command("clippy", ["cargo", "clippy", *common, "--all-targets", "--", "-D", "warnings"])
-        command("tests", ["cargo", "test", *common, "--", "--show-output"])
+        if args.compile_for_local_vm:
+            kit = output / "guest"
+            local_vm.compile_tests(kit, common, env)
+        else:
+            command("tests", ["cargo", "test", *common, "--", "--show-output"])
         command("release", ["cargo", "build", *common, "--release"])
         binary = work / "target" / args.target / "release" / ("ifw-yaml-assessment.exe" if os.name == "nt" else "ifw-yaml-assessment")
         result["rustExecutableSha256"] = file_digest(binary)
@@ -323,23 +358,12 @@ def main() -> int:
         command("csharp-build", [dotnet, "build", *dotnet_common, "--no-restore", "--configuration", "Release"])
         assembly = work / "dotnet/bin/YamlOracle/release/YamlOracle.dll"
         result["csharpAssemblySha256"] = file_digest(assembly)
-        reference = output / "reference"
-        original = work / "reference"
-        command("csharp-reference", [dotnet, str(assembly), "export", str(fixtures), str(original)])
-        # Replay the archived files after the producer's absolute directory has ceased to exist.
-        shutil.move(original, reference)
-        exported = json.loads((reference / "reference.json").read_text(encoding="utf-8"))
-        if file_digest(reference / "casing.json") != exported["casingSha256"]:
-            raise ValueError("native string reference checksum mismatch")
-        command("rust-roundtrip", [str(binary), str(reference), str(output / "rust-output")])
-        command("csharp-readback", [dotnet, str(assembly), "verify", str(reference), str(output / "rust-output")])
-        result["rust"] = json.loads((output / "rust-output/result.json").read_text(encoding="utf-8"))
-        result["csharp"] = json.loads((output / "rust-output/csharp-readback.json").read_text(encoding="utf-8"))
-        verify_scalar_fields(exported)
-        verify_file_inputs(reference, output / "rust-output", exported, result["rust"], result["csharp"])
-        if (result["rust"]["platform"] != native or result["rust"]["architecture"] != args.target.split("-")[0]
-                or exported["corpusAssertions"] != 10):
-            raise ValueError("incomplete native YAML results")
+        if args.compile_for_local_vm:
+            local_vm.finish_kit(output, kit, result, binary, assembly, fixtures, graph(metadata), inputs)
+            result["status"] = "compiled"
+            return 0
+        _, result["rust"], result["csharp"] = exchange(
+            binary, dotnet, assembly, fixtures, work / "reference", output, args.target, command)
         result["status"] = "passed"
         print(f"YAML assessment passed; upload only: {output}", flush=True)
     except Exception as error:
