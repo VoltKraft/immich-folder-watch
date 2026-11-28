@@ -35,7 +35,7 @@ def replay(folder):
             "Unexpected original observer sources")
     host, case = [read(folder / name) for name in ("host.json", "case.json")]
     require(all(host.get(k) is True for k in ("accountCreated", "accountRemoved", "taskRemoved", "profileRemoved",
-                    "stageRemoved", "serviceRestored", "userProcessesExited")) and not any(k.startswith("cleanupFailure") for k in host)
+                    "stageRemoved", "serviceRestored", "userProcessesExited", "taskFolderRemoved")) and not any(k.startswith("cleanupFailure") for k in host)
             and "error" not in host and host["controllerExit"] == 0, "The isolated host or its cleanup failed")
     require(host["grant"] == {"before":[], "after":["SeBatchLogonRight"]} and
             host["restore"] == {"before":["SeBatchLogonRight"], "after":[]}, "Temporary assignment was not restored")
@@ -51,6 +51,9 @@ def replay(folder):
     require(case["originalBootstrapExit"] == case["schedulerExit"] == case["cleanupExit"] == 0
             and read(folder / "cleanup.json")["cleanupVerified"], "Task or participant exit failed")
     scheduler = read(folder / "scheduler.json")
+    require(host["taskFolderTrusteesMatched"] and re.fullmatch(r"\\IfwWriterArm_[0-9a-f]{32}", host["taskFolder"]) and
+            host["taskFolder"] == scheduler["taskFolder"] == read(folder / "cleanup.json")["taskFolder"],
+            "The scheduled action did not use the owned task folder")
     require(scheduler["registered"] and scheduler["cleanupVerified"] and scheduler["lastTaskResult"] == 0
             and scheduler["definition"]["logonType"] == 2 and scheduler["definition"]["runLevel"] == 0
             and scheduler["definition"]["fixedActionMatched"] and scheduler["definition"]["currentSidMatched"],

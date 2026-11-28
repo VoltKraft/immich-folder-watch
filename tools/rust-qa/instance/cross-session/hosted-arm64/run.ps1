@@ -22,16 +22,17 @@ $description = "IFW writer $uid"
 $folder = Join-Path $env:ProgramData "IfwWriterArm_$uid"
 $work = Join-Path $folder 'work'
 $taskName = 'IfwQaCross_' + [guid]::NewGuid().ToString('N')
+$taskFolderName = "IfwWriterArm_$uid"
 $report = [ordered]@{ revision=$env:GITHUB_SHA; runId=$env:GITHUB_RUN_ID; runAttempt=$env:GITHUB_RUN_ATTEMPT
     runnerSession=$runner.SessionId; credentialSource='random job-local SecureString'; accountCreated=$false
     profileRemoved=$false; taskRemoved=$false; accountRemoved=$false; stageRemoved=$false; serviceRestored=$false
-    userProcessesExited=$false }
+    userProcessesExited=$false; taskFolderRemoved=$false }
 $pwdChars = [Security.SecureString]::new()
 foreach ($char in 'Aa8!'.ToCharArray()) {$pwdChars.AppendChar($char)}
 $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!_-+'
 foreach ($i in 1..48) {$pwdChars.AppendChar($alphabet[[Security.Cryptography.RandomNumberGenerator]::GetInt32($alphabet.Length)])}
 $pwdChars.MakeReadOnly()
-$user = $process = $before = $created = $rightsAttempted = $null
+$user = $process = $before = $created = $rightsAttempted = $taskFolder = $null
 $failed = $false
 function Invoke-BatchAssignment([string]$Action) {
     $raw = & $python -I -B "$PSScriptRoot/batch_account.py" $Action $folder
@@ -39,9 +40,8 @@ function Invoke-BatchAssignment([string]$Action) {
     return ($raw | ConvertFrom-Json)
 }
 function Assert-TaskGone {
-    $service = New-Object -ComObject Schedule.Service
-    $service.Connect()
-    $tasks = $service.GetFolder('\')
+    if (!$taskFolder) {return $true}
+    $tasks = $taskFolder
     try {$task = $tasks.GetTask($taskName)}
     catch {
         if ($_.Exception.GetBaseException().HResult -eq -2147024894) {return $true}
@@ -107,6 +107,20 @@ try {
     [IO.File]::WriteAllText("$folder/launch.json",($launch | ConvertTo-Json))
     $rightsAttempted = $true
     $report.grant = Invoke-BatchAssignment grant
+    $schedule = New-Object -ComObject Schedule.Service
+    $schedule.Connect()
+    $taskRoot = $schedule.GetFolder('\')
+    $folderDacl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;$($user.SID.Value))"
+    $taskFolder = $taskRoot.CreateFolder($taskFolderName, $folderDacl)
+    $report.taskFolder = $taskFolder.Path
+    $descriptor = [Security.AccessControl.RawSecurityDescriptor]::new($taskFolder.GetSecurityDescriptor(4))
+    $allowed = @($descriptor.DiscretionaryAcl | ForEach-Object {$_.SecurityIdentifier.Value})
+    $expected = @('S-1-5-18','S-1-5-32-544',$user.SID.Value)
+    $report.taskFolderTrusteesMatched = $allowed.Count -eq 3 -and !(Compare-Object ($allowed | Sort-Object) ($expected | Sort-Object))
+    if (!$report.taskFolderTrusteesMatched) {throw 'Unexpected trust on the new Scheduler folder.'}
+    if ($taskFolder.Path -cne "\$taskFolderName" -or $taskFolder.GetTasks(1).Count -ne 0 -or $taskFolder.GetFolders(0).Count -ne 0) {
+        throw 'Expected a fresh empty folder for the single standard-user task.'
+    }
     $before = Get-Service seclogon
     $report.serviceBefore = $before.Status.ToString()
     $report.startTypeBefore = $before.StartType.ToString()
@@ -157,6 +171,20 @@ try {
     $pwdChars.Dispose()
     if ($user) {
         Cleanup {$report.taskRemoved = Assert-TaskGone} 'Task'
+        Cleanup {
+            if ($taskFolder) {
+                if ($taskFolder.GetTasks(1).Count -ne 0 -or $taskFolder.GetFolders(0).Count -ne 0) {
+                    throw 'The owned Scheduler folder still contains objects.'
+                }
+                $taskRoot.DeleteFolder($taskFolderName,0)
+                try {[void]$taskRoot.GetFolder($taskFolderName)}
+                catch {
+                    if ($_.Exception.GetBaseException().HResult -in @(-2147024894,-2147024893)) {
+                        $report.taskFolderRemoved = $true
+                    } else {throw}
+                }
+            }
+        } 'TaskFolder'
         Cleanup {
             $owner = "$env:COMPUTERNAME\$name"
             $deadline = [DateTime]::UtcNow.AddSeconds(25)
@@ -225,5 +253,5 @@ try {
     } 'Stage'}
     [IO.File]::WriteAllText("$output/host.json",($report | ConvertTo-Json -Depth 8))
 }
-if ($failed -or !$report.userProcessesExited -or !$report.profileRemoved -or !$report.accountRemoved -or !$report.taskRemoved -or !$report.stageRemoved -or
+if ($failed -or !$report.userProcessesExited -or !$report.profileRemoved -or !$report.accountRemoved -or !$report.taskRemoved -or !$report.taskFolderRemoved -or !$report.stageRemoved -or
     !$report.serviceRestored -or $report.Keys.Where({$_.StartsWith('cleanupFailure')}).Count) {throw 'See the scoped ARM64 host and case receipts.'}
