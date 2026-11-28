@@ -260,25 +260,22 @@ pub fn start_launcher<T>(
     if std::env::var_os("IFW_QA_WINDOWS_LAUNCHER").is_none() {
         return Ok(Launch::Disabled);
     }
-    for (key, value) in [
-        ("IFW_QA_WINDOWS_LAUNCHER", "1"),
-        ("IFW_QA_ISOLATED", "1"),
-        ("RUNNER_ENVIRONMENT", "github-hosted"),
-        ("RUNNER_OS", "Windows"),
-        ("GITHUB_ACTIONS", "true"),
-        ("GITHUB_REPOSITORY", "VoltKraft/immich-folder-watch"),
-        ("GITHUB_REF", "refs/heads/rewrite/rust"),
-    ] {
-        if std::env::var(key).as_deref() != Ok(value) {
-            return Err(io::Error::other(
-                "expected the private native launcher fixture",
-            ));
-        }
+    let (temp, local_vm) = crate::fixture_temp()
+        .ok_or_else(|| io::Error::other("expected the private native launcher fixture"))?;
+    if std::env::var("IFW_QA_WINDOWS_LAUNCHER").as_deref() != Ok("1")
+        || std::env::var("IFW_QA_ISOLATED").as_deref() != Ok("1")
+        || (!local_vm
+            && (std::env::var("GITHUB_REPOSITORY").as_deref()
+                != Ok("VoltKraft/immich-folder-watch")
+                || std::env::var("GITHUB_REF").as_deref() != Ok("refs/heads/rewrite/rust")))
+    {
+        return Err(io::Error::other(
+            "expected the private native launcher fixture",
+        ));
     }
     let token = std::env::var("IFW_QA_INVENTORY_TOKEN").unwrap_or_default();
     let sid = std::env::var("IFW_QA_LAUNCHER_SID").unwrap_or_default();
     let root = PathBuf::from(std::env::var_os("IFW_QA_INVENTORY_ROOT").unwrap_or_default());
-    let temp = PathBuf::from(std::env::var_os("RUNNER_TEMP").unwrap_or_default());
     if !local::valid_sid(&sid)
         || token.len() != 32
         || !token.bytes().all(|b| b.is_ascii_hexdigit())

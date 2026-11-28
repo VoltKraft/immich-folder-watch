@@ -134,7 +134,7 @@ def application_artifact(messages, gui, executable):
     return {"target": target["name"], "crateRoot": "src/main.rs", "output": executable.name, "sha256": sha(output)}
 
 
-def main(target, *, isolated_vm=False):
+def main(target, *, isolated_vm=False, compile_only=False):
     hosted = os.name == "nt" and os.getenv("RUNNER_ENVIRONMENT") == "github-hosted" and os.getenv("GITHUB_ACTIONS") == "true"
     if not (hosted or isolated_windows_vm(isolated_vm)):
         raise ValueError("Build on a native hosted Windows runner or an explicitly selected disposable Windows VM")
@@ -161,9 +161,10 @@ def main(target, *, isolated_vm=False):
     if (lock != ordinary["lockSha256"] or graph != ordinary["graphSha256"] or selected != feature_rows(GUI / "Cargo.toml", target, env)
             or any(source_profile.tree_info(gui / "artifacts/text" / name) != info for name, info in approved["trees"].items())):
         raise ValueError("Unexpected package, feature or text engine change in the retained Windows graph")
-    subprocess.run(["cargo", "fmt", "--manifest-path", manifest, "--", "--check"], env=env, check=True)
-    subprocess.run(["cargo", "clippy", "--manifest-path", manifest, "--frozen", "--all-targets", "--", "-D", "warnings"],
-                   cwd=gui, env=env, check=True)
+    if not compile_only:
+        subprocess.run(["cargo", "fmt", "--manifest-path", manifest, "--", "--check"], env=env, check=True)
+        subprocess.run(["cargo", "clippy", "--manifest-path", manifest, "--frozen", "--all-targets", "--", "-D", "warnings"],
+                       cwd=gui, env=env, check=True)
     compiled = subprocess.check_output(["cargo", "build", "--manifest-path", manifest, "--frozen", "--release",
                                         "--message-format=json-render-diagnostics"], cwd=gui, env=env)
     messages = [json.loads(line) for line in compiled.splitlines()]
@@ -197,5 +198,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", choices=TARGETS)
     parser.add_argument("--isolated-vm", action="store_true", help="build in an explicitly selected disposable Windows VM")
+    parser.add_argument("--compile-only", action="store_true", help="prepare compiler receipts and executable inputs for local VM tests")
     args = parser.parse_args()
-    main(args.target, isolated_vm=args.isolated_vm)
+    main(args.target, isolated_vm=args.isolated_vm, compile_only=args.compile_only)

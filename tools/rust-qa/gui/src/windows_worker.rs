@@ -53,18 +53,16 @@ impl Benchmark {
             });
         }
         let top = std::env::var_os("IFW_QA_INVENTORY_ROOT").map(PathBuf::from);
-        let runner = std::env::var_os("RUNNER_TEMP").map(PathBuf::from);
+        let (runner, _) = native_gui_assessment::fixture_temp()
+            .ok_or_else(|| io::Error::other("Expected the staged native Windows comparison"))?;
         let exe = std::env::current_exe()?;
         let token = std::env::var("IFW_QA_INVENTORY_TOKEN").unwrap_or_default();
         let Some(top) = top else {
             return Err(io::Error::other("Missing private comparison root"));
         };
         if std::env::var("IFW_QA_ISOLATED").as_deref() != Ok("1")
-            || std::env::var("GITHUB_ACTIONS").as_deref() != Ok("true")
-            || std::env::var("RUNNER_ENVIRONMENT").as_deref() != Ok("github-hosted")
-            || std::env::var("RUNNER_OS").as_deref() != Ok("Windows")
             || !top.is_absolute()
-            || top.parent() != runner.as_deref()
+            || top.parent() != Some(runner.as_path())
             || !top
                 .file_name()
                 .is_some_and(|n| n.to_string_lossy().starts_with("ifw-rw02-"))

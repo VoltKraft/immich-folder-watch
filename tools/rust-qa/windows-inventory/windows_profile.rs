@@ -1,4 +1,5 @@
 // Compiled with the source-bound inventory, YAML model and budgets of the Linux comparison.
+mod windows_qa_host;
 static WINDOWS_ENDPOINT: std::sync::OnceLock<SocketAddr> = std::sync::OnceLock::new();
 
 struct WindowsInput {
@@ -13,13 +14,10 @@ fn windows_input() -> Result<WindowsInput, Box<dyn Error>> {
     let value = |name: &str| std::env::var(name);
     if value("IFW_QA_ISOLATED").as_deref() != Ok("1")
         || value("IFW_QA_BENCHMARK").as_deref() != Ok("1")
-        || value("GITHUB_ACTIONS").as_deref() != Ok("true")
-        || value("RUNNER_ENVIRONMENT").as_deref() != Ok("github-hosted")
-        || value("RUNNER_OS").as_deref() != Ok("Windows")
     {
         return Err("A disposable native Windows inventory run is required".into());
     }
-    let runner = PathBuf::from(value("RUNNER_TEMP")?);
+    let (runner, _) = windows_qa_host::fixture_temp().ok_or("Unexpected native inventory host")?;
     let top = PathBuf::from(value("IFW_QA_INVENTORY_ROOT")?);
     let name = top.file_name().ok_or("Missing private inventory root")?;
     let token = value("IFW_QA_INVENTORY_TOKEN")?;
