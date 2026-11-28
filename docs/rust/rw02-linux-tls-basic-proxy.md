@@ -105,3 +105,20 @@ delivered one event and closed normally. The incorrect password caused six
 407 pairs before any TLS request. A Digest-only relay received six anonymous
 CONNECTs and zero Basic credentials. A direct bypass made zero connections
 to that relay. The detached reader checked all ten signed and native cases.
+
+The full native Fedora x64 assessment ran the same ELF and passed **62
+wire scenarios and 17 unit tests**. Its final receipt at
+`artifacts/rust/realtime-assessment/linux-basic-proxy-native-tls-01/result.json`
+has SHA-256 `6a1d49fc9f4e87e6f36fb1cb0b1de8b833c10d236bf9a249cc2e8f35d5be9ee1`.
+The original wire observations in its `sessions.json` have SHA-256
+`94abc63a552f378bfc629cb61903357fde35f8a9d2e40b4d2392e81520a6009e`.
+Independent readback matched all 32 source files and twelve outputs,
+including the upstream crate, its MIT license, the patch and the same
+program digest used in the ten-case signed comparison. The graph contained
+108 unmodified registry inputs and one reconstructed crate, 4,992 verified
+files and 192 notices. Rustfmt, first-party warnings-denied Clippy and
+the offline release build passed. The compiler also reported an unused
+`timer` parameter in the unmodified hyper-util `client.rs`.
+This result covers Fedora x64. The Ubuntu x64 and ARM64 runners select
+the same Linux cases. Full Digest support and installed product networking
+remain open.
