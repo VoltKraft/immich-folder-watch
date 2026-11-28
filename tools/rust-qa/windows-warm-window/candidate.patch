@@ -147,17 +147,17 @@
 +            Ok("1" | "performance-control")
 +        );
          loop {
-             let command = match input.read_exact(&mut next) {
-                 Ok(()) if next[0] == b'O' => Command::Open,
-                 Ok(()) if next[0] == b'C' => Command::Close,
-+                Ok(()) if next[0] == b'M' => {
+             let command = match input.read_byte() {
+                 Ok(b'O') => Command::Open,
+                 Ok(b'C') => Command::Close,
++                Ok(b'M') => {
 +                    if report_memory {
 +                        Command::AllocatorReport
 +                    } else {
 +                        continue;
 +                    }
 +                }
-                 Ok(()) if next[0] == b'G' => {
+                 Ok(b'G') => {
                      if graphics::allows_test_fault() {
                          Command::DestroyGraphics
 --- a/src/native_window.rs

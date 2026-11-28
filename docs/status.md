@@ -8,6 +8,21 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+Two offline builds on native Ubuntu ARM64 at `378b36a` produced identical
+executables and identical modified Wayland relinks. Both passed all five
+held-file upload cases. Independent reconstruction reproduced the 446-package
+SPDX inventory and the notices archive byte for byte.
+[Native ARM64 compiler and archive comparison](rust/rw02-combined-profile.md#native-ubuntu-arm64-digest-inventory-at-378b36a).
+
+The local 4 GiB Windows x64 VM refused an ordinary NTFS replacement of
+two open synthetic configuration files at `fa337fa`. Independent readback
+confirmed the original names, file IDs and bytes. The Rust tray receiver
+now implements the shipping menu commands. Both Windows targets passed
+cross-target Clippy. Physical selection of all three menu commands in a
+single local Explorer session still needs a native result.
+[NTFS save trial](rust/rw02-cross-session.md#ordinary-replacement-of-two-rust-owned-config-files-on-ntfs) ·
+[Explorer menu trial](rust/rw02-windows-services.md#native-notification-area-menu).
+
 On the 4 GiB Server 2025 x64 VM, Explorer activated the retained Rust
 GUI from a background start and reopened its original window after close.
 Both windows gained keyboard focus and kept their inventory worker.

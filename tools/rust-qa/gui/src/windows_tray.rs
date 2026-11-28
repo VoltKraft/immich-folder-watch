@@ -1,9 +1,10 @@
 //! Own the elected GUI's notification icon independently of its eframe window generations.
+use crate::windows_tray_menu::{MenuControl, TrayLanguage};
 use crate::windows_tray_shell::{EVENTS, ICON, Icon, Image, Receiver, color, image, pump_messages};
 use crate::windows_tray_state::{Attempt, BoundHost, Host, Pending, Recovery, TrayEvent};
 use std::io;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::{Receiver as Channel, SyncSender, TrySendError, sync_channel};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -21,7 +22,8 @@ pub enum TrayRequest {
 
 pub struct NativeTray {
     pub requests: SyncSender<TrayRequest>,
-    stopping: Arc<AtomicBool>,
+    pub language: TrayLanguage,
+    menu: Arc<MenuControl>,
     thread: Option<JoinHandle<io::Result<()>>>,
 }
 
@@ -36,14 +38,17 @@ impl NativeTray {
         }
         let (requests, input) = sync_channel(8);
         let (ready, outcome) = sync_channel(1);
-        let stopping = Arc::new(AtomicBool::new(false));
-        let stop = Arc::clone(&stopping);
+        let menu = Arc::new(MenuControl::default());
+        let owner = Arc::clone(&menu);
+        let language = TrayLanguage::german();
+        let thread_language = language.clone();
         let thread = thread::Builder::new()
             .name("native-tray".into())
-            .spawn(move || run(&token, &stop, input, ready, deliver))?;
+            .spawn(move || run(&token, &owner, &thread_language, input, ready, deliver))?;
         let mut tray = Self {
             requests,
-            stopping,
+            menu,
+            language,
             thread: Some(thread),
         };
         match outcome.recv() {
@@ -58,8 +63,14 @@ impl NativeTray {
     }
 
     pub fn stop(&mut self) -> io::Result<()> {
-        self.stopping.store(true, Ordering::Release);
+        self.menu.stopping.store(true, Ordering::Release);
         if let Some(thread) = self.thread.take() {
+            // TrackPopupMenuEx owns a nested OS loop. Permit shutdown even
+            // while a user leaves a menu open and all input pipes stay open.
+            while !thread.is_finished() {
+                self.menu.cancel_popup();
+                std::thread::sleep(Duration::from_millis(20));
+            }
             thread
                 .join()
                 .map_err(|_| io::Error::other("Tray thread panicked"))??;
@@ -247,7 +258,8 @@ impl Registration<'_> {
 
 fn run<T>(
     token: &str,
-    stopping: &AtomicBool,
+    menu: &MenuControl,
+    language: &TrayLanguage,
     requests: Channel<TrayRequest>,
     ready: SyncSender<bool>,
     deliver: impl Fn(TrayEvent) -> Result<(), TrySendError<T>>,
@@ -281,12 +293,15 @@ fn run<T>(
         recovery.result(available, Instant::now());
         tray.sample("initial", available);
         ready.send(available).map_err(io::Error::other)?;
-        let mut pending = Pending::default();
+        let mut pending = Pending {
+            handled_menu_requests: seen.menu_requests,
+            ..Default::default()
+        };
         let mut next_host = Instant::now() + Duration::from_secs(1);
-        while !stopping.load(Ordering::Acquire) {
+        while !menu.stopping.load(Ordering::Acquire) {
             // The window procedure records callbacks only. Delivery and Shell calls happen after dispatch.
             pump_messages(
-                if pending.open.is_some() || pending.available.is_some() {
+                if pending.open.is_some() || pending.available.is_some() || pending.menu.is_some() {
                     5
                 } else {
                     100
@@ -355,6 +370,16 @@ fn run<T>(
                 pending.open = Some(open.ordinal);
             }
             seen = events;
+            if pending.take_menu_request(events.menu_requests, tray.available) {
+                match menu.select(&tray.icon, language) {
+                    Ok(selection) => {
+                        pending.menu = selection;
+                        // Ignore a second callback received inside modal tracking.
+                        pending.handled_menu_requests = EVENTS.get().menu_requests;
+                    }
+                    Err(error) => eprintln!("Windows tray menu unavailable: {error}"),
+                }
+            }
             match pending.flush(&deliver) {
                 Ok(Some(id)) => println!("TRAY_OPEN pid={} ordinal={id}", std::process::id()),
                 Ok(None) | Err(TrySendError::Full(_)) => {}

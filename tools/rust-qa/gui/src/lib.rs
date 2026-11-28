@@ -4,15 +4,18 @@
 mod launcher_delivery;
 mod win32_instance;
 pub mod windows_appearance;
+pub mod windows_control_input;
 mod windows_launcher;
 mod windows_qa_host;
 pub use windows_launcher::{Launch, start_launcher};
 pub use windows_qa_host::fixture_temp;
 mod windows_tray;
+mod windows_tray_menu;
 mod windows_tray_shell;
 mod windows_tray_state;
 pub use windows_tray::{NativeTray, TrayRequest};
-pub use windows_tray_state::TrayEvent;
+pub use windows_tray_menu::TrayLanguage;
+pub use windows_tray_state::{TrayAction, TrayEvent};
 
 use std::ffi::c_void;
 use std::ptr::null_mut;

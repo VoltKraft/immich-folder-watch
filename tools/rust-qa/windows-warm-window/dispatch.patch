@@ -32,12 +32,12 @@
      let mut lifecycle = DesktopLifecycle::new(background);
      lifecycle.tray_result(available);
 @@ -458,6 +468,8 @@
-     if model.borrow_mut().lifecycle.background_stopped() != Some(HostCommand::ExitEventLoop) {
+     if exit != Some(HostCommand::ExitEventLoop) {
          return Err("Unexpected supervisor shutdown state".into());
      }
 +    #[cfg(target_os = "windows")]
 +    ui_trace::finish(control.loop_wake.single())?;
-     println!("DRAINED passes={}", model.borrow().passes);
+     println!("DRAINED passes={passes}");
      Ok(())
  }
 --- a/src/native_window.rs

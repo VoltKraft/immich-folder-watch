@@ -35,6 +35,8 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug)]
 enum Command {
+    #[cfg(windows)]
+    RestartWorker,
     #[cfg(target_os = "windows")]
     TrayAvailability(bool),
     #[cfg(target_os = "windows")]
@@ -88,6 +90,10 @@ enum ControlId {
 }
 
 struct Model {
+    #[cfg(windows)]
+    restarts: Option<benchmark::Restarts>,
+    #[cfg(windows)]
+    tray_language: Option<native_gui_assessment::TrayLanguage>,
     #[cfg(target_os = "windows")]
     ime_sample: Option<u8>,
     #[cfg(windows)]
@@ -108,6 +114,15 @@ struct Model {
 impl Model {
     fn command(&mut self, command: Command) -> Option<HostCommand> {
         let action = match command {
+            #[cfg(windows)]
+            Command::RestartWorker => {
+                if self.lifecycle.shutdown() == Shutdown::Running
+                    && let Some(restarts) = self.restarts.as_ref()
+                {
+                    restarts.request();
+                }
+                None
+            }
             #[cfg(target_os = "windows")]
             Command::TrayAvailability(available) => self.lifecycle.tray_result(available),
             #[cfg(target_os = "windows")]
@@ -337,6 +352,10 @@ impl eframe::App for Window {
             let language = ui.add(button);
             if language.clicked() {
                 model.german = !de;
+                #[cfg(windows)]
+                if let Some(language) = model.tray_language.as_ref() {
+                    language.set_german(model.german);
+                }
             }
             let controls = [
                 (ControlId::Filename, filename),
@@ -490,12 +509,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     assessment.release()?;
     let mut lifecycle = DesktopLifecycle::new(background);
     lifecycle.tray_result(available);
+    #[cfg(windows)]
+    let assessment = benchmark::Owner::new(assessment, native.tray.is_some())?;
     println!(
         "READY {:?} {:?}",
         lifecycle.window_intent(),
         lifecycle.tray()
     );
     let model = Rc::new(RefCell::new(Model {
+        #[cfg(windows)]
+        restarts: assessment.restarts(),
+        #[cfg(windows)]
+        tray_language: native.tray.as_ref().map(|tray| tray.language.clone()),
         #[cfg(target_os = "windows")]
         ime_sample: None,
         #[cfg(windows)]
@@ -525,11 +550,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     let launcher_stopped = launcher.as_mut().map_or(Ok(()), |listener| listener.stop());
     #[cfg(target_os = "windows")]
     let tray_stopped = native.tray.as_mut().map_or(Ok(()), |tray| tray.stop());
-    assessment.finish()?;
-    #[cfg(target_os = "windows")]
-    launcher_stopped?;
-    #[cfg(target_os = "windows")]
-    tray_stopped?;
+    let worker_stopped = assessment.finish();
+    let exit = if worker_stopped.is_ok() && result.is_ok() {
+        model.borrow_mut().lifecycle.background_stopped()
+    } else {
+        None
+    };
+    let passes = model.borrow().passes;
+    // Disconnect the UI queue before joining a pipe reader that may be waiting for a slot.
+    drop(model);
+    #[cfg(windows)]
+    {
+        native.reader.stop()?;
+        println!("CONTROL_READER_STOPPED");
+        launcher_stopped?;
+        tray_stopped?;
+    }
+    worker_stopped?;
     #[cfg(target_os = "linux")]
     {
         if let Some(observer) = appearance.as_mut() {
@@ -537,24 +574,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         futures_lite::future::block_on(native.graceful_shutdown());
     }
-    #[cfg(target_os = "windows")]
-    if result.is_ok() {
-        native
-            .reader
-            .join()
-            .map_err(|_| "QA control worker failed")?;
-    }
     result?;
-    if model.borrow_mut().lifecycle.background_stopped() != Some(HostCommand::ExitEventLoop) {
+    if exit != Some(HostCommand::ExitEventLoop) {
         return Err("Unexpected supervisor shutdown state".into());
     }
-    println!("DRAINED passes={}", model.borrow().passes);
+    println!("DRAINED passes={passes}");
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
 struct WindowsInput {
-    reader: std::thread::JoinHandle<()>,
+    reader: native_gui_assessment::windows_control_input::ControlReader,
     tray: Option<native_gui_assessment::NativeTray>,
 }
 
@@ -563,15 +593,14 @@ fn windows_fixture_input(
     control: Control,
     elected: bool,
 ) -> Result<(WindowsInput, bool), Box<dyn Error>> {
-    use native_gui_assessment::{NativeTray, TrayEvent, TrayRequest};
-    use std::io::Read;
-    let mut input = std::io::stdin();
-    let mut next = [0];
+    use native_gui_assessment::windows_control_input::Input;
+    use native_gui_assessment::{NativeTray, TrayAction, TrayEvent, TrayRequest};
+    let mut input = Input::stdin()?;
     let observe_ime = std::env::var("IFW_QA_FILENAME_IME").as_deref() == Ok("1");
-    input.read_exact(&mut next)?;
+    let bootstrap = input.read_byte()?;
     let (tray, available) = match std::env::var("IFW_QA_WINDOWS_TRAY").as_deref() {
         Ok("1")
-            if next[0] == b'B'
+            if bootstrap == b'B'
                 && elected
                 && std::env::var("IFW_QA_BENCHMARK").as_deref() == Ok("1") =>
         {
@@ -584,7 +613,9 @@ fn windows_fixture_input(
                         TrayEvent::Open(ordinal) if observe_open => {
                             Command::ObserveTrayOpen(ordinal)
                         }
-                        TrayEvent::Open(_) => Command::Open,
+                        TrayEvent::Open(_) | TrayEvent::Menu(TrayAction::Open) => Command::Open,
+                        TrayEvent::Menu(TrayAction::Restart) => Command::RestartWorker,
+                        TrayEvent::Menu(TrayAction::Quit) => Command::Quit,
                         TrayEvent::Availability(available) => Command::TrayAvailability(available),
                     })?;
                     target.wake();
@@ -592,18 +623,18 @@ fn windows_fixture_input(
                 })?;
             (Some(tray), registered)
         }
-        Err(std::env::VarError::NotPresent) if next[0] == b'T' || next[0] == b'N' => {
-            (None, next[0] == b'T')
+        Err(std::env::VarError::NotPresent) if matches!(bootstrap, b'T' | b'N') => {
+            (None, bootstrap == b'T')
         }
         _ => {
             return Err("Expected a tray result or the elected native tray fixture barrier".into());
         }
     };
     let requests = tray.as_ref().map(|owner| owner.requests.clone());
-    let handle = std::thread::spawn(move || {
+    let handle = input.listen(move |mut input| {
         if let Some(requests) = requests {
-            while input.read_exact(&mut next).is_ok() {
-                let request = match next[0] {
+            while let Ok(byte) = input.read_byte() {
+                let request = match byte {
                     b'M' => TrayRequest::ChangeMarker,
                     b'P' => TrayRequest::Sample,
                     b'Q' => break,
@@ -620,26 +651,24 @@ fn windows_fixture_input(
             return;
         }
         loop {
-            let command = match input.read_exact(&mut next) {
-                Ok(()) if next[0] == b'O' => Command::Open,
-                Ok(()) if next[0] == b'C' => Command::Close,
-                Ok(()) if next[0] == b'G' => {
+            let command = match input.read_byte() {
+                Ok(b'O') => Command::Open,
+                Ok(b'C') => Command::Close,
+                Ok(b'G') => {
                     if graphics::allows_test_fault() {
                         Command::DestroyGraphics
                     } else {
                         continue;
                     }
                 }
-                Ok(()) if observe_ime && matches!(next[0], b'1'..=b'7') => {
-                    Command::ReadFilenameIme(next[0] - b'0')
-                }
+                Ok(byte @ b'1'..=b'7') if observe_ime => Command::ReadFilenameIme(byte - b'0'),
                 _ => Command::Quit,
             };
             if control.send(command).is_err() || matches!(command, Command::Quit) {
                 break;
             }
         }
-    });
+    })?;
     Ok((
         WindowsInput {
             reader: handle,

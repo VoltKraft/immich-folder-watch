@@ -844,6 +844,25 @@ and Shell readback SHA-256 is
 `711da3aa0f4dd89519a34f3cb9de8c98f6600ab8e54b99ee97adb73807cbdf85`.
 [x64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14806170882) · [ARM64 retained GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45144662858/artifacts/14805618878).
 
+### Native notification-area menu
+
+The Rust tray receiver uses the version 4 `WM_CONTEXTMENU` callback for its
+own icon to open the standard Windows popup. Its three commands follow the
+installed WPF application's order and German or English labels. Open uses
+the elected GUI. Restart drains the current inventory worker before the
+replacement starts. Quit requests shutdown through the GUI supervisor.
+[WPF tray implementation](../../src/ImmichFolderWatch.App/Services/TrayIconHost.cs) ·
+[Native menu](../../tools/rust-qa/gui/src/windows_tray_menu.rs).
+
+The portable delivery tests cover a full command queue, command order and
+both sets of labels. To establish desktop behavior, open the menu at the
+verified Explorer icon for each selection, inspect the visible menu rows
+and click their screen coordinates. Observe the original GUI window and
+worker handles across all three selections. Keep the GUI's control pipe
+open until it exits through Quit.
+[Local Explorer test and replay](../../tools/rust-qa/windows-launcher/tray-menu.md) ·
+[Delivery tests](../../tools/rust-qa/gui/tests/windows_tray.rs).
+
 ## Canonical GUI startup on the staged Windows desktop at 13e4af8
 
 On x64 and ARM64 the ordinary launcher primary on Default, the launcher

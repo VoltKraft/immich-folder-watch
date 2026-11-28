@@ -5,10 +5,13 @@ use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc::{self, SyncSender, TrySendError};
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 pub(super) struct Benchmark {
     child: Option<Child>,
+    executable: Option<PathBuf>,
     _pins: Vec<File>,
 }
 
@@ -49,6 +52,7 @@ impl Benchmark {
         if std::env::var("IFW_QA_BENCHMARK").as_deref() != Ok("1") {
             return Ok(Self {
                 child: None,
+                executable: None,
                 _pins: Vec::new(),
             });
         }
@@ -89,17 +93,33 @@ impl Benchmark {
         }
         let worker = stage.join("ifw-performance-worker.exe");
         let image = pin(&worker, false)?;
-        let child = Command::new(worker)
+        let mut result = Self {
+            child: None,
+            executable: Some(worker),
+            _pins: vec![root, staged, marker, image],
+        };
+        result.spawn_child()?;
+        Ok(result)
+    }
+
+    fn spawn_child(&mut self) -> io::Result<u32> {
+        let path = self
+            .executable
+            .as_ref()
+            .ok_or_else(|| io::Error::other("Missing pinned inventory executable"))?;
+        if self.child.is_some() {
+            return Err(io::Error::other(
+                "Previous inventory process is still owned",
+            ));
+        }
+        let child = Command::new(path)
             .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
             .stdin(Stdio::piped())
             .spawn()?;
         let pid = child.id();
-        let result = Self {
-            child: Some(child),
-            _pins: vec![root, staged, marker, image],
-        };
+        self.child = Some(child);
         println!("INVENTORY_WORKER pid={pid}");
-        Ok(result)
+        Ok(pid)
     }
 
     /// The existing tray bootstrap byte releases the worker after the observer attaches.
@@ -110,18 +130,105 @@ impl Benchmark {
         Ok(())
     }
 
-    pub(super) fn finish(mut self) -> io::Result<()> {
+    fn stop_child(&mut self, reason: &str) -> io::Result<Option<Child>> {
         if let Some(child) = self.child.as_mut() {
+            let pid = child.id();
             drop(child.stdin.take());
             let status = wait_child(child, Duration::from_secs(6))?.ok_or_else(|| {
                 io::Error::new(io::ErrorKind::TimedOut, "Inventory did not exit after EOF")
             })?;
-            self.child.take();
+            let reaped = self.child.take();
+            println!(
+                "WORKER_EXIT pid={pid} reason={reason} success={}",
+                status.success()
+            );
             if !status.success() {
                 return Err(io::Error::other("Native comparison inventory failed"));
             }
+            return Ok(reaped);
+        }
+        Ok(None)
+    }
+
+    fn restart(&mut self) -> io::Result<()> {
+        let old = self.stop_child("restart")?;
+        let new = self.spawn_child()?;
+        self.release()?;
+        if let Some(original) = old {
+            // Hold the reaped process handle across the spawn so Windows cannot recycle its PID.
+            let old = original.id();
+            println!("WORKER_RESTARTED old={old} new={new}");
+        } else {
+            println!("WORKER_STARTED_AFTER_FAILURE new={new}");
         }
         Ok(())
+    }
+}
+
+pub(super) enum WorkerCommand {
+    Restart,
+    Stop,
+}
+
+pub(super) struct Restarts(SyncSender<WorkerCommand>);
+
+impl Restarts {
+    pub(super) fn request(&self) {
+        match self.0.try_send(WorkerCommand::Restart) {
+            Ok(()) => (),
+            Err(TrySendError::Full(_)) => println!("WORKER_RESTART_PENDING"),
+            Err(TrySendError::Disconnected(_)) => {
+                eprintln!("WORKER_RESTART_FAILED owner disconnected")
+            }
+        }
+    }
+}
+
+pub(super) enum Owner {
+    Direct(Benchmark),
+    Tray(SyncSender<WorkerCommand>, JoinHandle<io::Result<()>>),
+}
+
+impl Owner {
+    pub(super) fn new(mut worker: Benchmark, with_tray: bool) -> io::Result<Self> {
+        if !with_tray {
+            return Ok(Self::Direct(worker));
+        }
+        let (send, commands) = mpsc::sync_channel(1);
+        let thread = thread::Builder::new()
+            .name("windows-inventory-owner".into())
+            .spawn(move || {
+                while let Ok(WorkerCommand::Restart) = commands.recv() {
+                    if let Err(error) = worker.restart() {
+                        eprintln!("WORKER_RESTART_FAILED {error}");
+                    }
+                }
+                worker.stop_child("quit")?;
+                Ok(())
+            })?;
+        Ok(Self::Tray(send, thread))
+    }
+
+    pub(super) fn restarts(&self) -> Option<Restarts> {
+        match self {
+            Self::Tray(send, _) => Some(Restarts(send.clone())),
+            Self::Direct(_) => None,
+        }
+    }
+
+    pub(super) fn finish(self) -> io::Result<()> {
+        match self {
+            Self::Direct(mut worker) => {
+                worker.stop_child("quit")?;
+                Ok(())
+            }
+            Self::Tray(send, thread) => {
+                let _ = send.send(WorkerCommand::Stop);
+                thread
+                    .join()
+                    .map_err(|_| io::Error::other("Inventory owner panicked"))?
+            }
+        }
     }
 }
 
@@ -134,5 +241,74 @@ impl Drop for Benchmark {
                 let _ = wait_child(child, Duration::from_secs(2));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn restart_reaps_original_before_reporting_live_replacement() -> io::Result<()> {
+        // The system's native sort reads our synthetic input until the writer closes.
+        let system =
+            std::env::var_os("SystemRoot").ok_or_else(|| io::Error::other("Missing SystemRoot"))?;
+        let sorter = PathBuf::from(system).join("System32/sort.exe");
+        let mut child = Command::new(&sorter)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
+        let first = child.id();
+        let mut original_output = child.stdout.take().unwrap();
+        let mut worker = Benchmark {
+            child: Some(child),
+            executable: Some(sorter),
+            _pins: Vec::new(),
+        };
+        worker.release()?;
+        worker
+            .child
+            .as_mut()
+            .unwrap()
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(b"\r\n")?;
+        worker.restart()?;
+        let replacement = worker.child.as_mut().unwrap();
+        let second = replacement.id();
+        assert_ne!(first, second);
+        // The original's private stdout reaches EOF while the replacement's stdin remains open.
+        let mut completed = Vec::new();
+        original_output.read_to_end(&mut completed)?;
+        assert!(completed.contains(&b'S'));
+        assert!(replacement.try_wait()?.is_none());
+        assert_eq!(
+            worker.stop_child("quit")?.map(|child| child.id()),
+            Some(second)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn failed_original_stops_restart_before_spawning_replacement() -> io::Result<()> {
+        // An invalid test harness option exits the disposable child with a failure status.
+        let child = Command::new(std::env::current_exe()?)
+            .arg("--invalid-inventory-test-option")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+        let mut worker = Benchmark {
+            child: Some(child),
+            executable: None,
+            _pins: Vec::new(),
+        };
+        assert_eq!(
+            worker.restart().unwrap_err().to_string(),
+            "Native comparison inventory failed"
+        );
+        assert!(worker.child.is_none());
+        Ok(())
     }
 }

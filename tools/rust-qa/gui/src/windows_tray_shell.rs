@@ -57,6 +57,7 @@ pub(crate) struct Events {
     pub(crate) last_pointer_id: u32,
     pub(crate) pointer_up: u32,
     pub(crate) shell_context: u32,
+    pub(crate) menu_requests: u32,
     pub(crate) shown: u32,
     pub(crate) hidden: u32,
     pub(crate) timed_out: u32,
@@ -118,7 +119,13 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPAR
                 }
             }
             WM_LBUTTONUP if id == ICON => e.pointer_up = e.pointer_up.saturating_add(1),
-            WM_CONTEXTMENU | WM_RBUTTONUP => e.shell_context = e.shell_context.saturating_add(1),
+            WM_CONTEXTMENU | WM_RBUTTONUP if id == ICON => {
+                e.shell_context = e.shell_context.saturating_add(1);
+                // Version 4 delivers the menu request separately from the raw button release.
+                if code == WM_CONTEXTMENU {
+                    e.menu_requests = e.menu_requests.saturating_add(1);
+                }
+            }
             NIN_BALLOONSHOW if id == ICON => e.shown = e.shown.saturating_add(1),
             NIN_BALLOONHIDE if id == ICON => e.hidden = e.hidden.saturating_add(1),
             NIN_BALLOONTIMEOUT if id == ICON => e.timed_out = e.timed_out.saturating_add(1),
@@ -368,6 +375,24 @@ pub(crate) fn color(id: &str) -> Result<[u8; 3]> {
 #[cfg(test)]
 mod notification_tests {
     use super::*;
+
+    #[test]
+    fn only_the_registered_icons_context_callback_requests_a_menu() {
+        EVENTS.set(Events::default());
+        let tap = |id, message| unsafe {
+            window_proc(
+                HWND::default(),
+                CALLBACK,
+                WPARAM(0xffc8_ff9c),
+                LPARAM(((id << 16) | message) as isize),
+            )
+        };
+        tap(ICON + 1, WM_CONTEXTMENU);
+        tap(ICON, WM_RBUTTONUP);
+        assert_eq!(EVENTS.get().menu_requests, 0);
+        tap(ICON, WM_CONTEXTMENU);
+        assert_eq!(EVENTS.get().menu_requests, 1);
+    }
 
     #[test]
     fn balloon_callbacks_belong_to_the_registered_v4_icon() {

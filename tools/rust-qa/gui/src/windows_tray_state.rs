@@ -97,22 +97,68 @@ impl Recovery {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub enum TrayAction {
+    Open = 1,
+    Restart,
+    Quit,
+}
+
+impl TrayAction {
+    pub(crate) const ITEMS: [Self; 3] = [Self::Open, Self::Restart, Self::Quit];
+
+    pub(crate) fn label(self, german: bool) -> &'static str {
+        match (self, german) {
+            (Self::Open, true) => "GUI öffnen",
+            (Self::Open, false) => "Open GUI",
+            (Self::Restart, true) => "Neustart",
+            (Self::Restart, false) => "Restart",
+            (Self::Quit, true) => "Beenden",
+            (Self::Quit, false) => "Quit",
+        }
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::Restart => "restart",
+            Self::Quit => "quit",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrayEvent {
     Availability(bool),
     Open(u32),
+    Menu(TrayAction),
 }
 
 #[derive(Default)]
 pub(crate) struct Pending {
+    pub(crate) handled_menu_requests: u32,
     pub(crate) available: Option<bool>,
     pub(crate) open: Option<u32>,
+    pub(crate) menu: Option<TrayAction>,
 }
 
 impl Pending {
+    pub(crate) fn take_menu_request(&mut self, received: u32, available: bool) -> bool {
+        if received == self.handled_menu_requests || (available && self.menu.is_some()) {
+            return false;
+        }
+        self.handled_menu_requests = received;
+        available
+    }
+
     pub(crate) fn flush<T>(
         &mut self,
         send: &impl Fn(TrayEvent) -> Result<(), TrySendError<T>>,
     ) -> Result<Option<u32>, TrySendError<T>> {
+        if let Some(action) = self.menu {
+            send(TrayEvent::Menu(action))?;
+            self.menu = None;
+        }
         if let Some(available) = self.available {
             send(TrayEvent::Availability(available))?;
             self.available = None;

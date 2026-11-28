@@ -3,7 +3,7 @@ mod windows_tray_state;
 
 use std::sync::mpsc::{TryRecvError, TrySendError, sync_channel};
 use std::time::{Duration, Instant};
-use windows_tray_state::{Attempt, BoundHost, Pending, Recovery, TrayEvent};
+use windows_tray_state::{Attempt, BoundHost, Pending, Recovery, TrayAction, TrayEvent};
 
 #[test]
 fn only_a_signaled_original_process_and_absent_shell_and_icon_can_retire_an_entry() {
@@ -146,6 +146,7 @@ fn a_full_queue_preserves_availability_then_admits_one_coalesced_open() {
     let mut pending = Pending {
         available: Some(false),
         open: Some(1),
+        ..Default::default()
     };
     assert_eq!(
         pending.flush(&deliver),
@@ -172,10 +173,68 @@ fn a_disconnected_supervisor_cannot_acknowledge_the_pending_callback() {
     let mut pending = Pending {
         available: None,
         open: Some(7),
+        ..Default::default()
     };
     assert_eq!(
         pending.flush(&|event| sender.try_send(event)),
         Err(TrySendError::Disconnected(TrayEvent::Open(7)))
     );
     assert_eq!(pending.open, Some(7));
+}
+
+#[test]
+fn a_second_right_click_waits_for_the_previous_selection_to_reach_the_gui() {
+    let (sender, receiver) = sync_channel(1);
+    sender.send(TrayEvent::Open(1)).unwrap();
+    let mut pending = Pending::default();
+    assert!(pending.take_menu_request(1, true));
+    pending.menu = Some(TrayAction::Restart);
+    let deliver = |event| sender.try_send(event);
+    assert_eq!(
+        pending.flush(&deliver),
+        Err(TrySendError::Full(TrayEvent::Menu(TrayAction::Restart)))
+    );
+    assert!(!pending.take_menu_request(2, true));
+    assert_eq!(receiver.recv().unwrap(), TrayEvent::Open(1));
+    pending.flush(&deliver).unwrap();
+    assert_eq!(
+        receiver.recv().unwrap(),
+        TrayEvent::Menu(TrayAction::Restart)
+    );
+    assert!(pending.take_menu_request(2, true));
+    assert!(!pending.take_menu_request(2, true));
+}
+
+#[test]
+fn an_explicit_menu_selection_survives_queue_pressure_and_is_delivered_once() {
+    for action in TrayAction::ITEMS {
+        let (sender, receiver) = sync_channel(1);
+        sender.send(TrayEvent::Open(8)).unwrap();
+        let mut pending = Pending {
+            menu: Some(action),
+            ..Default::default()
+        };
+        assert_eq!(
+            pending.flush(&|e| sender.try_send(e)),
+            Err(TrySendError::Full(TrayEvent::Menu(action)))
+        );
+        assert_eq!(receiver.recv().unwrap(), TrayEvent::Open(8));
+        pending.flush(&|e| sender.try_send(e)).unwrap();
+        assert_eq!(receiver.recv().unwrap(), TrayEvent::Menu(action));
+        pending.flush(&|e| sender.try_send(e)).unwrap();
+        assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
+    }
+}
+
+#[test]
+fn native_tray_menu_uses_the_shipping_order_and_labels_in_both_languages() {
+    let items = TrayAction::ITEMS.map(|a| (a as usize, a.name(), a.label(false), a.label(true)));
+    assert_eq!(
+        items,
+        [
+            (1, "open", "Open GUI", "GUI öffnen"),
+            (2, "restart", "Restart", "Neustart"),
+            (3, "quit", "Quit", "Beenden")
+        ]
+    );
 }
