@@ -223,6 +223,24 @@ compiler outputs and 92 source files. The 43,199,735-byte archive has
 SHA-256 `e74aa06b2df05d101a540d54ce05f5744dc3101c4141a5193f20743402523107`.
 [Original ARM64 repeat and venue receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46105893287/artifacts/15247523506).
 
+### Native ARM64 editor frames after the selection fix
+
+At `b0fb23c`, both the ordinary and retained ARM64 GUI compiled from the
+updated editor sources. On each private input desktop the native edit
+changed 645 field pixels across 84 columns and 18 rows. The original
+text was restored, both processes exited with code zero and both
+supervisors returned to the original desktop. Independent replay bound
+96 source files to the revision and recomputed the raster differences.
+
+Both original Default-desktop observations timed out waiting for their
+own HWND under the field center. The entire display workflow consequently
+ended with a failure. The hosted console again exposed one 1024 × 768
+monitor at 96 DPI. WTS reported one active console session, one
+disconnected console session and two listeners. A connected RDP session
+and different monitor scales remain outstanding. The original archive
+SHA-256 is `ca7f1e67e246548a663f39939969f380184d3bbb67e94bb22140285ae35c6f1f`.
+[Original ARM64 display archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46120848150/artifacts/15253874143).
+
 The local Intel x64 KVM host has a Windows Server x64 guest. For native
 Windows ARM64 mixed-DPI and RDP measurements, Microsoft documents local
 Windows 11 guests on Arm hardware and Windows Arm64 VMs on Azure that

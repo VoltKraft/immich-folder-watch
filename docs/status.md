@@ -181,6 +181,11 @@ desktop. On Default the fields were covered. The runner at `0ae5d1c`
 reported no connected RDP session. Native ARM64 mixed-DPI and RDP
 measurements remain open. On November 28 the user confirmed that they
 currently have no separate ARM64 test system. [Original frame and session observations](rust/rw02-windows-display.md#arm64-source-monitor-focus-at-3d55500).
+At `b0fb23c` the current ordinary and retained GUI each produced a
+645-pixel filename edit on the private ARM64 desktop. The two Default
+trials timed out before capturing the field. The ARM64 console still
+reported one 96-DPI monitor and zero connected RDP sessions.
+[Compiler, frames and session readback](rust/rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
 
 New Windows x64 tests for the rewrite run on the local Server 2025 VM.
 The GitHub x64 build supplies native executables. Windows ARM64, Linux x64
