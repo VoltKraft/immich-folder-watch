@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "combined-profile"))
 import notices
 import sbom
 import sources
+from realtime import hyper_util_source
 
 
 def ensure_archive(name, version, checksum, locations, cache, fetch):
@@ -39,7 +40,8 @@ def prepare_cache(fetch: bool) -> None:
     # Both the native compiler and the offline notice reader consult these project-local caches.
     cache = sources.ROOT / "artifacts/rust/assessment-cache/registry/cache/ifw-native-notices"
     cache.mkdir(parents=True, exist_ok=True)
-    locations = sorted({d for home in sources.local_caches() for d in (home / "registry/cache").glob("*")
+    homes = sources.local_caches()
+    locations = sorted({d for home in homes for d in (home / "registry/cache").glob("*")
                         if d.is_dir()})
     catalog = sources.catalog()
 
@@ -49,7 +51,14 @@ def prepare_cache(fetch: bool) -> None:
 
     with ThreadPoolExecutor(max_workers=4) as workers:
         acquired = sum(workers.map(acquire, sorted(catalog.items())))
-    print(f"Verified {len(catalog)} original Cargo archives, acquired {acquired} missing inputs")
+    # The lock identifies the maintained CONNECT source by path. Retain its upstream
+    # archive as well so a fresh compiler or notice process can reconstruct it offline.
+    archive_name = hyper_util_source.ARCHIVE.name
+    upstream_home = next((home for home in homes if any((home / "registry/cache").glob("*/" + archive_name))), homes[0])
+    original = hyper_util_source.original(upstream_home, fetch)
+    receipt = hyper_util_source.reconstruct(original, hyper_util_source.SOURCE)
+    print(f"Verified {len(catalog)} registry archives, acquired {acquired} missing registry inputs")
+    print(f"Reconstructed hyper-util compiler source {receipt['treeSha256']}")
 
 
 def pack(target: str, revision: str, run: Path, destination: Path) -> str:

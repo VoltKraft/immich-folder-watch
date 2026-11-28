@@ -1,6 +1,8 @@
 """Check the project-local cache used after a native build releases its temporary sources."""
+from contextlib import redirect_stdout
 import hashlib
 import importlib.util
+import io
 from pathlib import Path
 import tempfile
 import unittest
@@ -39,6 +41,22 @@ class AcquisitionTests(unittest.TestCase):
             network.assert_called_once()
         self.assertEqual(list(self.cache.iterdir()), [self.filename])
         self.assertEqual(self.filename.read_bytes(), self.original)
+
+    def test_path_dependency_uses_a_secondary_cache_when_offline(self):
+        empty = self.cache / "empty"
+        secondary = self.cache / "transport"
+        cached = secondary / "registry/cache/test" / assessment.hyper_util_source.ARCHIVE.name
+        cached.parent.mkdir(parents=True)
+        cached.write_bytes(self.original)
+        with (patch.object(assessment.sources, "ROOT", self.cache),
+              patch.object(assessment.sources, "local_caches", return_value=[empty, secondary]),
+              patch.object(assessment.sources, "catalog", return_value={}),
+              patch.object(assessment.hyper_util_source, "original", return_value=cached) as original,
+              patch.object(assessment.hyper_util_source, "reconstruct", return_value={"treeSha256": self.digest}) as replay,
+              redirect_stdout(io.StringIO())):
+            assessment.prepare_cache(False)
+        original.assert_called_once_with(secondary, False)
+        replay.assert_called_once_with(cached, assessment.hyper_util_source.SOURCE)
 
     def test_failed_acquisition_leaves_no_partial_input(self):
         def interrupted(name, staged, checksum):

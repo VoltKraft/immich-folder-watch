@@ -190,6 +190,15 @@ The historical Linux x64 input at `0a2b5ca` also reproduced its original
 [Four-target profile](../../tools/rust-qa/combined-profile/review.json) ·
 [Original native notice archive](rw02-combined-notices.md#native-notices-at-0a2b5ca).
 
+The notice cache prepares the path dependency alongside the 471 registry
+archives. In an empty project source directory, it reconstructed
+`hyper-util` offline from a secondary acquisition cache. A second pass
+verified the retained original and compiler tree after removal of that
+secondary archive. The cold-cache receipt is
+`artifacts/rust/combined-profile/runs/hyper-connect-cold-cache-01/result.json`,
+SHA-256 `1875ca302a8da9059383a6ab22308806345015ecebd08f6eb05fa38ce7cc5679`.
+[Notice source preparation](../../tools/rust-qa/native-notice-input.py).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
