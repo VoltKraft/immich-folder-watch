@@ -45,6 +45,9 @@ def main():
     source_profile.validate()
     compiler_evidence = {}
     if os.name == "nt":
+        source_paths = [MANIFEST, *sorted((MANIFEST.parent / "src").glob("*.rs")), MANIFEST.parent / "src/tray-icon.argb",
+                        ROOT / "rust/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/Cargo.toml",
+                        ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]
         lock_hash, graph_hash = source_profile.verify_native_graph(args.target, env, output / "graph.json")
         if not args.local_x64_inputs:
             subprocess.run(["cargo", "clippy", "--manifest-path", str(MANIFEST), "--frozen",
@@ -54,12 +57,16 @@ def main():
         binary = build / "release/native-gui-assessment.exe"
         tests = ["cargo", "test", "--manifest-path", str(MANIFEST), "--release", "--frozen",
                  "--lib", "--bin", "native-gui-assessment"]
+        compiler_sources = {p.relative_to(ROOT).as_posix(): source_profile.sha(p) for p in source_paths}
     else:
         builder = [sys.executable, str(QA / "gui/build.py"), "--registry", str(cargo_home / "registry")]
         subprocess.run([*builder, "--clippy"], env=env, check=True)
         subprocess.run(builder, env=env, check=True)
         binary = build / "release/native-gui-assessment"
         inputs = json.loads(binary.with_suffix(".inputs.json").read_bytes())
+        compiler_sources = dict(inputs["sources"])
+        if compiler_sources.pop("tools/rust-qa/gui/Cargo.lock") != source_profile.sha(MANIFEST.with_name("Cargo.lock")):
+            raise ValueError("The archived GUI compiler inputs differ from the selected lock")
         shutil.copyfile(build / "gui-graph.json", output / "graph.json")
         shutil.copyfile(build / "gui-compiler.jsonl", output / "compiler.jsonl")
         shutil.copyfile(build / "gui-registry-sources.json", output / "registry-sources.json")
@@ -95,10 +102,7 @@ def main():
               "sourceTrees": profile["trees"], "fallbackFonts": profile["fonts"],
               "textNotices": profile["noticeFiles"], "sourceProfileSha256": source_profile.sha(source_profile.REVIEW),
               "sourceReconstructionSha256": source_profile.sha(Path(source_profile.__file__)),
-              "compilerSources": {p.relative_to(ROOT).as_posix(): source_profile.sha(p) for p in
-                                  [MANIFEST, *sorted((MANIFEST.parent / "src").glob("*.rs")), MANIFEST.parent / "src/tray-icon.argb",
-                                   ROOT / "rust/Cargo.toml",
-                                   ROOT / "rust/crates/desktop-lifecycle/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]}}
+              "compilerSources": compiler_sources}
     (output / "build.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     if args.local_x64_inputs:
         desktop = kit / "desktop"

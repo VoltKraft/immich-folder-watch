@@ -1,7 +1,26 @@
 """Verify native Cargo compiler units against the audited GUI package and feature choices."""
 import json
 from pathlib import Path
+import tomllib
 from urllib.parse import unquote
+
+
+def linux_project_sources(project):
+    """List the first-party inputs of the ordinary Linux binary in this source tree."""
+    qa = project / "tools/rust-qa"
+    gui = qa / "gui"
+    lifecycle = project / "rust/crates/desktop-lifecycle"
+    paths = [gui / "Cargo.toml", gui / "Cargo.lock", *sorted((gui / "src").glob("*.rs")),
+             gui / "src/tray-icon.argb", project / "rust/Cargo.toml", lifecycle / "Cargo.toml",
+             lifecycle / "src/lib.rs"]
+    manifest = tomllib.loads((gui / "Cargo.toml").read_text(encoding="utf-8"))
+    linux = manifest["target"]['cfg(target_os = "linux")']["dependencies"]
+    if "ifw-yaml-assessment" in linux:
+        if linux["ifw-yaml-assessment"] != {"path": "../yaml"}:
+            raise ValueError("Expected the sibling reviewed YAML library for the Linux GUI")
+        yaml = qa / "yaml"
+        paths.extend([yaml / "Cargo.toml", *sorted((yaml / "src").rglob("*.rs"))])
+    return paths
 
 
 def verify_gui_units(log, expected):

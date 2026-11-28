@@ -92,19 +92,19 @@ def prepare(work, homes, fetch):
     if hyper["archiveSha256"] != hyper_util_source.ARCHIVE_SHA:
         raise ValueError("The realtime archive review differs from its source reconstruction")
     allowed[HYPER_KEY] = hyper["archiveSha256"]
-    vendor, inputs = prepare_registry(work, homes, fetch, allowed)
+    vendor, inputs = prepare_registry(work, [home / "registry" for home in homes], fetch, allowed)
     return vendor, inputs, approved_text
 
 
-def prepare_registry(work, homes, fetch, allowed, *, jobs=4):
+def prepare_registry(work, registries, fetch, allowed, *, jobs=4):
     """Authenticate and filter the selected original crates using the combined compiler rules."""
     yaml = {(row["name"], row["version"]): row for row in read(QA / "yaml/inputs.json")["packages"]}
     cache = work / "registry/cache/reviewed"
     vendor = work / "registry/src/reviewed"
     cache.mkdir(parents=True)
     vendor.mkdir(parents=True)
-    locations = sorted({registry for home in homes for registry in (home / "registry/cache").glob("*")
-                        if registry.is_dir()})
+    locations = sorted({location for registry in registries for location in (registry / "cache").glob("*")
+                        if location.is_dir()})
     locations.append(HYPER_ROOT.parent)
 
     def one(item):

@@ -87,7 +87,8 @@ def main(args):
     root = qa.parents[1]
     art = root / 'artifacts/rust'
     launch = root / 'tools/RustCompatibilityOracle/installed/launch'
-    sys.path[:0] = [str(qa / 'performance'), str(qa / 'portal-dialog'), str(launch)]
+    sys.path[:0] = [str(qa / 'performance'), str(qa / 'portal-dialog'), str(launch), str(qa)]
+    from gui.compiler_inputs import linux_project_sources
     from linux import namespace
     from runtime_pin import deployment, COMMITS
     from flatpak_fixture import SYS_DIRS
@@ -115,10 +116,7 @@ def main(args):
         binary = subject / 'native-gui-assessment'
         receipt = binary.with_suffix('.inputs.json')
         gui = json.loads(receipt.read_bytes())
-        source_paths = [*sorted((qa / 'gui/src').glob('*.rs')), qa / 'gui/src/tray-icon.argb',
-                        qa / 'gui/Cargo.toml', qa / 'gui/Cargo.lock', root / 'rust/Cargo.toml',
-                        root / 'rust/crates/desktop-lifecycle/Cargo.toml', root / 'rust/crates/desktop-lifecycle/src/lib.rs']
-        sources = {p.relative_to(root).as_posix(): sha(p) for p in source_paths}
+        sources = {p.relative_to(root).as_posix(): sha(p) for p in linux_project_sources(root)}
         if (gui['target'] != f'{arch}-unknown-linux-gnu' or gui['binary_sha256'] != sha(binary)
                 or sources != gui['sources']):
             raise ValueError('The staged native executable and its exact compiled first-party sources must match')
@@ -136,6 +134,7 @@ def main(args):
     if set(shipping) != set(PERMISSIONS + ['--share=network', '--device=dri']):
         raise ValueError('Review the current shipping sandbox permissions')
     drivers = [HERE / n for n in ('run.py', 'observe.py', 'tray_menu.py', 'launch.sh')]
+    drivers.append(qa / 'gui/compiler_inputs.py')
     if args.startup_gui:
         drivers += [HERE / 'installed_language.py', HERE / 'accessibility-readback.sh',
                     qa / 'gui/desktop_input.py', qa / 'gui/native.py']

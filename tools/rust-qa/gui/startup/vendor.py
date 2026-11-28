@@ -15,6 +15,10 @@ from sources import local_caches, locked, prepare_registry, read, sha256, write,
 # Measured from the two locks against the original complete combined compiler-tree receipt.
 RECEIPT_SHA256 = "1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3"
 GUI_RECEIPT_SHA256 = "0a4cc8dc3db5daee67b22898a0b4b3ca09a15fd157691e3d19eb72c134f885fe"
+GUI_LOCK_RECEIPTS = {
+    "6716b1cc5835c1fbec9c9485773bdacfd63c4f5d01568a9aa94a8839c2e81d25": GUI_RECEIPT_SHA256,
+    "bdda6dc843f34b90bbe9efd99c84e994fd293a5d6ad88c52f6c70ceb8ea97679": RECEIPT_SHA256,
+}
 
 
 def selected_inputs():
@@ -25,8 +29,8 @@ def selected_inputs():
     return selected
 
 
-def prepare(output, homes, fetch, *, selected=None, receipt_sha=RECEIPT_SHA256):
-    vendor, inputs = prepare_registry(output, homes, fetch, selected_inputs() if selected is None else selected, jobs=2)
+def prepare(output, registries, fetch, *, selected=None, receipt_sha=RECEIPT_SHA256):
+    vendor, inputs = prepare_registry(output, registries, fetch, selected_inputs() if selected is None else selected, jobs=2)
     receipt = output / "registry-sources.json"
     write(receipt, inputs)
     if sha256(receipt) != receipt_sha:
@@ -59,24 +63,26 @@ def verify_sources(vendor, selected, catalog):
     return projection
 
 
-def compiler_directory(registry):
+def compiler_directory(registry, gui=QA / "gui"):
     """Materialize the pinned registry once, then authenticate the actual compiler inputs on each use."""
-    selected = locked(QA / "gui")
-    cache = ROOT / "artifacts/rust/gui-registry" / GUI_RECEIPT_SHA256
+    lock = sha256(gui / "Cargo.lock")
+    if lock not in GUI_LOCK_RECEIPTS:
+        raise ValueError("The GUI lock has no reviewed compiler source inventory")
+    expected = GUI_LOCK_RECEIPTS[lock]
+    selected = locked(gui)
+    cache = ROOT / "artifacts/rust/gui-registry" / expected
     if not cache.exists():
         cache.parent.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=cache.parent) as scratch:
-            work = Path(scratch)
-            (work / "registry").symlink_to(registry.resolve(), target_is_directory=True)
-            fresh = work / "prepared"
-            prepare(fresh, [work], False, selected=selected, receipt_sha=GUI_RECEIPT_SHA256)
+            fresh = Path(scratch) / "prepared"
+            prepare(fresh, [registry], False, selected=selected, receipt_sha=expected)
             try:
                 fresh.rename(cache)
             except OSError as error:
                 if error.errno not in (errno.ENOTEMPTY, errno.EEXIST) or not cache.is_dir():
                     raise
     receipt = cache / "registry-sources.json"
-    if sha256(receipt) != GUI_RECEIPT_SHA256:
+    if sha256(receipt) != expected:
         raise ValueError("The GUI compiler registry receipt differs from its reviewed projection")
     directory = cache / "registry/src/reviewed"
     catalog = read(receipt)
@@ -103,4 +109,4 @@ if __name__ == "__main__":
     output = args.output.resolve()
     if output.exists() or not output.is_relative_to(ROOT / "artifacts/rust"):
         parser.error("Use a new output directory below artifacts/rust")
-    print(prepare(output, args.cache or local_caches(), args.fetch))
+    print(prepare(output, [home / "registry" for home in args.cache or local_caches()], args.fetch))

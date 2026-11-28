@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 import source_profile
-from compiler_inputs import verify_gui_units
+from compiler_inputs import linux_project_sources, verify_gui_units
 from startup import vendor
 
 
@@ -44,6 +44,7 @@ def main(args):
     if build == OUTPUT or not build.is_relative_to(OUTPUT.resolve()):
         raise ValueError("Use a build directory below artifacts/rust")
     build.mkdir(exist_ok=True, parents=True)
+    sources = linux_project_sources(ROOT)
     with tempfile.TemporaryDirectory(dir=build) as home:
         vendor.configure_cargo_home(Path(home), directory)
         audit_env = dict(os.environ, PATH=str(toolchain / "bin") + os.pathsep + os.environ["PATH"],
@@ -65,6 +66,8 @@ def main(args):
             command += ["--ro-bind", path, path]
     command += ["--ro-bind", str(source_profile.FONTS), "/fallback-fonts",
                     "--setenv", "IFW_QA_FALLBACK_DIR", "/fallback-fonts"]
+    if HERE.parent / "yaml/Cargo.toml" in sources:
+        command += ["--ro-bind", str(HERE.parent / "yaml"), "/project/tools/rust-qa/yaml"]
     command += ["--ro-bind", str(directory), "/vendor", "--ro-bind", str(toolchain), "/toolchain",
                 "--ro-bind", str(ROOT / "rust"), "/project/rust", "--ro-bind", str(HERE), "/project/tools/rust-qa/gui",
                 "--ro-bind", str(fonts), "/fonts", "--bind", str(build), "/build",
@@ -87,9 +90,6 @@ def main(args):
             subprocess.run([*command, "--ro-bind", str(passwd), "/etc/passwd", "--ro-bind", str(group), "/etc/group",
                             *cargo, "test", *selection, "--release", "--frozen", "--jobs", str(args.jobs)], check=True)
         return
-    sources = [HERE / "Cargo.toml", HERE / "Cargo.lock", *sorted((HERE / "src").glob("*.rs")), HERE / "src/tray-icon.argb",
-               ROOT / "rust/Cargo.toml", ROOT / "rust/crates/desktop-lifecycle/Cargo.toml",
-               ROOT / "rust/crates/desktop-lifecycle/src/lib.rs"]
     drivers = [Path(__file__).resolve(), HERE / "compiler_inputs.py", HERE / "startup/vendor.py",
                HERE / "source_profile.py", HERE.parent / "combined-profile/sources.py", HERE.parent / "yaml/prepare.py",
                HERE.parent / "audit-graph.py", HERE.parent / "storage/evidence.py"]
@@ -112,7 +112,7 @@ def main(args):
     registry_receipt = build / "gui-registry-sources.json"
     shutil.copyfile(directory.parents[2] / "registry-sources.json", registry_receipt)
     record["registryReceiptSha256"] = sha(registry_receipt)
-    if record["registryReceiptSha256"] != vendor.GUI_RECEIPT_SHA256:
+    if record["registryReceiptSha256"] != vendor.GUI_LOCK_RECEIPTS[original_sources["tools/rust-qa/gui/Cargo.lock"]]:
         raise ValueError("The GUI directory-source receipt changed during compilation")
     record["compilerStreamSha256"] = sha(log)
     record["compilerUnits"] = units
