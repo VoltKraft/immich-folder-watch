@@ -26,6 +26,7 @@ enum Error {
     Transport,
     Status(u16),
     Protocol,
+    BasicProxyChallenge,
     Limit,
     Timeout,
     #[cfg(any(windows, test))]
@@ -194,12 +195,15 @@ fn fixture_proxy(
     } else {
         transport::SelectedProxy::unix(api, read)
     };
-    if proxy
-        .endpoint
-        .as_ref()
-        .is_some_and(|selected| selected != &owned)
-    {
-        return Err(Error::Protocol);
+    if let Some(selected) = &proxy.endpoint {
+        let mut address = selected.clone();
+        if cfg!(target_os = "linux") && api.scheme() == "http" && selected.password().is_some() {
+            address.set_username("").map_err(|_| Error::Protocol)?;
+            address.set_password(None).map_err(|_| Error::Protocol)?;
+        }
+        if address != owned {
+            return Err(Error::Protocol);
+        }
     }
     Ok(proxy.route())
 }

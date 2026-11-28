@@ -1,9 +1,9 @@
-//! A plaintext WebSocket uses an unauthenticated CONNECT to the configured
+//! A plaintext WebSocket uses CONNECT to the configured
 //! proxy, followed by the normal authenticated HTTP upgrade inside the tunnel.
 
 use hyper::{HeaderMap, Request, StatusCode, Uri, client::conn::http1};
 use hyper_util::rt::TokioIo;
-use reqwest::{Body, Upgraded, Url, header};
+use reqwest::{Body, Upgraded, Url, header, header::HeaderValue};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::TcpStream,
@@ -34,7 +34,7 @@ fn relay_address(proxy: &Url) -> Result<(&str, u16), Error> {
     Ok((host, port))
 }
 
-fn requests(request: reqwest::Request) -> Result<(Request<Body>, Request<Body>), Error> {
+fn requests(request: reqwest::Request) -> Result<(Uri, Request<Body>), Error> {
     let url = request.url();
     if url.scheme() != "http" || !url.username().is_empty() || url.password().is_some() {
         return Err(Error::Origin);
@@ -49,12 +49,9 @@ fn requests(request: reqwest::Request) -> Result<(Request<Body>, Request<Body>),
         .authority(destination.as_str())
         .build()
         .map_err(|_| Error::Origin)?;
-    let connect = Request::connect(authority)
-        .header(header::HOST, destination)
-        .body(Body::default())
-        .map_err(|_| Error::Origin)?;
 
     let mut inner: Request<Body> = request.try_into()?;
+    inner.headers_mut().remove(header::PROXY_AUTHORIZATION);
     let host = inner
         .uri()
         .authority()
@@ -68,7 +65,7 @@ fn requests(request: reqwest::Request) -> Result<(Request<Body>, Request<Body>),
         .path_and_query(path)
         .build()
         .map_err(|_| Error::Origin)?;
-    Ok((connect, inner))
+    Ok((authority, inner))
 }
 
 /// Poll the HTTP driver together with its single request. Cancellation drops
@@ -104,23 +101,93 @@ async fn upgrade(
     Ok(upgraded)
 }
 
-pub(crate) async fn websocket(
-    relay: &Url,
-    request: reqwest::Request,
-    accept: &str,
+/// Challenge lists may contain quoted commas. An unknown scheme's realm
+/// never authorizes releasing credentials to the proxy.
+pub(crate) fn offers_basic(headers: &HeaderMap) -> bool {
+    headers
+        .get_all(header::PROXY_AUTHENTICATE)
+        .iter()
+        .any(|value| {
+            let Ok(value) = value.to_str() else {
+                return false;
+            };
+            let (mut quoted, mut escaped) = (false, false);
+            value
+                .split(|c| {
+                    if escaped {
+                        escaped = false;
+                    } else if c == '\\' && quoted {
+                        escaped = true;
+                    } else if c == '"' {
+                        quoted = !quoted;
+                    } else if c == ',' && !quoted {
+                        return true;
+                    }
+                    false
+                })
+                .any(|part| {
+                    let mut fields = part.split_ascii_whitespace();
+                    fields
+                        .next()
+                        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("basic"))
+                        && !fields.next().is_some_and(|params| params.starts_with('='))
+                })
+        })
+}
+
+fn connect_request(
+    authority: &Uri,
+    authorization: Option<&HeaderValue>,
+) -> Result<Request<Body>, Error> {
+    let mut request = Request::connect(authority.clone()).header(
+        header::HOST,
+        authority.authority().ok_or(Error::Origin)?.as_str(),
+    );
+    if let Some(authorization) = authorization {
+        request = request.header(header::PROXY_AUTHORIZATION, authorization);
+    }
+    request.body(Body::default()).map_err(|_| Error::Origin)
+}
+
+async fn open_tunnel(
+    address: (&str, u16),
+    authority: &Uri,
+    authorization: Option<&HeaderValue>,
 ) -> Result<Upgraded, Error> {
-    let (connect, inner) = requests(request)?;
-    let stream = TcpStream::connect(relay_address(relay)?)
+    let request = connect_request(authority, authorization)?;
+    let stream = TcpStream::connect(address)
         .await
         .map_err(|_| Error::Transport)?;
-    let tunnel = upgrade(stream, connect, |status, _| {
+    upgrade(stream, request, |status, headers| {
         if status.is_success() {
             Ok(())
+        } else if authorization.is_none()
+            && status == StatusCode::PROXY_AUTHENTICATION_REQUIRED
+            && offers_basic(headers)
+        {
+            Err(Error::BasicProxyChallenge)
         } else {
             Err(Error::Status(status.as_u16()))
         }
     })
-    .await?;
+    .await
+}
+
+pub(crate) async fn websocket(
+    relay: &Url,
+    authorization: Option<&HeaderValue>,
+    request: reqwest::Request,
+    accept: &str,
+) -> Result<Upgraded, Error> {
+    let (authority, inner) = requests(request)?;
+    let address = relay_address(relay)?;
+    let tunnel = match open_tunnel(address, &authority, None).await {
+        Err(Error::BasicProxyChallenge) => {
+            let authorization = authorization.ok_or(Error::Status(407))?;
+            open_tunnel(address, &authority, Some(authorization)).await?
+        }
+        result => result?,
+    };
     upgrade(tunnel, inner, |status, headers| {
         validate_upgrade(status, headers, accept)
     })
@@ -130,6 +197,27 @@ pub(crate) async fn websocket(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_an_offered_basic_scheme_triggers_the_retry() {
+        for (challenges, expected) in [
+            (r#"Digest realm="protected, Basic realm", nonce="a""#, false),
+            (r#"Digest realm="quoted\", Basic", Basic = data"#, false),
+            (
+                r#"Digest realm="protected, Basic", bAsIc realm="proxy""#,
+                true,
+            ),
+            ("Basic", true),
+            ("Bearer", false),
+        ] {
+            let mut headers = HeaderMap::new();
+            headers.append(
+                header::PROXY_AUTHENTICATE,
+                HeaderValue::from_str(challenges).unwrap(),
+            );
+            assert_eq!(offers_basic(&headers), expected);
+        }
+    }
 
     #[test]
     fn relay_preserves_dns_and_native_ip_hosts_for_tcp_connect() {
@@ -211,7 +299,13 @@ mod tests {
             request
                 .headers_mut()
                 .insert("x-api-key", header::HeaderValue::from_static("synthetic"));
-            let (connect, inner) = requests(request).unwrap();
+            request.headers_mut().insert(
+                header::PROXY_AUTHORIZATION,
+                HeaderValue::from_static("proxy-only"),
+            );
+            let (authority, inner) = requests(request).unwrap();
+            let connect = connect_request(&authority, None).unwrap();
+            assert!(!inner.headers().contains_key(header::PROXY_AUTHORIZATION));
             assert_eq!(connect.method(), hyper::Method::CONNECT);
             assert_eq!(connect.uri().to_string(), connect_host);
             assert_eq!(connect.headers()[header::HOST], connect_host);

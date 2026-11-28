@@ -6,9 +6,19 @@ from pathlib import Path
 import sys
 
 
-def replay(cases):
+def verify_retries(proxy, operations, credential, status):
+    assert {r["operation"] for r in proxy} == set(operations)
+    for op in operations:
+        attempts = [(r["credentials"], r["status"]) for r in proxy if r["operation"] == op]
+        assert len(attempts) >= 2 and len(attempts) % 2 == 0
+        assert attempts == [("absent", "407"), (credential, status)] * (len(attempts) // 2)
+
+
+def replay(cases, candidate=False):
     expected = {("signed", "anonymous"), ("signed", "correct"), ("signed", "incorrect"),
                 ("rust", "anonymous"), ("rust", "correct")}
+    if candidate:
+        expected.update(("candidate", mode) for mode in ("anonymous", "correct", "incorrect", "connect-only", "other-scheme"))
     assert len(cases) == len(expected) and {(c["client"], c["mode"]) for c in cases} == expected
     for case in cases:
         client, mode = case["client"], case["mode"]
@@ -23,20 +33,32 @@ def replay(cases):
             assert not any(case[k] for k in ("eventObserved", "inventorySucceeded", "stopped"))
             continue
         assert case["exitCode"] == 0 and case["stopped"] and not case["fixtureProtocolRejected"]
+        if mode == "other-scheme":
+            assert not case["eventObserved"] and not case["inventorySucceeded"]
+            assert rows == proxy and {r["operation"] for r in proxy} == {"inventory", "pollingGET"}
+            assert all(r["credentials"] == "absent" and r["status"] == "407" for r in proxy)
+            continue
+        if mode == "connect-only":
+            assert not case["eventObserved"] and case["inventorySucceeded"]
+            assert not any(r["kind"] == "innerUpgrade" for r in rows)
+            direct = [r for r in proxy if r["operation"] != "connect"]
+            assert {r["operation"] for r in direct} == {"inventory", "pollingGET", "pollingPOST"}
+            assert all(r["credentials"] == "absent" and r["status"] == "allow" for r in direct)
+            connect = [r for r in proxy if r["operation"] == "connect"]
+            assert len(connect) == 2
+            verify_retries(connect, ["connect"], "incorrect", "407")
+            continue
         if mode == "incorrect":
             assert not case["eventObserved"] and not case["inventorySucceeded"]
             assert all(r["kind"] == "proxy" for r in rows)
-            assert [(r["operation"], r["credentials"], r["status"]) for r in proxy] == [
-                (op, creds, "407") for op in ("inventory", "pollingGET") for creds in ("absent", "incorrect")]
+            verify_retries(proxy, ["inventory", "pollingGET"], "incorrect", "407")
             continue
         assert case["eventObserved"] and case["inventorySucceeded"]
         counts = Counter(r["operation"] for r in proxy if r["status"] == "allow")
         assert counts.keys() == {"inventory", "pollingGET", "pollingPOST", "connect"}
         assert counts["inventory"] >= 1 and all(counts[k] == 1 for k in ("pollingGET", "pollingPOST", "connect"))
         if mode == "correct":
-            assert [(r["operation"], r["credentials"], r["status"]) for r in proxy] == [
-                (op, creds, status) for op in ("inventory", "pollingGET", "pollingPOST", "connect")
-                for creds, status in (("absent", "407"), ("correct", "allow"))]
+            verify_retries(proxy, ["inventory", "pollingGET", "pollingPOST", "connect"], "correct", "allow")
         else:
             assert all(r["status"] == "allow" and r["credentials"] == "absent" for r in proxy)
         upgrades = [r for r in rows if r["kind"] == "innerUpgrade"]
@@ -50,5 +72,6 @@ def replay(cases):
 
 
 if __name__ == "__main__":
-    replay(json.loads(Path(sys.argv[1]).read_text())["cases"])
-    print("Five archived Linux Basic proxy observations passed.")
+    report = json.loads(Path(sys.argv[1]).read_text())
+    replay(report["cases"], "candidateBinarySha256" in report)
+    print(f"Validated {len(report['cases'])} archived Linux proxy observations.")

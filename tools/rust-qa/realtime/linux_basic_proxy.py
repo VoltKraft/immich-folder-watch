@@ -13,7 +13,7 @@ import subprocess
 import sys
 import threading
 from http.server import ThreadingHTTPServer
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 
 AUTHORITY = "127.0.0.1:28431"
@@ -22,6 +22,7 @@ MATRIX = [
     ("signed", "anonymous"), ("signed", "correct"), ("signed", "incorrect"),
     ("rust", "anonymous"), ("rust", "correct"),
 ]
+CANDIDATE_MATRIX = [("candidate", mode) for mode in ("anonymous", "correct", "incorrect", "connect-only", "other-scheme")]
 ARCHIVE_PINS = {
     "inputs.json": "a558a833ecdf7de509ebb00d93992d8d3a281b00f7bd59fba00a3016b9346237",
     "test/peer.py": "3c1153ce7e6e9ab16a19921d967e87b582cd14a084faed30ed54e74929f9c623",
@@ -39,12 +40,12 @@ def inside(client, mode):
 
     assert socket.if_nameindex() == [(1, "lo")]
     assert len(Path("/proc/net/route").read_text().splitlines()) == 1
-    secret = secrets.token_hex(16)
+    secret = secrets.token_hex(16) + "@:+/"
     user = "fixture"
     expected = "Basic " + base64.b64encode(f"{user}:{secret}".encode()).decode()
 
     class Relay(ThreadingHTTPServer):
-        lang = client
+        lang = "signed" if client == "signed" else "rust"
 
         def record(self, kind, **data):
             with self.lock:
@@ -78,13 +79,15 @@ def inside(client, mode):
                     assert url.path in ("/socket.io/", "/collection/api/albums")
                     self.path = url.path + ("?" + url.query if url.query else "")
                     label = "inventory" if url.path.endswith("/albums") else "polling" + self.command
-                allowed = mode == "anonymous" or valid
+                allowed = (mode == "anonymous" or mode == "connect-only" and label != "connect"
+                           or mode != "other-scheme" and valid)
                 self.server.record("proxy", operation=label, credentials=(
                     "correct" if valid else "incorrect" if values else "absent"),
                     apiKey=api == ["synthetic"], status="allow" if allowed else "407")
                 if not allowed:
                     self.send_response(407)
-                    self.send_header("Proxy-Authenticate", 'Basic realm="fixture"')
+                    challenge = 'Digest realm="protected, Basic realm", nonce="fixture"' if mode == "other-scheme" else 'Basic realm="fixture"'
+                    self.send_header("Proxy-Authenticate", challenge)
                     self.send_header("Content-Length", "0")
                     self.send_header("Connection", "close")
                     self.end_headers()
@@ -112,8 +115,8 @@ def inside(client, mode):
     api = f"http://{AUTHORITY}/collection/api"
     proxy = f"http://{RELAY}"
     if mode != "anonymous":
-        chosen = secret if mode == "correct" else secret + "x"
-        proxy = f"http://{user}:{chosen}@{RELAY}"
+        chosen = secret + "x" if mode in ("incorrect", "connect-only") else secret
+        proxy = f"http://{user}:{quote(chosen, safe='')}@{RELAY}"
     env = {
         "HTTP_PROXY": proxy, "HOME": "/tmp", "PATH": "/usr/bin", "LANG": "C.UTF-8",
         "DOTNET_EnableDiagnostics": "0", "DOTNET_MULTILEVEL_LOOKUP": "0",
@@ -123,7 +126,7 @@ def inside(client, mode):
         command = ["/sdk/dotnet", "exec", "--runtimeconfig", "/package/immich-folder-watch.runtimeconfig.json",
                    "--depsfile", "/package/immich-folder-watch.deps.json", "/package/proxy.dll", api]
     else:
-        command = ["/binprobe", api, "allow-http-linux-proxy", "-", "1400", "30000", "250", f"http://{RELAY}"]
+        command = ["/candidate" if client == "candidate" else "/binprobe", api, "allow-http-linux-proxy", "-", "1400", "30000", "250", f"http://{RELAY}"]
     try:
         subject = subprocess.run(command, text=True, capture_output=True, env=env, timeout=15)
     finally:
@@ -147,7 +150,11 @@ def main():
     parser.add_argument("--archive", type=Path, required=True, help="paired native proxy-fedora-05 archive")
     parser.add_argument("--sdk", type=Path, required=True, help="shared .NET SDK containing the dotnet host")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--candidate", type=Path, help="additional native release binary")
+    parser.add_argument("--candidate-sha256", help="expected digest of the additional binary")
     args = parser.parse_args()
+    if bool(args.candidate) != bool(args.candidate_sha256):
+        parser.error("supply both the candidate and its expected digest")
     archive = args.archive.resolve(strict=True)
     inputs = json.loads((archive / "inputs.json").read_text())
     pins = {**ARCHIVE_PINS, **{f"package/{k}": v for k, v in inputs["signedAssemblies"].items()},
@@ -166,13 +173,20 @@ def main():
     for source, target in [(sdk, "/sdk"), (archive / "package", "/package"), (archive / "test", "/fixture"),
                            (archive / "target/release/ifw-realtime-probe", "/binprobe"), (script, "/case.py")]:
         launch.extend(("--ro-bind", str(source.resolve()), target))
+    if args.candidate:
+        if digest(args.candidate) != args.candidate_sha256:
+            raise ValueError("candidate binary does not match")
+        launch.extend(("--ro-bind", str(args.candidate.resolve(strict=True)), "/candidate"))
     launch.extend(("--setenv", "PYTHONPATH", "/fixture", "--chdir", "/tmp", "--", "/usr/bin/python3", "-B", "/case.py", "--inside"))
-    observations = [json.loads(subprocess.check_output([*launch, *case], timeout=25)) for case in MATRIX]
+    cases = MATRIX + CANDIDATE_MATRIX if args.candidate else MATRIX
+    observations = [json.loads(subprocess.check_output([*launch, *case], timeout=25)) for case in cases]
     evidence = {
         "host": Path("/etc/os-release").read_text(), "machine": os.uname().machine, "kernel": os.uname().release,
         "signedCommit": inputs["signedCommit"], "rustSourceHead": inputs["sourceHead"], "archiveInputs": pins,
         "dotnetHost": digest(sdk / "dotnet"), "trialScript": digest(script), "cases": observations,
     }
+    if args.candidate:
+        evidence["candidateBinarySha256"] = args.candidate_sha256
     with args.output.open("x") as stream:
         json.dump(evidence, stream, indent=2)
         stream.write("\n")

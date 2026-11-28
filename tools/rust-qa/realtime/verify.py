@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import secrets
 import shutil
 import socket
 import ssl
@@ -19,7 +20,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 
 LIMIT = 4 * 1024 * 1024
@@ -40,6 +41,8 @@ HTTPS_PROXY_CASES = ("https-proxy", "https-proxy-bypass", "https-proxy-priority"
                      "https-proxy-untrusted-tls", "https-proxy-wrong-host-tls")
 HTTP_PROXY_CASES = ("http-proxy", "http-proxy-bypass", "http-proxy-connect-redirect",
                     "http-proxy-upgrade-redirect", "http-proxy-reconnect")
+LINUX_BASIC_CASES = ("http-basic-proxy", "http-basic-refused", "http-basic-connect-refused",
+                     "http-basic-other-scheme", "http-basic-bypass")
 WINDOWS_HTTP_CASES = ("http-proxy-cgi", "http-proxy-opposite-scheme")
 WINDOWS_SYSTEM_CASES = ("windows-system-proxy-empty", "windows-system-proxy-invalid")
 
@@ -449,6 +452,7 @@ class PlainProxyOrigin(ProxyOriginHandler):
     upgrade_connection = "keep-alive, Upgrade"
 
     def validate_target(self):
+        assert not self.headers.get_all("Proxy-Authorization")
         assert self.path.startswith("/") and not self.path.startswith("//")
         assert self.headers.get_all("Host") == [f"127.0.0.1:{self.server.server_port}"]
 
@@ -545,9 +549,9 @@ def proxy_environment(home):
 
 
 def run_http_proxy_scenario(executable, platform_name, name, directory, redirect, configure_system=None):
-    from https_proxy import plaintext_handler
+    from https_proxy import basic_proxy_handler, check_basic_attempts, plaintext_handler
 
-    bypass = name in {"http-proxy-bypass", "http-proxy-opposite-scheme"}
+    bypass = name in {"http-proxy-bypass", "http-proxy-opposite-scheme", "http-basic-bypass"}
     refuse_connect = name == "http-proxy-connect-redirect"
     refuse_upgrade = name == "http-proxy-upgrade-redirect"
     reconnect = name == "http-proxy-reconnect"
@@ -557,11 +561,20 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
     budget = 1750 if reconnect else 1300
     with peer(scenario, api, handler=PlainProxyOrigin) as direct:
         authority = f"127.0.0.1:{direct.server_port}"
-        with peer(scenario, api, handler=plaintext_handler(PlainProxyOrigin, authority, refuse_connect)) as proxied:
+        handler = plaintext_handler(PlainProxyOrigin, authority, refuse_connect)
+        if name in LINUX_BASIC_CASES:
+            secret = secrets.token_hex(16) + "@:+/"
+            expected = "Basic " + base64.b64encode(f"fixture:{secret}".encode()).decode()
+            handler = basic_proxy_handler(handler, authority, name, expected)
+        with peer(scenario, api, handler=handler) as proxied:
             proxied.proxy_targets = {}
+            proxied.auth_attempts = []
             proxied.redirect_port = redirect.server_port
             endpoint = f"http://127.0.0.1:{proxied.server_port}"
             env = {**proxy_environment(directory), "HTTP_PROXY": endpoint}
+            if name in LINUX_BASIC_CASES:
+                password = secret + "x" if name in ("http-basic-refused", "http-basic-connect-refused") else secret
+                env["HTTP_PROXY"] = f"http://fixture:{quote(password, safe='')}@127.0.0.1:{proxied.server_port}"
             if name == "http-proxy-cgi":
                 # Win32 looks up any spelling of HTTP_PROXY; CGI suppresses
                 # this value, leaving the owned ALL_PROXY as the route.
@@ -588,6 +601,11 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
             assert not redirect.accepted_connections and not redirect.counts, redirect.counts
             assert proc.returncode == 0 and not proc.stderr and events[-1:] == ["Stopped"], (events, proc.stderr)
             assert budget - 50 <= elapsed < budget + 2000, elapsed
+            if name in LINUX_BASIC_CASES:
+                refused = check_basic_attempts(name, proxied.auth_attempts, trace, stats)
+                if refused:
+                    assert not direct.accepted_connections
+                    return {"proxyAttempts": proxied.auth_attempts.copy(), "client": dict(trace), "peer": dict(stats)}
             assert stats["inventoryRequests"] >= 3 and trace["Inventory"] >= 3 and trace["Periodic"] >= 3, (stats, events)
             assert stats["openingRequests"] == stats["namespacePosts"] == 1 and origin.namespace_posts == ["40/collection,"]
             assert not stats["sidPollingGets"] and not stats["pollingDisconnects"]
@@ -601,7 +619,8 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
                 assert stats["absoluteRequests"] == stats["inventoryRequests"] + 2, stats
                 assert stats["authenticatedRequests"] == stats["absoluteRequests"] + stats["tunneledUpgrades"], stats
                 assert not stats["rejectedAuthority"] and not stats["nestedConnect"], stats
-            assert stats["httpRequests"] == stats["authenticatedRequests"] + stats["connects"], stats
+            challenges = sum(status == "407" for _, _, status in proxied.auth_attempts)
+            assert stats["httpRequests"] == stats["authenticatedRequests"] + stats["connects"] + challenges, stats
             if refuse_connect or refuse_upgrade:
                 declined = [e for e in events if e.startswith("UpgradeDeclined ")]
                 assert declined == ["UpgradeDeclined Status(302)"] and trace["Attempt"] == 1, events
@@ -617,7 +636,8 @@ def run_http_proxy_scenario(executable, platform_name, name, directory, redirect
                 assert origin.direct_joins == (["40/collection,"] if reconnect else [])
                 assert origin.close_packets == [{"websocketText": "41/collection,"},
                                                 {"websocketCloseCode": 1000, "reason": "io client disconnect"}]
-            return {"client": dict(trace), "peer": dict(stats), "requestLinesAtProxy": proxied.proxy_targets.copy(),
+            return {**({"proxyAttempts": proxied.auth_attempts.copy()} if name in LINUX_BASIC_CASES else {}),
+                    "client": dict(trace), "peer": dict(stats), "requestLinesAtProxy": proxied.proxy_targets.copy(),
                     "directConnections": direct.accepted_connections, "proxyConnections": proxied.accepted_connections,
                     "redirectConnections": redirect.accepted_connections, "connectApiHeaders": stats["credentialHeaders"],
                     "closePacketsAtPeer": list(origin.close_packets), "directNamespaceJoinsAtPeer": list(origin.direct_joins),
@@ -719,7 +739,7 @@ def run_scenario(executable, name, directory, contexts, redirect):
             return {"selection": "SystemProxy", "originConnections": 0, "relayConnections": 0}
     platform_name, _, proxy_case = name.partition("-")
     if platform_name in ("windows", "linux"):
-        if proxy_case in (*HTTP_PROXY_CASES, *WINDOWS_HTTP_CASES):
+        if proxy_case in (*HTTP_PROXY_CASES, *WINDOWS_HTTP_CASES) or platform_name == "linux" and proxy_case in LINUX_BASIC_CASES:
             return run_http_proxy_scenario(executable, platform_name, proxy_case, directory, redirect)
         if proxy_case in HTTPS_PROXY_CASES:
             return run_proxy_scenario(executable, platform_name, proxy_case, directory, contexts, redirect)
@@ -948,6 +968,7 @@ def main():
     if platform.system() == "Linux":
         cases += ("linux-platform-tls", "linux-platform-directory-tls", "linux-platform-untrusted-tls",
                   "linux-platform-wrong-host-tls")
+        cases += tuple(f"linux-{name}" for name in LINUX_BASIC_CASES)
     platform_name = platform.system().lower()
     if platform_name in ("windows", "linux"):
         cases += tuple(f"{platform_name}-{case}" for case in (*HTTPS_PROXY_CASES, *HTTP_PROXY_CASES))

@@ -44,3 +44,50 @@ python3 -B tools/rust-qa/realtime/linux_basic_proxy.py \
 python3 -B tools/rust-qa/realtime/replay_linux_basic_proxy.py \
   artifacts/rust/realtime-assessment/linux-basic-proxy-repeat.json
 ```
+
+## First-party Linux transport
+
+When an explicitly selected HTTP proxy URL contains credentials and the origin
+uses opted-in plaintext HTTP, the adapter issues the request without proxy
+credentials. A 407 offering Basic permits one retry of the same request.
+The Socket.IO WebSocket opens a fresh connection to the selected proxy for
+the challenged CONNECT. The inner upgrade excludes the proxy header. The
+request builder disables redirects. Existing pinned reqwest code decodes
+the URL user information, including escaped characters, and marks the derived
+header sensitive. This trial covers plaintext HTTP to an HTTP proxy. Basic
+authentication for HTTPS tunnels, Windows, other proxy authentication schemes
+and installed application integration each need separate observations.
+
+On Fedora x64 the final release ELF
+`aba1c6c8144014c12e1e767db0028cef7e36f6c23f219551627729ee6da35079`
+and the signed client each decoded an escaped synthetic password. Each first
+sent anonymous REST, polling and CONNECT requests and retried after the fixed
+proxy returned 407. The Rust process made six successful inventory reads
+and delivered one event before closing with code 1000. The incorrect-password
+trial produced zero successful reads and no event. With a refusal only at
+CONNECT, polling joined and inventory continued but no WebSocket opened.
+A Digest challenge containing the text “Basic” inside its quoted realm
+received zero credential headers. No CONNECT included the Immich API key.
+
+The paired report at
+`artifacts/rust/realtime-assessment/linux-basic-proxy-comparison-02/report.json`
+has SHA-256 `3901e895d117a17636f8426b73322597e1f94815c89204e9c7039fec20458281`.
+Repeat the separate comparison by adding the following arguments to
+`linux_basic_proxy.py` and replaying the output with the same readback.
+
+```text
+--candidate artifacts/rust/realtime-assessment/linux-basic-proxy-comparison-02/ifw-realtime-probe
+--candidate-sha256 aba1c6c8144014c12e1e767db0028cef7e36f6c23f219551627729ee6da35079
+```
+
+The standard native Linux transport run on Fedora x64 passed 54 wire
+scenarios, 17 unit tests, rustfmt, warnings-denied Clippy and the locked
+release build. Both native Ubuntu architectures use the same entry point.
+The five new cases cover Basic success, refusal at all requests, refusal
+only at CONNECT, a foreign challenge and a direct route through
+`NO_PROXY`. The direct origin received its synthetic application key and
+no proxy header. The native receipt at
+`artifacts/rust/realtime-assessment/linux-basic-proxy-native-05/result.json`
+has SHA-256 `d4ff505e74925f334fd19ac1d5222af2c46f95fa04fef5407d705061ce361efa`.
+Its 27 source digests and nine outputs matched independently. The existing
+graph retained 109 registry inputs and 192 original notices.

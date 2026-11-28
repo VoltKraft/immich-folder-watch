@@ -25,7 +25,12 @@ and unpacked source bytes, notice evidence, formatting, unit tests, Clippy, rele
 build and 35 shared wire scenarios. Each platform also runs five HTTPS
 and five explicitly enabled HTTP proxy cases. Windows adds two HTTP routing
 cases and two system-provider selection controls. Linux adds four platform
-trust cases. Two strict polling peers accept only the
+trust cases and five named HTTP Basic proxy cases for explicitly enabled plaintext.
+The latter compare the initial anonymous request, the challenge and its single
+retry for REST, polling and WebSocket CONNECT. The controls exercise an incorrect
+password for all requests or just the tunnel, a different authentication scheme
+and an exact-host bypass. The separate paired reference uses the signed
+Linux assemblies. [Linux Basic proxy comparison](../../../docs/rust/rw02-linux-basic-proxy.md). Two strict polling peers accept only the
 Socket.IO namespace derived by the shipping client from an escaped API URL.
 They check CONNECT, the authenticated album request and DISCONNECT for the
 root and a named namespace. [Signed reference and expected packets](../../../docs/rust/rw02-realtime-transport.md#escaped-api-paths-and-socketio-namespaces).

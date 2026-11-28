@@ -23,6 +23,7 @@ pub(crate) struct Transport {
     endpoint: Url,
     client: Client,
     plaintext_proxy: Option<Url>,
+    proxy_authorization: Option<header::HeaderValue>,
     header: header::HeaderValue,
     pub namespace: String,
 }
@@ -262,20 +263,43 @@ impl Transport {
             builder = builder.tls_certs_only(roots);
         }
         let mut plaintext_proxy = None;
-        if let Some(proxy) = proxy {
+        let mut credentials = None;
+        if let Some(mut proxy) = proxy {
             if api.scheme() == "http" {
+                if cfg!(target_os = "linux")
+                    && proxy.scheme() == "http"
+                    && (!proxy.username().is_empty() || proxy.password().is_some())
+                {
+                    credentials = Some(proxy.clone());
+                    proxy.set_username("").map_err(|_| Error::Origin)?;
+                    proxy.set_password(None).map_err(|_| Error::Origin)?;
+                }
                 builder = builder.proxy(reqwest::Proxy::http(proxy.clone())?);
                 plaintext_proxy = Some(proxy);
             } else {
                 builder = builder.proxy(reqwest::Proxy::https(proxy)?);
             }
         }
+        let client = builder.build().map_err(|_| Error::Transport)?;
+        // Reqwest decodes URL userinfo and builds a sensitive Basic header. This
+        // request is never sent. Only a challenged proxy receives its header.
+        let proxy_authorization = credentials
+            .map(|url| {
+                client
+                    .get(url)
+                    .build()?
+                    .headers_mut()
+                    .remove(header::AUTHORIZATION)
+                    .ok_or(Error::Origin)
+            })
+            .transpose()?;
         Ok(Self {
             api,
             endpoint,
             namespace,
             header,
-            client: builder.build().map_err(|_| Error::Transport)?,
+            client,
+            proxy_authorization,
             plaintext_proxy,
         })
     }
@@ -307,11 +331,29 @@ impl Transport {
             .header("x-api-key", &self.header))
     }
 
+    async fn send(&self, request: RequestBuilder) -> Result<Response, Error> {
+        let Some(auth) = &self.proxy_authorization else {
+            return Ok(request.send().await?);
+        };
+        // The adapter's GET/POST bodies are bounded and replayable. Redirects
+        // remain disabled, so the fixed proxy and origin do not change.
+        let retry = request.try_clone().ok_or(Error::Protocol)?;
+        let response = request.send().await?;
+        if response.status() == StatusCode::PROXY_AUTHENTICATION_REQUIRED
+            && crate::plaintext_proxy::offers_basic(response.headers())
+        {
+            drop(response);
+            return Ok(retry
+                .header(header::PROXY_AUTHORIZATION, auth)
+                .send()
+                .await?);
+        }
+        Ok(response)
+    }
+
     pub async fn poll(&self, sid: Option<&str>) -> Result<Vec<u8>, Error> {
-        let resp = self
-            .request(Method::GET, self.uri("polling", sid))?
-            .send()
-            .await?;
+        let request = self.request(Method::GET, self.uri("polling", sid))?;
+        let resp = self.send(request).await?;
         bounded_ok_body(resp).await
     }
 
@@ -319,12 +361,11 @@ impl Transport {
         if packet.len() > max_payload.min(MAX_MESSAGE_BYTES) {
             return Err(Error::Limit);
         }
-        let resp = self
+        let request = self
             .request(Method::POST, self.uri("polling", Some(sid)))?
             .header(header::CONTENT_TYPE, "text/plain;charset=UTF-8")
-            .body(packet)
-            .send()
-            .await?;
+            .body(packet);
+        let resp = self.send(request).await?;
         if bounded_ok_body(resp).await? != b"ok" {
             return Err(Error::Protocol);
         }
@@ -358,7 +399,13 @@ impl Transport {
         accept: &str,
     ) -> Result<reqwest::Upgraded, Error> {
         if let Some(relay) = &self.plaintext_proxy {
-            return crate::plaintext_proxy::websocket(relay, request.build()?, accept).await;
+            return crate::plaintext_proxy::websocket(
+                relay,
+                self.proxy_authorization.as_ref(),
+                request.build()?,
+                accept,
+            )
+            .await;
         }
         let response = request.send().await?;
         validate_upgrade(response.status(), response.headers(), accept)?;
@@ -392,7 +439,7 @@ impl Transport {
             .map_err(|_| Error::Origin)?
             .pop_if_empty()
             .push("albums");
-        let resp = self.request(Method::GET, url)?.send().await?;
+        let resp = self.send(self.request(Method::GET, url)?).await?;
         if bounded_ok_body(resp).await? == b"[]" {
             Ok(())
         } else {

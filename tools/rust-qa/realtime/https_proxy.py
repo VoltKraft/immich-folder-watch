@@ -1,6 +1,7 @@
 """Loopback HTTP proxy observers that serve a single fixed origin on their own sockets."""
 
 from collections import Counter
+import hmac
 from http.server import BaseHTTPRequestHandler
 import ssl
 import threading
@@ -134,3 +135,68 @@ def plaintext_handler(origin, authority, refuse_connect):
                 self.server.mark("absoluteRequests")
                 self.record_target(label)
     return FixedPlaintext
+
+def basic_proxy_handler(origin, authority, name, expected):
+    """Authenticate only the absolute HTTP request or CONNECT on this fixed listener."""
+    class BasicProxy(origin):
+        def parse_request(self):
+            if not super().parse_request():
+                return False
+            assert self.headers.get_all("Host") == [authority]
+            supplied = self.headers.get_all("Proxy-Authorization", [])
+            if self.in_tunnel:
+                assert not supplied
+                return True
+            if self.command == "CONNECT":
+                assert self.path == authority and not self.headers.get_all("x-api-key")
+                operation = "connect"
+            else:
+                target = urlsplit(self.path)
+                assert target.scheme == "http" and target.netloc == authority
+                assert target.path in (self.server.api + "/albums", "/socket.io/")
+                assert self.headers.get_all("x-api-key") == ["synthetic"]
+                operation = "inventory" if target.path.endswith("/albums") else "polling" + self.command
+            valid = len(supplied) == 1 and hmac.compare_digest(supplied[0], expected)
+            credentials = "correct" if valid else "incorrect" if supplied else "absent"
+            allowed = ((name == "http-basic-connect-refused" and operation != "connect")
+                       or (valid and name != "http-basic-other-scheme"))
+            with self.server.lock:
+                self.server.auth_attempts.append((operation, credentials, "allow" if allowed else "407"))
+            if allowed:
+                del self.headers["Proxy-Authorization"]
+                return True
+            challenge = ('Digest realm="private, Basic realm", nonce="fixture"'
+                         if name == "http-basic-other-scheme" else 'Basic realm="fixture"')
+            self.close_connection = True
+            self.body(b"", 407, {"Proxy-Authenticate": challenge, "Connection": "close"})
+            return False
+    return BasicProxy
+
+def check_basic_attempts(name, attempts, trace, stats):
+    """Verify every observed retry and return whether the session was refused."""
+    operations = {op for op, _, _ in attempts}
+    if name == "http-basic-bypass":
+        assert not attempts
+        return False
+    if name == "http-basic-connect-refused":
+        assert operations == {"inventory", "pollingGET", "pollingPOST", "connect"}
+        assert all((c, status) == ("absent", "allow") for o, c, status in attempts if o != "connect")
+        assert [(c, status) for o, c, status in attempts if o == "connect"] == [
+            ("absent", "407"), ("incorrect", "407")]
+        assert not trace["Event"] and not stats["tunneledUpgrades"] and trace["Inventory"] >= 3
+        assert trace["UpgradeDeclined Status(407)"] == 1
+        return True
+    refused = name in ("http-basic-refused", "http-basic-other-scheme")
+    step = [("absent", "407")]
+    if refused:
+        assert operations == {"inventory", "pollingGET"} and not stats["openingRequests"]
+        assert not trace["Inventory"] and not trace["Event"] and not stats["tunneledUpgrades"]
+        if name == "http-basic-refused":
+            step.append(("incorrect", "407"))
+    else:
+        assert name == "http-basic-proxy" and operations == {"inventory", "pollingGET", "pollingPOST", "connect"}
+        step.append(("correct", "allow"))
+    for operation in operations:
+        observed = [(credentials, status) for op, credentials, status in attempts if op == operation]
+        assert observed == step * (len(observed) // len(step))
+    return refused
