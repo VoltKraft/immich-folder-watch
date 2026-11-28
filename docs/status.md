@@ -38,6 +38,14 @@ Default all sixteen Quit points still hit one other window. Its process
 name remains unknown.
 [Backup and desktop observations](rust/rw01-storage-contract.md#installed-arm64-worker-and-foreground-at-1910195).
 
+On the 4 GiB x64 guest, all 20 Rust GUI cases across five native
+executables passed at `1660aeb`. At `343ebd3`, the shipping .NET
+solution built locally. Its three TRX files report 646 passes and 28
+Linux/Unix-specific skips, with no failures. The 39 Python regression
+cases also passed.
+[Original native GUI results](../tools/rust-qa/windows-local/README.md#gui-tests-on-server-2025-at-1660aeb) ·
+[Local .NET reference](../tools/rust-qa/windows-local/README.md#local-shipping-reference-at-343ebd3).
+
 On November 27 the archived Windows x64 GUI passed the RDP and mixed-DPI
 checks on a local Windows Server 2025 Standard Evaluation VM. Windows
 measured 96 and 192 DPI and the observer verified visible edits in the same

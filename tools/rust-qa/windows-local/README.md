@@ -46,10 +46,26 @@ native dependency graph and build receipt. Its `testHarnessReceiptSha256`
 identifies the companion test kit. The retained-window and CPU-renderer
 comparisons use their own executables and measurements.
 
+### GUI tests on Server 2025 at 1660aeb
+
+The offline 4 GiB VM ran all five original x64 test executables from
+[`1660aeb` compiler run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46099044960).
+The foreground-request tests passed 2 cases, the GUI library 3, the
+Windows tray 8, launcher delivery 4 and the GUI application 3. All
+twenty cases passed, with zero ignored or filtered. Each original test
+log matched the guest report. Real Explorer interactions have separate
+[desktop observations](../../../docs/rust/rw02-windows-services.md).
+
+| Original archive | SHA-256 |
+| --- | --- |
+| [Five test executables and compiler stream](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46099044960/artifacts/15244223677) | `22dbf4faaada4456a20d18752bae854545745363007478ae650949e6e4190d04` |
+| [Ordinary GUI and compiler receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46099044960/artifacts/15244358084) | `f6d7f5e21b9b723f5582ebb5a131356dbeeacb5bb463401da467c448e865021d` |
+| Guest output in `artifacts/rust/local-windows-server-2025-x64/20261128/gui-1660aeb/original-guest-results.zip` | `c14401996f4afb3af1c7b13120e18e46089e194a57229ce818b77f31b69b49d0` |
+
 ## Shipping .NET solution and installer checks
 
 In a fresh guest checkout, select the x64 SDK from `global.json`, Git for
-Windows, Python and PowerShell 7.3 or later. Stage the locked Avalonia
+Windows with `bin/bash.exe`, Python and PowerShell 7.3 or later. Stage the locked Avalonia
 source and upstream inputs in `artifacts/reduced-avalonia/inputs`.
 Pass the guest path of the offline public NuGet feed. The launcher keeps the
 private Avalonia packages mapped to the feed it builds from the pinned sources.
@@ -72,6 +88,38 @@ the published 3.0.3 MSI. The test checks its pinned hash before installation.
     -CandidatePublishDirectory artifacts/windows/msi/publish/win-x64 `
     -EvidenceDirectory artifacts/windows/upgrade-evidence
 ```
+
+### Local shipping reference at `343ebd3`
+
+On 2026-11-28, the standard user in the offline 4 GiB Windows Server 2025
+x64 guest ran the solution at `343ebd315d92699d00443d52fb09bc18b214b27b`.
+The fixture checked SHA-512 for 127 input files, including 120 public NuGet
+packages and the four upstream Avalonia inputs. The guest used .NET SDK
+10.0.401, PowerShell 7.7.0, Python 3.13.17 and Git for Windows 2.56.1.
+Its private embedded Python path file included the checkout's `tools`
+directory for sibling module imports. A short physical checkout at
+`C:\Users\ifw-test\i\r` kept the longest extracted framework path below
+the guest's 260-character limit. Python resolves substituted drive letters
+to their physical locations during that extraction.
+
+All 39 workflow and installer regression cases passed. The guest rebuilt
+both private Avalonia packages, restored and built the Release solution,
+verified the assemblies' provenance and produced three original TRX files.
+
+| Test assembly | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| ImmichFolderWatch.Tests | 36 | 0 | 0 |
+| ImmichFolderWatch.Tests.Core | 564 | 9 | 0 |
+| ImmichFolderWatch.Tests.Linux | 46 | 19 | 0 |
+| **Total** | **646** | **28** | **0** |
+
+The skipped rows identify 27 Linux D-Bus cases and one Unix file-mode case.
+The separate installed MSI upgrade has its own guest procedure above.
+The original transcript, standard output and errors, three TRX files, guest
+receipt and independent per-row readback are under
+`artifacts/rust/local-windows-server-2025-x64/20261127/dotnet-343ebd3/attempt-3/`.
+The guest returned exit code zero. Its archived results have SHA-256
+`23e3b24f55a92aad19fd21b750e41aa4311e9af9451475502557cd5393650752`.
 
 ## Other native suites
 
