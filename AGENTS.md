@@ -206,8 +206,9 @@ to reconcile project decisions, defaults, and recorded state.
   using metadata from the held file. Verify [legacy upload identities](docs/rust/rw02-legacy.md#legacy-upload-identities-from-the-held-file)
   and the rewound retry body against the C# multipart cases. For realtime changes, verify the
   [disconnect packets observed by the peer](docs/rust/rw02-realtime-transport.md#stopping-an-established-session).
-  Use the [four-target transport workflow](.github/workflows/rust-realtime.yaml)
-  to obtain the exact Windows executable for comparison with the shipping MSI.
+  Use the [transport workflow](.github/workflows/rust-realtime.yaml) on
+  Windows ARM64 and both Linux targets. For comparison with the x64 shipping
+  MSI, use the [compiler archive on the local VM](tools/rust-qa/windows-local/README.md#workspace-and-network).
   Use the [private bundle and directory](docs/rust/rw02-realtime-transport.md#linux-platform-trust-with-private-certificates)
   for the Linux platform-verifier trials. For [Linux HTTPS proxy routing](docs/rust/rw02-realtime-transport.md#linux-proxy-selection-for-rest-and-realtime),
   verify the CONNECT authority, the route taken by authenticated origin
@@ -265,7 +266,8 @@ to reconcile project decisions, defaults, and recorded state.
   Match a [visible WinRT popup](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup)
   to the ordinary sender's timed call and the exact title and body shown by the Shell.
   Use the [archived native sender](tools/rust-qa/windows-services/toast-history.md#original-sender-on-a-disposable-windows-x64-vm)
-  for the isolated x64 console.
+  for the isolated x64 console. For the [ARM64 banner](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup),
+  replay the separate screen capture against the notification history from the same job.
   Preserve the [original job CPU and member working sets](docs/rust/rw02-windows-window.md#process-accounting-for-the-same-host-wpf-budget)
   in the three-trial WPF budget. Compare Windows renderer timings with the same host's WPF reference and
   qualify the [GDI control](tools/rust-qa/windows-gdi-control/README.md)

@@ -11,10 +11,24 @@ The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-impleme
 New Windows x64 tests for the rewrite run on the local Server 2025 VM.
 The GitHub x64 build supplies native executables. Windows ARM64, Linux x64
 and Linux ARM64 still have hosted test jobs. Already started mixed runs may
-finish. See the [suite inventory and guest commands](../tools/rust-qa/windows-local/README.md).
+finish. At `30e2a9c` the local guest passed 35 workspace cases, 14 transport
+unit tests and all 49 loopback scenarios. The GitHub x64 compiler job
+succeeded, and PR CI skipped its Windows test job. At `a8828b5` GitHub
+scheduled the two ordinary ARM64 activation orders and the private desktop
+trial. [Workspace and guest evidence](../tools/rust-qa/windows-local/README.md#workspace-execution-on-server-2025-at-30e2a9c)
+· [Compiler job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46066266349)
+· [ARM64 activation jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46066405965).
 The guest also showed the expected WinRT notification title and body on the
 original Shell window. The console observer retained the screenshot and the
 original Do Not Disturb setting was restored. [Local Windows evidence](rust/rw02-windows-services.md).
+
+Local Windows trials share one guest slot. The Server 2025 test guest now
+runs with 4 GiB of RAM. In the ARM64 Default desktop trials at `f69065e`,
+the installed WPF window reopened and the separate backup run logged its
+first upload. A different foreground window covered all sixteen sampled
+Quit menu anchor points in both runs. The private desktop trials passed.
+[ARM64 activation run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46067133157) ·
+[ARM64 backup run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46067133243).
 
 On November 27 the archived Windows x64 GUI passed the RDP and mixed-DPI
 checks on a local Windows Server 2025 Standard Evaluation VM. Windows
