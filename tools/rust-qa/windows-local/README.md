@@ -7,9 +7,10 @@ the x64 inputs. Native Windows ARM64 and both Linux suites run in Actions.
 Retain the full source revision, original input ZIP, its Actions SHA-256,
 guest result and logs together. Use a fresh output directory for each trial.
 
-Run one local Windows guest at a time. The desktop, workspace and MSI
-launchers allocate 3.5 GiB (`-m 3584M`). Use that limit for new disposable
-overlays as well. The isolated proxy launcher uses 3 GiB.
+Run one local Windows guest at a time. Allocate 3 GiB (`-m 3072M`)
+to the desktop and every disposable overlay, including the workspace,
+MSI, tray and proxy trials. When copying a launcher from an older trial,
+set the new copy's memory limit before starting it.
 Stage new DVDs, result disks and writable guest overlays on the local SSD.
 On this test host `/tmp` is a RAM-backed filesystem.
 

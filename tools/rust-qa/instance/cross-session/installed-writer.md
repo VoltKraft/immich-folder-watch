@@ -36,7 +36,7 @@ for writing or grants migration authority.
 
 ## Native trial and replay
 
-Use a disposable Server 2025 x64 overlay with 3584 MiB RAM and an active RDP
+Use a disposable Server 2025 x64 overlay with 3072 MiB RAM and an active RDP
 session for its ordinary `ifw-test` user. Install the pinned release MSI into
 the overlay. Preserve the installer log and receipt in the existing test marker
 directory. Begin with an absent `%LOCALAPPDATA%\Immich Folder Watch` profile.
@@ -140,7 +140,7 @@ then opens the installed WPF application and selects its ordinary tray Quit.
 
 ### Reproducing the transaction
 
-Use one disposable 3584 MiB Server 2025 x64 VM with the original per-machine
+Use one disposable 3072 MiB Server 2025 x64 VM with the original per-machine
 3.0.4 installation, the bound standard-user marker from the preflight above,
 and a fresh `ifw-test` RDP profile. Supply the original compiler archive above
 as `endpoint.zip`, the 3.0.4 x64 MSI as `shipping.msi`, the previous WPF

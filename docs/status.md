@@ -183,10 +183,12 @@ The guest also showed the expected WinRT notification title and body on the
 original Shell window. The console observer retained the screenshot and the
 original Do Not Disturb setting was restored. [Local Windows evidence](rust/rw02-windows-services.md).
 
-Local Windows trials share one guest slot. The Server 2025 guest previously
-ran with 4 GiB of RAM, down from 6 GiB. The desktop and seven local test
-launchers now request 3584 MiB, reducing the allocation by another 512 MiB
-per run. The proxy launcher uses 3 GiB.
+Local Windows trials share one guest slot. The local Server 2025 guest
+now uses 3072 MiB, down from 3584 MiB. The desktop, workspace, MSI,
+tray, setup and proxy launchers all use this limit. Three host kernel
+OOM events ended QEMU processes before the reduction. A fresh
+SSD-backed guest reported 3,221,225,472 bytes of base RAM and zero
+hot-plugged memory through QMP.
 The three .NET test images and nine other completed Windows test DVDs
 now reside on the SSD. The twelve original paths resolve to copies
 verified by SHA-256, freeing 3,901,890,560 bytes on the host's tmpfs.
