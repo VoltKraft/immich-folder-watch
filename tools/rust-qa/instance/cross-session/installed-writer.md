@@ -271,3 +271,7 @@ Its `committed-inventory.json` has SHA-256
 `readback.json` identifies the original executable, private product code,
 MSI digest, transactions and profile hashes. `shutdown.json` records the host
 readback.
+
+The [separate profile-return trial](transaction/rust-return.md) checks the
+album value in the reinstalled WPF editor using an archived Windows x64
+Rust configuration and an isolated copy of the database files.
