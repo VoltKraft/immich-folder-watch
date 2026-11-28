@@ -106,10 +106,41 @@ The native observations and signed readbacks are in
 `artifacts/rust/combined-profile/editor-language-shipping-readback/results.json`,
 SHA-256 `5653a5c8e5ae73a7fca73dfcc3d3d5c193cebe713a2d1019ab90c13ad0be7be0`.
 
-This staged integration leaves adoption by the ordinary cross-platform
-compiler entry points open. The current normal renderer profile, retained
-Windows variants and Linux headless renderer each have their own compiler
-and source-reconstruction contracts.
+The Fedora comparison used the staged compiler. The ordinary Linux compiler
+subsequently produced the Ubuntu builds below. Retained Windows variants
+and the Linux headless renderer have their own compiler and
+source-reconstruction contracts.
+
+## Ordinary native Ubuntu launches at 17437d0
+
+Ubuntu 24.04 x64 and ARM64 each passed the four startup cases in the
+table above at `17437d00514e698f911788efca390fcb973442d7`.
+Each GUI acquired the session bus name and opened its original X11 window
+on a private Xvfb display before the watcher started. Its AT-SPI tree
+showed `Filename`, `Password`, `Deutsch`, `Quit` for both English
+cases and `Dateiname`, `Kennwort`, `English`, `Beenden` for both German
+cases. The watcher then registered the same primary and its first dbusmenu
+revision had IDs 1–3 with the corresponding labels. [Both native Ubuntu jobs](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46139648505)
+
+In all eight sessions the original inventory worker read one synthetic
+JPEG on passes zero and one, then detected the second JPEG on pass two.
+Menu ID 3 stopped the same child and GUI. The GUI released the window
+and bus name, reported `DRAINED passes=5` and exited zero. The original
+configuration bytes matched their recorded pre-launch digest. The Ubuntu
+jobs ran the ordinary Rust GUI and worker. The signed 3.0.4 comparison
+remains recorded under Fedora above.
+
+| Native target | Original Actions archive SHA-256 | Four-case `results.json` SHA-256 |
+| --- | --- | --- |
+| [Ubuntu x64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46139648505/artifacts/15261697178) | `434904a26a3eb6115605c5f0973212d56ae959f7cd71d9ae6e8528086b59002d` | `3b3abdb344e5752460fd0aa05f3b512a2bde64da5e5081d01d79867b4386115a` |
+| [Ubuntu ARM64](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46139648505/artifacts/15261786049) | `6146f4c1efa6b639b8910148ca531120f7b4f55e7a879cc244aaf25cb6c9ba9b` | `e61b5c36cf9e726b35e32a954361fefca03dd88c11f72b354cf856872362e4d8` |
+
+Both original archives and their independent replay are in
+`artifacts/rust/gui-run/ubuntu-ordinary-startup-17437d0/`. The replay
+checked each AT-SPI tree, registration log, worker scan and shutdown log,
+configuration file and case record. On each architecture it verified both
+native ELF images, the compiler stream, dependency graph, registry-source
+receipt, 39 GUI compiler source entries and eight observer source entries.
 
 ## Full source, feature and notice audits
 
