@@ -100,7 +100,8 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
             with self.subTest(workflow=name):
                 self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
         for name in ("rust-windows-x64-build.yaml", "rust-windows-x64-gui-build.yaml",
-                     "rust-windows-x64-combined-build.yaml", "rust-windows-x64-tray-build.yaml"):
+                     "rust-windows-x64-combined-build.yaml", "rust-windows-x64-tray-build.yaml",
+                     "rust-windows-arm64-notification.yaml"):
             self.check_rust_workflow(name, {"actions/checkout", "actions/upload-artifact"})
 
     def test_rewrite_windows_x64_has_only_compiler_inputs_on_actions(self):

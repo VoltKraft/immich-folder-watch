@@ -8,6 +8,20 @@ qualifying the desktop stack. RW-03 through RW-07 depend on that decision.
 The shipping reference is .NET 3.0.4. [Fixed contract](project.md#m-rust-implementation-20261114) ·
 [Acceptance matrix](rust/acceptance.md#work-package-gates) · [Draft PR 46](https://github.com/VoltKraft/immich-folder-watch/pull/46).
 
+On Server 2025 x64 at `36190f1`, the standard user ran the combined Rust
+executable, its five held-file upload cases and the SPDX generator. The
+host reproduced the guest's 258-package inventory byte for byte. On Fedora
+x64 the Linux HTTPS transport at `ed9268e` passed 19 unit tests, 66 wire
+cases and the sixteen-case paired Digest comparison with .NET 3.0.4.
+[Local combined results](../tools/rust-qa/windows-local/README.md#combined-profile-on-server-2025-at-36190f1) ·
+[Fedora Digest comparison](rust/rw02-linux-tls-basic-proxy.md#authority-bound-digest-on-fedora-x64).
+
+On the Windows ARM64 desktop at `3d55500`, the normal WinRT sender and
+history succeeded. The 93 point samples did not establish visible labels.
+The [fresh console trial](../tools/rust-qa/windows-services/toast-history.md#first-notification-on-a-fresh-windows-arm64-console)
+runs the physical observer before the other desktop workloads and reads
+the two Windows notification switches after the sender exits.
+
 New Windows x64 tests for the rewrite run on the local Server 2025 VM.
 The GitHub x64 build supplies native executables. Windows ARM64, Linux x64
 and Linux ARM64 still have hosted test jobs. Already started mixed runs may

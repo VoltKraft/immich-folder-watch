@@ -18,6 +18,32 @@ The result and raw per-process logs are under `artifacts/rust/windows-services/t
 python3 -B tools/rust-qa/windows-services/toast_history.py x86_64-pc-windows-msvc --replay /path/to/evidence
 ```
 
+## First notification on a fresh Windows ARM64 console
+
+The [focused ARM64 workflow](../../../.github/workflows/rust-windows-arm64-notification.yaml)
+builds the same source-bound sender on a fresh Windows 11 ARM64 runner.
+It exercises the ordinary and suppressed notifications immediately after
+the native Shell controls. The general desktop assessment also exercises
+the sender later in its session. The fresh trial archives the compiler
+and service receipt, the two notification histories and the physical
+screen evidence together. Its last step requires independent confirmation
+of both visible labels. When the point provider misses a label, the
+original crop remains available for visual review.
+
+After both observers exit, the focused job queries the Windows Shell
+notification state and reads the Notifications and Do not disturb switches
+through Windows Settings. It records the exact two automation IDs' states
+when available. It closes the Settings window it opened. An existing
+Settings window is left alone. These are post-observation readings.
+
+The earlier [ARM64 history at 3d55500](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105348/artifacts/15244648584)
+contained both messages. The normal sender returned success from Show,
+and selective removal ended with an empty history. Its point observer
+made 93 samples across the Show call and the following ten seconds.
+It saw two known Shell roots and recorded zero provider errors. Neither
+label was visible to that observer. This archive predates the separate
+physical screen observer.
+
 ## Visible normal WinRT popup
 
 On the hosted ARM64 desktop the command above starts a second, native

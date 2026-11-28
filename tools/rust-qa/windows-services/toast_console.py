@@ -164,11 +164,15 @@ def observe_arm64():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--observe-arm64", action="store_true", help="Observe the existing sender in its native rewrite job")
+    parser.add_argument("--require-visible", action="store_true", help="require independent confirmation of both visible labels")
     parser.add_argument("native", type=Path, nargs="?")
     parser.add_argument("frames", type=Path, nargs="?")
     args = parser.parse_args()
-    if args.observe_arm64 and not (args.native or args.frames):
+    if args.observe_arm64 and not (args.native or args.frames or args.require_visible):
         raise SystemExit(observe_arm64())
     if args.observe_arm64 or not (args.native and args.frames):
         parser.error("Select --observe-arm64 or supply both native and physical evidence directories")
-    print(json.dumps(verify(args.native, args.frames), indent=2))
+    result = verify(args.native, args.frames)
+    print(json.dumps(result, indent=2))
+    if args.require_visible and result["presentation"] != "visible":
+        raise SystemExit(2)

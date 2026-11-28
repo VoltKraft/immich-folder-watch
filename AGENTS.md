@@ -271,6 +271,8 @@ to reconcile project decisions, defaults, and recorded state.
   scopes posting, readback and removal to the test shortcut's app identity.
   Match a [visible WinRT popup](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup)
   to the ordinary sender's timed call and the exact title and body shown by the Shell.
+  Use the [fresh ARM64 console](tools/rust-qa/windows-services/toast-history.md#first-notification-on-a-fresh-windows-arm64-console)
+  to compare early notification history, physical labels and the post-test Settings readback.
   Use the [archived native sender](tools/rust-qa/windows-services/toast-history.md#original-sender-on-a-disposable-windows-x64-vm)
   for the isolated x64 console. For the [ARM64 banner](tools/rust-qa/windows-services/toast-history.md#visible-normal-winrt-popup),
   replay the separate screen capture against the notification history from the same job.
