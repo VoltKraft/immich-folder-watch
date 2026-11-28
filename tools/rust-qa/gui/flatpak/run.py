@@ -112,12 +112,17 @@ def main(args):
             subject = args.gui_build.resolve(strict=True)
             if not subject.is_relative_to(art) or subject == art:
                 raise ValueError('Use an existing isolated GUI build under artifacts/rust')
+            if subject == art / 'gui-build' or (subject / 'gui-current').is_symlink():
+                from gui.publication import pin_build
+                subject = pin_build(subject)
             subject = subject / 'release'
         else:
             if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', args.stage):
                 raise ValueError('Expected a staged subject name')
             subject = art / 'performance/subjects' / args.stage
-        binary = subject / 'native-gui-assessment'
+        binary = (subject / 'native-gui-assessment').resolve(strict=True)
+        if not binary.is_relative_to(art):
+            raise ValueError('The selected native editor must belong to the private build directory')
         receipt = binary.with_suffix('.inputs.json')
         gui = json.loads(receipt.read_bytes())
         sources = {p.relative_to(root).as_posix(): sha(p) for p in linux_project_sources(root)}
@@ -128,9 +133,9 @@ def main(args):
         subprocess.run(['git', 'diff', '--quiet', revision, '--', *sources], cwd=root, check=True)
         if ordinary:
             from ordinary_reader import corrected_build
-            compiler = corrected_build(subject.parent, gui, root)
+            compiler = corrected_build(binary.parents[1], gui, root)
         elif args.screen_reader:
-            original = runpy.run_path(str(qa / 'gui/flatpak-accessibility/build.py'))['original'](subject.parent)
+            original = runpy.run_path(str(qa / 'gui/flatpak-accessibility/build.py'))['original'](binary.parents[1])
             if original.receipt_sha != sha(receipt):
                 raise ValueError('The screen-reader control must use the ordinary compiler receipt')
     runtime, platform_receipt = deployment(args.hosted_runtime)
@@ -146,6 +151,8 @@ def main(args):
         raise ValueError('Review the current shipping sandbox permissions')
     drivers = [HERE / n for n in ('run.py', 'observe.py', 'tray_menu.py', 'launch.sh')]
     drivers.append(qa / 'gui/compiler_inputs.py')
+    if args.gui_build:
+        drivers.append(qa / 'gui/publication.py')
     if languages:
         drivers += [HERE / 'installed_language.py', HERE / 'accessibility-readback.sh',
                     HERE / 'ordinary_reader.py', qa / 'gui/desktop_input.py', qa / 'gui/native.py']

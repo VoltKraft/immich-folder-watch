@@ -41,9 +41,10 @@ def main():
     reviewed = json.loads(source_inputs.read_text())
     packages = {(p["name"], p["version"]): p for p in reviewed["packages"]}
     profile = {(p["name"], p["version"]): set(p["features"]) for p in reviewed["target_graphs"][target]}
-    gui_receipt = args.gui.with_suffix(".inputs.json")
+    gui = args.gui.resolve(strict=True)
+    gui_receipt = gui.with_suffix(".inputs.json")
     gui_inputs = json.loads(gui_receipt.read_text())
-    if gui_inputs["binary_sha256"] != sha(args.gui):
+    if gui_inputs["binary_sha256"] != sha(gui):
         raise ValueError("The GUI binary does not match its source receipt")
     build = ART / "performance/worker-build"
     build.mkdir(parents=True, exist_ok=True)
@@ -101,12 +102,12 @@ def main():
     shutil.copy2(build / "present-observer.so", observer)
     worker = output / "ifw-performance-worker"
     shutil.copy2(build / "release/ifw-performance-worker", worker)
-    shutil.copy2(args.gui, output / "native-gui-assessment")
+    shutil.copy2(gui, output / "native-gui-assessment")
     shutil.copy2(gui_receipt, output / "native-gui-assessment.inputs.json")
     sources = [*sorted((HERE / "worker").rglob("*.rs")), HERE / "worker/Cargo.toml", HERE / "worker/Cargo.lock",
                HERE / "present.rs", HERE / "build_worker.py", source_inputs, ROOT / "rust/Cargo.toml",
                ROOT / "rust/crates/safe-fs/Cargo.toml", *sorted((ROOT / "rust/crates/safe-fs/src").glob("*.rs"))]
-    record = {"worker_sha256": sha(worker), "observer_sha256": sha(observer), "gui_sha256": sha(args.gui),
+    record = {"worker_sha256": sha(worker), "observer_sha256": sha(observer), "gui_sha256": sha(gui),
               "sources": {x.relative_to(ROOT).as_posix(): sha(x) for x in sources}, "resolved": closure}
     (output / "worker.inputs.json").write_text(json.dumps(record, indent=2) + "\n")
     print(output)

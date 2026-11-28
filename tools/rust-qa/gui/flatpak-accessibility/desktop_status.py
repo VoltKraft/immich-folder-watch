@@ -102,10 +102,14 @@ def launch(binary):
     scope = area / "flatpak-accessibility"
     sys.path[:0] = [str(HERE.parent / "flatpak"), str(qa), str(qa / "performance")]
     from linux import namespace
+    build = area / "gui-build"
+    ordinary = binary.absolute() == build / "release/native-gui-assessment"
+    if ordinary:
+        from gui.publication import pin_build
+        binary = pin_build(build) / "release/native-gui-assessment"
     binary = binary.resolve(strict=True)
     inputs = {"binary": digest(binary), "observer": digest(Path(__file__))}
-    build = area / "gui-build"
-    if binary == build / "release/native-gui-assessment":
+    if ordinary and binary.is_relative_to(build):
         from gui.compiler_inputs import linux_project_sources
         from ordinary_reader import corrected_build
         receipt = binary.with_suffix(".inputs.json").read_bytes()
@@ -114,7 +118,8 @@ def launch(binary):
         if (native["binary_sha256"] != inputs["binary"] or native["sources"] != sources
                 or native["target"] != f"{os.uname().machine}-unknown-linux-gnu"):
             raise ValueError("The ordinary native ELF or its first-party sources differ from the compiler receipt")
-        inputs.update(compiler=corrected_build(build, native, root), compilerReceiptSha256=hashlib.sha256(receipt).hexdigest())
+        inputs.update(compiler=corrected_build(binary.parents[1], native, root),
+                      compilerReceiptSha256=hashlib.sha256(receipt).hexdigest())
     elif binary.is_relative_to(scope):
         receipt = None
     else:
