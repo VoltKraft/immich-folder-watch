@@ -392,6 +392,62 @@ The local verification and originals are indexed in
 `artifacts/rust/combined-profile/verification/gui-language-a4d967d/verification.json`,
 SHA-256 `e978101ae36e7970f515c3e140e4901c554fe72f18542dbf80305df63b22258d`.
 
+## Linux accessibility adapter in the combined profile
+
+The combined runner at `f47753b` reconstructed `accesskit_unix 0.24.1`
+from the original archive with SHA-256
+`30d5192871228c54f1b0fb4a85cef000e11a3804f25d2165f14afa0daa67f3f6`.
+The source identifies upstream Git revision `f3026222559c7f5f46d8f25cb7404de68eb149f0`.
+The patch changes the Flatpak AT-SPI connection in `src/context.rs` and
+`src/atspi/bus.rs`. Cargo's directory-source checksum map covers all 28
+files and has SHA-256
+`38ba18df2c350eee1ad11b89bad7f79f281a50e93bc3d30f19f14d62057662c8`.
+[Original archive and changed files](../../tools/rust-qa/gui/flatpak-accessibility/source-review.json)
+
+Reconstruction from the 473 original archives changed one compiler source
+tree and one of the 352 external inventory entries compared with `a4d967d`.
+The canonical tree digest is
+`99e9d56cfa775b763633986e90691589d23bbedacc7e5539f4c056f1f74f2be0`.
+The updated inventory has canonical SHA-256
+`b88b6c7c6fda70fd0829fb58dc1e7216c935455561f57a91d4a76b3ba07f1ebe`.
+The 385-source GUI projection reproduced
+`6a169a3b2c15a259d24ee23f10fc4625876808ae121e2edd15469ab1e96d0478`.
+All four combined Cargo feature maps and typed dependency trees matched
+their previous bytes. The Unix adapter appears on both Linux targets.
+The Windows x64 and ARM64 graphs select the Windows adapter.
+[Combined review](../../tools/rust-qa/combined-profile/review.json)
+
+The updated verifier also read three original stock-source receipts. The
+Fedora receipt at `a4d967d` reproduced its original digest above. Both
+Windows ZIPs at `6cd7757` matched their recorded Actions digests and
+retained their original compiler units, 281 on x64 and 280 on ARM64.
+[Windows x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15220466574) ·
+[Windows ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46021242330/artifacts/15218516011)
+
+The fresh two-job Fedora x64 release link took 11 minutes 13 seconds. Rustc
+compiled `accesskit_unix` with `async-io`. Its 7,808,698-byte library has
+SHA-256 `b58bcfc5335c539e3d71e2cbd5240691f498194cab90dd001d425959bf988aaf`.
+The resulting 50,676,792-byte ELF has SHA-256
+`c0dfdcf849a463e3fdcc60c95fcd9eeb447a5a148998797e862138268520a00b`.
+Both contain the application-side Flatpak AT-SPI bus address. The
+installed application has a separate screen-reader trial.
+[Installed reader evidence](../../tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs)
+
+The compiler log identified 403 units from 338 packages. The retained
+rustc dependency rule for the release library lists both modified modules.
+Clippy passed with warnings denied. The renderer smoke test and all five
+held-file upload cases ran in isolated Linux namespaces. The native input
+ZIP has SHA-256
+`950833a9adbfbfd1413655bb74e7deebbdd59db734e209c34b7bfc09e2993fdb`.
+It retains the dependency file, library, compiler outputs and receipt.
+The replay also verified 121 source witnesses against Git. The ZIP,
+executable, original archive, all 28 effective source files and the replay
+are under `artifacts/rust/combined-profile/verification/accesskit-f47753b/`.
+The resulting `verification.json` has SHA-256
+`87bfc9a458cf0456840fc38ff3e09b917196ae4c2e7277a322f7ccda96237d5b`.
+[SPDX](rw02-combined-sbom.md#fedora-x64-accesskit-unix-source-at-f47753b) ·
+[Original notices](rw02-combined-notices.md#accesskit-unix-attributions-on-fedora-x64)
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).

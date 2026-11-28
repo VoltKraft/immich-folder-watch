@@ -95,3 +95,20 @@ its native archive. [Actions archives](rw02-native-gui.md#native-follow-up-at-75
 | Linux ARM64 | 336 | 443 | 1,061 | `1e6bda9e7e22d7ed344d06fd432f88797f7f9275c9b0f6a2085a734d2f62930c` |
 | Windows x64 | 250 | 257 | 614 | `cf9c45d0692f00db34ad87ba55ffc8277d81334162414dd819c6c7df657a8519` |
 | Windows ARM64 | 249 | 256 | 613 | `4e04407310d8a5ed0764214e65b695d323e7a6827620d451696741e0dc4cd3e8` |
+
+## Fedora x64 AccessKit Unix source at f47753b
+
+The Fedora x64 SPDX document for `f47753b` has SHA-256
+`d873b8dd5f34105e78f685e25e77bf8a436a3b618b71e48fb0c293093650749d`.
+Its 447 packages and 1,067 relationships passed the SPDX 2.3.1 schema.
+All package license declarations, conclusions, extracted grants and
+relationships matched the stock-source Fedora document at `a4d967d`.
+The `accesskit_unix 0.24.1` package's `sourceInfo` identifies the
+original registry archive and upstream revision, both before/after module
+hashes, the patch, its source review and the reconstructor. It records the
+actual release library and the rustc dependency file that named both
+modified modules. The package uses `NOASSERTION` for the download location
+of the modified source. The native verifier also checked the original
+Git witnesses for the patch, review and reconstructor.
+[Native compiler evidence](rw02-combined-profile.md#linux-accessibility-adapter-in-the-combined-profile) ·
+[Original grants](rw02-combined-notices.md#accesskit-unix-attributions-on-fedora-x64)

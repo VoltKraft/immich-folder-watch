@@ -243,3 +243,21 @@ RI-AC09 still requires the exact installed release candidate and its actual
 runtime contents, bundled notices, package SBOM, corresponding source and
 relink material. These archives cover the development Cargo graph and reviewed
 embedded assets. [Acceptance record](acceptance.md).
+
+## AccessKit Unix attributions on Fedora x64
+
+The notice ZIP for the combined development executable at `f47753b` has
+SHA-256 `83d831bb30d23a9f8bec9393954b96692401992c951cfbdcff3b81d417eb5d30`.
+Its 1,805 members include the original AccessKit MIT, Apache-2.0 and
+Chromium BSD texts. For `accesskit_unix 0.24.1`, the inventory records
+23 source attribution ranges across 22 original paths. Comparison against
+the actual compiler input reproduced the 221-byte header of each modified
+Rust module, including its original offset and text digest.
+
+The archive preserves all 1,800 original payloads from `a4d967d`
+byte-for-byte. The index and manifest identify the new executable.
+The three additional members are the reviewed patch,
+`source-review.json` and `accesskit_source.py` from the compiler's Git
+revision. Their paths and checksums appear in the package record.
+[Native archive and local originals](rw02-combined-profile.md#linux-accessibility-adapter-in-the-combined-profile) ·
+[Source review](../../tools/rust-qa/gui/flatpak-accessibility/source-review.json)
