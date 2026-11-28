@@ -20,11 +20,12 @@ def register(connection, sender, path, interface, method, arguments, invocation)
 
 
 def acquired(connection, name):
-    connection.register_object("/StatusNotifierWatcher", description.interfaces[0], register, None, None)
     print("WATCHER_READY", flush=True)
 
 
 loop = GLib.MainLoop()
-Gio.bus_own_name(Gio.BusType.SESSION, WATCHER, Gio.BusNameOwnerFlags.NONE,
-                 None, acquired, lambda *_: loop.quit())
+# A client can register as soon as NameOwnerChanged is delivered on the bus.
+connection = Gio.bus_get_sync(Gio.BusType.SESSION)
+connection.register_object("/StatusNotifierWatcher", description.interfaces[0], register, None, None)
+Gio.bus_own_name_on_connection(connection, WATCHER, Gio.BusNameOwnerFlags.NONE, acquired, lambda *_: loop.quit())
 loop.run()

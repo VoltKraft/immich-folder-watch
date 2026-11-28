@@ -142,6 +142,7 @@ jobs:
       - name: Read the ordinary editor and tray startup languages on four private desktops
         if: ${{ !cancelled() && steps.pair.outcome == 'success' }}
         run: |
+          /usr/bin/python3 -B tools/rust-qa/gui/watcher_ready.py > "artifacts/rust/gui-native/$NATIVE_TARGET/watcher-ready.json"
           /usr/bin/python3 -B tools/rust-qa/gui/startup/observe.py --native-only \
             --gui artifacts/rust/gui-build/release/native-gui-assessment \
             --compiler-receipt "artifacts/rust/gui-native/$NATIVE_TARGET/build.json" \

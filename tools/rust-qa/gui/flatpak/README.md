@@ -283,3 +283,33 @@ control, empty application roots before Orca and only Tab echoes during
 each traversal. Both primaries exited through Quit and the private
 installation was empty. The replay report `x11-tl5qsy5w/result.json` has
 SHA-256 `a4c44d142b8c2cb618ce180aa53a8a099c04b171a34fb616ec2629b7dc186117`.
+
+### Native Ubuntu packages on both architectures
+
+On Ubuntu 24.04 x64 and ARM64, the installed ordinary editor passed both
+saved languages with Orca 46.1 in [run 46141403406](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46141403406)
+at `048b0d7`. Both original archives verified against their Actions SHA-256.
+The independent readback checked the compiler streams, corrected 28-file
+AccessKit tree, seven Noble speech packages, GTK control, initial registry,
+screenshots, original proxy and XID, speech log, PCM and empty installation.
+Orca announced all four English and German controls in order. Both signed
+Platform and GL deployments were verified on the matching host.
+
+| Target | Native compiler units | Captured PCM, English / German | Actions archive SHA-256 |
+| --- | ---: | ---: | --- |
+| x86-64 | 310 | 327,292 / 324,454 bytes | `311816ca1449718f6ac2613b996452cec266573ad96c78e099223a0587efcc97` |
+| ARM64 | 309 | 377,112 / 354,454 bytes | `5be0d0c2b634f94745ab953e2016bc674e7b23e757f1fc990f798cd162965488` |
+
+The ARM64 job passed. In a separate native x64 startup case before the
+installed reader ran, the GUI called the new watcher's unique owner
+`:1.9` as soon as it appeared. D-Bus returned `UnknownMethod` because
+`/StatusNotifierWatcher` did not exist yet. The private watcher now exports
+that object on its connection before requesting the well-known name.
+The [first-registration check](../watcher_ready.py) starts its own bus,
+calls each new owner on the first name-change signal and matches the reply
+to the watcher PID and the registering client. On Fedora all 16 owners
+accepted that first registration. The original x64 GUI and worker from
+the failed job then passed saved English, saved German, system German and
+system English on Fedora with the fixed watcher. The report in
+`hosted-048b0d7/watcher-fixed-original-x64/results.json` has SHA-256
+`e73798f29714c5994ce60d70b8d85b49a88c8006f2cd58aa06518000d0eb7427`.
