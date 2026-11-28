@@ -4,6 +4,17 @@ $tokens = $errors = $null
 $source = [Management.Automation.Language.Parser]::ParseFile(
     (Join-Path $PSScriptRoot 'toast_settings.ps1'), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
+# Exercise the original parameter binder for the ordinary read and the setter's
+# separate request for a UI Automation pattern, including on non-Windows hosts.
+$reader = $source.Find({ param($n)
+    $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Read-Switch'
+}, $false)
+$parameters = ($reader.Parameters | ForEach-Object { $_.Extent.Text }) -join ','
+. ([scriptblock]::Create('function Invoke-BindingTrial(' + $parameters + ') { $patternOut.Value = 41 }'))
+Invoke-BindingTrial $null 'master'
+$received = $null
+Invoke-BindingTrial $null 'dnd' ([ref]$received)
+if ($received -ne 41) { throw 'The read did not return the requested pattern.' }
 foreach ($fn in @('Save-Intent','Confirm-Intent','Set-TestDnd')) {
     $body = $source.FindAll({ param($node)
         $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $fn

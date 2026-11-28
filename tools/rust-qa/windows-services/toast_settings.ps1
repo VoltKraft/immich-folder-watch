@@ -41,7 +41,7 @@ function Get-SettingsWindow {
         } catch [Windows.Automation.ElementNotAvailableException] { continue }
     }
 }
-function Read-Switch($window, [string]$id, [ref]$patternOut = $null) {
+function Read-Switch($window, [string]$id, [ref]$patternOut = ([ref]$null)) {
     $find = [Windows.Automation.PropertyCondition]::new($element::AutomationIdProperty, $id)
     $nodes = $window.FindAll($scope::Descendants, $find)
     if ($nodes.Count -ne 1) { return @{ count = $nodes.Count } }
@@ -52,7 +52,7 @@ function Read-Switch($window, [string]$id, [ref]$patternOut = $null) {
         !$node.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern, [ref]$pattern)) {
         return @{ count = 1; readable = $false }
     }
-    if ($null -ne $patternOut) { $patternOut.Value = $pattern }
+    $patternOut.Value = $pattern
     return @{ count = 1; state = $pattern.Current.ToggleState.ToString(); enabled = $node.Current.IsEnabled }
 }
 $folder = Join-Path $env:GITHUB_WORKSPACE 'artifacts/rust/windows-services'
