@@ -3,6 +3,7 @@
 import ctypes as c
 from ctypes import wintypes as w
 import secrets
+import time
 import xml.etree.ElementTree as ET
 
 from observe import bind, check, ordinary_console
@@ -62,8 +63,8 @@ class MenuInput:
         u = c.WinDLL("user32", use_last_error=True)
         g = c.WinDLL("gdi32", use_last_error=True)
         self.send = bind(u, "SendInput", w.UINT, w.UINT, c.POINTER(Input), c.c_int)
-        self.move = bind(u, "SetCursorPos", w.BOOL, c.c_int, c.c_int)
-        self.cursor = bind(u, "GetCursorPos", w.BOOL, c.POINTER(w.POINT))
+        self.move = bind(u, "SetPhysicalCursorPos", w.BOOL, c.c_int, c.c_int)
+        self.cursor = bind(u, "GetPhysicalCursorPos", w.BOOL, c.POINTER(w.POINT))
         self.key_state = bind(u, "GetAsyncKeyState", c.c_int16, c.c_int)
         self.thread = bind(u, "GetGUIThreadInfo", w.BOOL, w.DWORD, c.POINTER(GuiThread))
         self.visitor = c.WINFUNCTYPE(w.BOOL, w.HWND, w.LPARAM)
@@ -87,7 +88,7 @@ class MenuInput:
 
     def pointer(self):
         p = w.POINT()
-        check(self.cursor(c.byref(p)), "GetCursorPos(menu)")
+        check(self.cursor(c.byref(p)), "GetPhysicalCursorPos(menu)")
         return [p.x, p.y]
 
     def on_desktop(self):
@@ -168,19 +169,28 @@ class MenuInput:
 
     def place(self, point):
         self.on_desktop()
-        if self.pointer() != self.last:
-            raise ValueError("The pointer moved independently on the owned console")
-        check(self.move(*point), "SetCursorPos(menu)")
+        previous = self.pointer()
+        if previous != self.last:
+            raise ValueError(f"The physical pointer moved from {self.last} to {previous} before positioning")
+        check(self.move(*point), "SetPhysicalCursorPos(menu)")
         self.last = list(point)
-        if self.pointer() != self.last:
-            raise ValueError("The cursor did not reach the requested physical point")
+        observed = self.pointer()
+        if observed != self.last:
+            raise ValueError(f"The physical pointer reached {observed}, expected {self.last}")
 
     def click(self, point, flags, valid):
         before = valid()
         self.place(point)
-        at_point = valid()
-        if self.pointer() != point or any(self.key_state(k) & 0x8000 for k in (1, 2, 4, 0x10, 0x11, 0x12, 0x5b, 0x5c)):
-            raise ValueError("Input state changed at the selected physical point")
+        end_wait = time.monotonic() + .5
+        while True:
+            at_point = valid()
+            position = self.pointer()
+            held = [k for k in (1, 2, 4, 0x10, 0x11, 0x12, 0x5b, 0x5c) if self.key_state(k) & 0x8000]
+            if position == point and not held:
+                break
+            if time.monotonic() >= end_wait:
+                raise ValueError(f"Physical input stayed at {position} with pressed keys {held}, expected {point} and no keys")
+            time.sleep(.025)
         rows = (Input * 2)()
         for row, flag in zip(rows, flags):
             row.kind, row.mouse.flags, row.mouse.extra = 0, flag, self.tag

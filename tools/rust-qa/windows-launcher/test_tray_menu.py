@@ -1,10 +1,11 @@
 """Control the physical menu readback, existing tray ownership and two-worker evidence offline."""
 from copy import deepcopy
 import unittest
+from unittest.mock import Mock, patch
 
 import native_tray as tray
 import tray_menu
-from tray_menu_input import expected_menus, identify_menu
+from tray_menu_input import MenuInput, expected_menus, identify_menu
 from test_native_tray import COMPLEMENT, ELEMENT, KEY, SURFACE, TOKEN, registration, closed
 
 
@@ -19,6 +20,25 @@ def rows(language="en"):
 
 
 class NativeMenuTests(unittest.TestCase):
+    def test_click_waits_for_physical_point_and_button_release_while_rechecking_target(self):
+        pointer = object.__new__(MenuInput)
+        pointer.place, pointer.send, pointer.tag = Mock(), Mock(return_value=2), 12
+        pointer.api = Mock(clock=Mock(side_effect=[100, 110]))
+        pointer.pointer = Mock(side_effect=[[2,2], [3,3], [3,3]])
+        held = iter([0] * 8 + [0x8000] + [0] * 15)
+        pointer.key_state = lambda _key: next(held)
+        check = Mock(return_value={"hit": 12})
+        with patch("tray_menu_input.time.sleep"):
+            result = pointer.click([3,3], (2,4), check)
+        self.assertEqual(check.call_count, 4)
+        self.assertEqual(result["queued"], 2)
+        pointer.send.assert_called_once()
+        pointer.pointer = Mock(return_value=[10,20])
+        pointer.key_state = lambda _key: 0
+        with patch("tray_menu_input.time.monotonic", side_effect=[0, 1]), self.assertRaisesRegex(ValueError,"Physical input stayed"):
+            pointer.click([3,3], (2,4), check)
+        pointer.send.assert_called_once()
+
     def test_open_requires_foreground_and_keyboard_focus_on_original_editor(self):
         surface = dict(hwnd="0x12", pid=23, tid=31)
         sample = dict(thread=31, foreground=True, active=True, focused=True, queryError=0)
