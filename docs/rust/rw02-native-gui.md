@@ -1207,6 +1207,13 @@ The ARM64 executable had SHA-256
 [Original Ubuntu x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46138706466/artifacts/15260589233) ·
 [Original Ubuntu ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46138706466/artifacts/15260723709).
 
+The separate Flatpak comparison repeated the screen-reader test on this
+ordinary source tree and its current settings library. Both packages showed
+the same eight labels. The original adapter produced Tab echoes. With the
+two reviewed AccessKit source changes, Orca spoke each focused control
+and the external client identified the original application proxy.
+[Ordinary and corrected installed editors](../../tools/rust-qa/gui/flatpak/README.md#orca-with-the-ordinary-gui-and-current-settings-reader).
+
 ## Reproduction
 
 At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed

@@ -76,6 +76,12 @@ The ordinary binary subsequently passed all 40 Fedora tests, the four
 signed language comparisons and both installed Flatpak startup cases.
 Mutter retained the selected filename range after a normal second launch.
 [Ordinary editor and installed Flatpak](rust/rw02-native-gui.md#ordinary-linux-startup-language-at-c361c69).
+An independent review matched the GUI and compiler sources to `446fc1f`,
+traced the single Linux primary's language read to both the editor and the
+first menu, and checked the four Fedora settings against the signed reader.
+With the same ordinary sources, the private Flatpak adapter also passed
+all eight Orca focus checks under the original package permissions.
+[Installed screen reader on the current sources](../tools/rust-qa/gui/flatpak/README.md#orca-with-the-ordinary-gui-and-current-settings-reader).
 [Typed YAML values](rust/rw02-yaml.md#grouped-floats-and-untagged-scalar-aliases) ·
 [Linux startup language](rust/rw02-native-gui.md#saved-language-at-linux-editor-and-tray-startup).
 

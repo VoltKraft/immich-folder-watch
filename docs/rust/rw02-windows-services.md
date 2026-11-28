@@ -1530,3 +1530,12 @@ revision, all 47 files in the compiler pair receipt, all 18 worker source
 files, both ARM64 PE images, both button records and their shutdown logs.
 [Original artifact 15261255202](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46137194724/artifacts/15261255202)
 [ARM64 workflow](../../.github/workflows/rust-windows-arm64-display.yaml).
+
+At `446fc1f` the integrated ordinary editor repeated the private keyboard
+trial on Windows ARM64. Its native PE and all 30 compiler-source entries
+matched the archived receipt for the new GUI lock. Three Tab presses
+again focused the password, language and Quit controls. The Space key
+completed Quit. The supervisor recorded a verified session, successful
+worker exit, closed job and return to the original desktop. The separate
+source-monitor steps on the default desktop failed.
+[Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46138706469/artifacts/15261487514).
