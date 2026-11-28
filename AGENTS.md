@@ -232,6 +232,8 @@ to reconcile project decisions, defaults, and recorded state.
   the same account. Verify the Actions digest before reusing a hosted build.
   Use the [installed WPF handover trial](tools/rust-qa/instance/cross-session/wpf-handover.md)
   to follow a normal tray Quit on the original RDP desktop before Rust acquires the writer.
+  Use the [read-only MSI preflight](tools/rust-qa/instance/cross-session/installed-writer.md)
+  to identify the shipping installation with its editor closed or open.
   Run every feasible Windows x64 rewrite test on the [local disposable
   VM](tools/rust-qa/windows-local/README.md). The x64 Actions jobs compile inputs.
   Run the [combined Windows x64 profile](tools/rust-qa/windows-local/README.md#combined-native-profile)

@@ -647,3 +647,16 @@ the start of flushing. Its log contains no separate flush-complete event.
 The independent replay used the 22 source hashes captured during the test
 and three modules read from the same guest checkout afterwards.
 [Guest ZIP, source supplement and replay](../../tools/rust-qa/instance/cross-session/wpf-handover.md#local-server-2025-handover-at-bfd99b2).
+
+### Identifying a still-installed WPF before the next launch
+
+On the local Server 2025 x64 guest the Rust preflight at `3913061`
+identified the original machine MSI from a standard user's RDP session
+before WPF had ever launched. The profile was still absent after the
+query. While the original WPF editor and tray were open, Rust reported
+the same product and package codes and returned the same veto (exit 20).
+The WPF process continued running and later exited through its own tray
+menu. This provides a read-only prerequisite check for a future cutover.
+Preventing re-entry through the installation transaction and integrating
+admission into the product writer remain open.
+[Native results, original MSI and independent replay](../../tools/rust-qa/instance/cross-session/installed-writer.md).

@@ -62,6 +62,15 @@ The opposite start order still allows a legacy writer to run.
 [Orderly handover](rust/rw02-cross-session.md#ordinary-wpf-shutdown-before-rust-writer-admission) ·
 [Rust-first result](rust/rw02-cross-session.md#installed-304-worker-in-another-session).
 
+A fresh 4 GiB x64 guest ran the read-only MSI preflight at `3913061` as
+a standard user in RDP. Both before first launch and while the WPF
+editor was visible, it returned exit 20 for the exact installed 3.0.4
+machine package. Independent replay matched both raw outputs, the
+installer log and the ordinary WPF Quit. The VM shut down and its
+temporary disks were removed. RI-AC05 still requires the transaction
+that keeps the old application from restarting during cutover.
+[Installed MSI preflight and guest archive](../tools/rust-qa/instance/cross-session/installed-writer.md).
+
 Both native Ubuntu runners at `9487dbe` passed the five-owner D-Bus trial,
 two ordinary panel activations and all three physical menu selections
 after KDED reloaded its watcher. Each replacement worker found two new
