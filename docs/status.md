@@ -309,10 +309,11 @@ starts the background GUI first on a fresh Explorer desktop.
 [Native run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105453) ·
 [Ordinary launcher when the icon has no rectangle](rust/rw02-windows-services.md#ordinary-launch-when-the-registered-icon-has-no-rectangle).
 
-The ARM64 IME observer at `9313f39` lost its filename field during Japanese
-layout selection. It exited before composing text and restored the layout
-and test profile. It now waits for the same focused field and records the
-last observation if the field stays unavailable. A native repeat is pending.
+The ARM64 IME observer lost its filename field during Japanese layout
+selection at `9313f39`. At `3d55500` the bounded lookup found the focused
+filename on its first attempt. The native observer saw preedit before Enter,
+commit after Enter and U+3042 in the filename. The original layout, language
+list and capability state returned, and the private profile was removed.
 [ARM64 source and archive](rust/rw02-windows-ime.md).
 
 The remaining Windows desktop tests cover ARM64 Explorer activation,

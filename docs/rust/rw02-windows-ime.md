@@ -11,9 +11,22 @@ and the inserted U+3042.
 After selecting the Japanese layout, the observer now waits up to eight
 seconds for the focused filename in the original GUI window. It records its
 last observation and attempt count, and checks the focused field and layout
-again before delivering keys. The native repeat is pending.
+again before delivering keys.
 [Original ARM64 evidence](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46017375691/artifacts/15213539112) ·
 [Field checks](../../tools/rust-qa/windows-ime/observe.ps1).
+
+At `3d5550096e298190be9a5315aa7fb6c13045d78a` the native ARM64 repeat
+first found Japanese Basic Typing absent. After installing Microsoft's
+10.0.26100.9974 ARM64 package, the focused filename was available on the
+first lookup after selecting Japanese. The observer saw preedit before
+Enter, commit after Enter and U+3042 appended to the original filename.
+The original HKL 67699721 and language list returned. The GUI exited, the
+private profile was removed, and Basic Typing returned to `NotPresent`
+without requiring a restart. The original Actions ZIP matched its published
+SHA-256 `0e78b012bbd47d41a6cc779f1fb260ee600adefc1493f7ec5597036c53205f2e`.
+The native `japanese/compose.json` SHA-256 was
+`248066be78e3fd4c0a3434c05117f0a6c33a4cce34191db4a93b5029ac8c1f91`.
+[ARM64 original results and servicing receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105348/artifacts/15244658835).
 
 The hosted wrapper first runs the actual field test with the installed
 components. If the runner has an active input desktop and the native
