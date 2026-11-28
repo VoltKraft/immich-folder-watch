@@ -55,3 +55,7 @@ The native report records the configured limits along with its observations.
 
 See [the YAML assessment record](../../../docs/rust/rw02-yaml.md) for exact inputs,
 license disposition, actual results, policy choices and remaining qualification.
+
+The [Linux startup language reader](startup/README.md) uses the same bounded
+decoder and typed parser for a read-only preference on the normal XDG path.
+Its native comparison uses the original signed 3.0.4 assemblies.

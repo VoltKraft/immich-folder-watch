@@ -1,12 +1,7 @@
 //! Development-only bounded YAML compatibility assessment.
 #![forbid(unsafe_code)]
 
-mod anchors;
-mod codec;
-mod encoding;
-mod model;
-mod scalar_breaks;
-
+use ifw_yaml_assessment::{codec, encoding, model};
 use model::{Casing, TextRules};
 use serde_json::{Value, json};
 use std::error::Error;

@@ -301,6 +301,11 @@ impl TextRules {
 }
 
 impl RawConfig {
+    #[cfg(target_os = "linux")]
+    pub(crate) fn startup_language(self) -> Option<String> {
+        self.localization.and_then(|settings| settings.language)
+    }
+
     pub fn normalize(self, rules: &TextRules) -> Config {
         let immich = self.immich.unwrap_or_default();
         let watch = self.watch.unwrap_or_default();
