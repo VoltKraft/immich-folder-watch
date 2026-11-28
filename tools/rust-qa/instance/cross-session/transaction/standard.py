@@ -30,10 +30,12 @@ def stock_launch(accounts, own, sid, work):
                     break
                 time.sleep(.15)
             active = desktop_state(Win32(), proc)
+            quit_area = work / 'wpf-handover'
+            quit_area.mkdir()
             subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-STA', '-File', HERE / 'handover_quit.ps1',
                             '-ProcessId', str(proc.pid), '-Created', str(token['created100ns']),
                             '-Root', str(active['window']), '-Receiver', str(active['receiver']),
-                            '-ThreadId', str(active['thread']), '-Evidence', work / 'quit-menu.json'],
+                            '-ThreadId', str(active['thread']), '-Evidence', quit_area / 'quit-menu.json'],
                            stdout=output, stderr=subprocess.STDOUT, timeout=45, check=True)
             code = proc.wait(timeout=30)
             require(code == 0, 'The restored WPF failed its ordinary tray Quit')
