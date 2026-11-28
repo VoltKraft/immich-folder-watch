@@ -1,16 +1,25 @@
 #[path = "linux_legacy.rs"]
 mod legacy;
+#[path = "linux_tray_menu.rs"]
+mod menu;
+#[path = "linux_tray_watcher.rs"]
+mod watcher;
+pub(super) use menu::TrayLanguage;
 
 use super::{Command, Control};
 use std::collections::HashMap;
 use std::error::Error;
 use std::ops::Deref;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::TrySendError;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use zbus::{
-    Connection, connection::Builder, fdo, interface, object_server::SignalEmitter,
-    zvariant::OwnedValue,
+    Connection,
+    connection::Builder,
+    fdo, interface,
+    object_server::SignalEmitter,
+    zvariant::{ObjectPath, OwnedValue},
 };
 
 const NAME: &str = "org.example.IfwGuiProbe";
@@ -22,11 +31,16 @@ const NO_DISPLAY: &str = "Graphics unavailable. Activate to retry. Background wo
 type PlatformData = HashMap<String, OwnedValue>;
 
 struct Application {
-    control: Control,
+    actions: Actions,
     admitted: bool,
-    quitting: bool,
 }
-struct Item(Control, &'static str);
+
+#[derive(Clone)]
+struct Actions {
+    control: Control,
+    quitting: Arc<Mutex<bool>>,
+}
+struct Item(Actions, &'static str);
 
 fn dispatch(control: &Control, command: Command) -> fdo::Result<()> {
     control.send(command).map_err(|error| match error {
@@ -35,15 +49,30 @@ fn dispatch(control: &Control, command: Command) -> fdo::Result<()> {
     })
 }
 
+impl Actions {
+    fn send(&self, command: Command) -> fdo::Result<()> {
+        // Serialize Quit with requests from the application, SNI and menu interfaces.
+        let mut quitting = self
+            .quitting
+            .lock()
+            .expect("desktop admission mutex poisoned");
+        if *quitting {
+            return Err(fdo::Error::Failed("GUI is shutting down".into()));
+        }
+        dispatch(&self.control, command)?;
+        if matches!(command, Command::Quit) {
+            *quitting = true;
+        }
+        Ok(())
+    }
+}
+
 impl Application {
     fn enqueue(&self, command: Command) -> fdo::Result<()> {
         if !self.admitted {
             return Err(fdo::Error::Failed("GUI startup has not completed".into()));
         }
-        if self.quitting {
-            return Err(fdo::Error::Failed("GUI is shutting down".into()));
-        }
-        dispatch(&self.control, command)
+        self.actions.send(command)
     }
 }
 
@@ -67,9 +96,7 @@ impl Application {
             }
             _ => return Err(fdo::Error::InvalidArgs("Unknown fixture action".into())),
         };
-        self.enqueue(command)?;
-        self.quitting = matches!(command, Command::Quit);
-        Ok(())
+        self.enqueue(command)
     }
 }
 
@@ -81,7 +108,7 @@ impl Item {
     }
     #[zbus(property)]
     fn title(&self) -> &str {
-        if self.0.graphics_attention.load(Ordering::Acquire) {
+        if self.0.control.graphics_attention.load(Ordering::Acquire) {
             NO_DISPLAY
         } else {
             "Desktop input probe"
@@ -89,7 +116,7 @@ impl Item {
     }
     #[zbus(property)]
     fn status(&self) -> &str {
-        if self.0.graphics_attention.load(Ordering::Acquire) {
+        if self.0.control.graphics_attention.load(Ordering::Acquire) {
             "NeedsAttention"
         } else {
             "Active"
@@ -117,7 +144,21 @@ impl Item {
     #[zbus(signal)]
     async fn new_title(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
     fn activate(&self, _x: i32, _y: i32) -> fdo::Result<()> {
-        dispatch(&self.0, Command::Open)
+        self.0.send(Command::Open)
+    }
+    fn secondary_activate(&self, _x: i32, _y: i32) -> fdo::Result<()> {
+        self.0.send(Command::Open)
+    }
+    #[zbus(property)]
+    fn menu(&self) -> ObjectPath<'static> {
+        ObjectPath::from_static_str_unchecked(menu::PATH)
+    }
+    #[zbus(property)]
+    fn item_is_menu(&self) -> bool {
+        false
+    }
+    fn context_menu(&self, _x: i32, _y: i32) {
+        // The SNI host renders the exported com.canonical.dbusmenu at Menu.
     }
 }
 
@@ -147,6 +188,8 @@ pub(super) fn graphics_attention(connection: &Connection, control: &Control, una
 pub(super) struct Primary {
     connection: Connection,
     installed_socket: Option<legacy::Guard>,
+    publisher: Arc<menu::Publisher>,
+    watcher: watcher::Watcher,
 }
 
 impl Deref for Primary {
@@ -158,9 +201,20 @@ impl Deref for Primary {
 }
 
 impl Primary {
+    pub(super) fn tray_status(&self) -> Arc<AtomicBool> {
+        self.watcher.available.clone()
+    }
+
+    pub(super) fn tray_language(&self) -> TrayLanguage {
+        self.publisher.language()
+    }
+
     pub(super) async fn graceful_shutdown(self) {
         // The supervisor calls this after worker drain. Even a disconnected
         // object server cannot release the shipping endpoint earlier.
+        // Cancel the signal stream before waiting for its connection to close.
+        drop(self.watcher);
+        drop(self.publisher);
         self.connection.graceful_shutdown().await;
         drop(self.installed_socket);
     }
@@ -179,13 +233,16 @@ pub(super) fn start(control: Control) -> Result<Option<(Primary, bool)>, Box<dyn
         NAME
     };
     futures_lite::future::block_on(async {
+        let actions = Actions {
+            control,
+            quitting: Arc::default(),
+        };
         let connection = Builder::session()?
             .serve_at(
                 APP_PATH,
                 Application {
-                    control: control.clone(),
+                    actions: actions.clone(),
                     admitted: false,
-                    quitting: false,
                 },
             )?
             .method_timeout(Duration::from_secs(2))
@@ -231,31 +288,29 @@ pub(super) fn start(control: Control) -> Result<Option<(Primary, bool)>, Box<dyn
             Err(error) => return Err(error.into()),
             Ok(_) => return Err("Unexpected D-Bus ownership result for a new connection".into()),
         };
+        let labels = menu::SharedLabels::default();
         connection
             .object_server()
-            .at("/StatusNotifierItem", Item(control, name))
+            .at(menu::PATH, menu::Menu::new(actions.clone(), labels.clone()))
+            .await?;
+        connection
+            .object_server()
+            .at("/StatusNotifierItem", Item(actions.clone(), name))
             .await?;
         admission.admitted = true;
         drop(admission);
         drop(application);
-        let result = connection
-            .call_method(
-                Some(WATCHER),
-                "/StatusNotifierWatcher",
-                Some(WATCHER),
-                "RegisterStatusNotifierItem",
-                &name,
-            )
-            .await;
-        if let Err(error) = &result {
-            println!("TRAY_REGISTRATION {error}");
-        }
+        let watcher = watcher::Watcher::start(&connection, actions.control, name).await;
+        let available = watcher.available.load(Ordering::Acquire);
+        let publisher = menu::Publisher::new(connection.clone(), labels);
         Ok(Some((
             Primary {
                 connection,
                 installed_socket,
+                publisher,
+                watcher,
             },
-            result.is_ok(),
+            available,
         )))
     })
 }
@@ -269,14 +324,16 @@ mod tests {
     fn secondary_activation_reports_full_closed_and_quitting_queues() {
         let (sender, commands) = sync_channel(1);
         let mut app = Application {
-            control: Control {
-                sender,
-                window: Default::default(),
-                graphics_attention: Default::default(),
-                appearance: Default::default(),
+            actions: Actions {
+                control: Control {
+                    sender,
+                    window: Default::default(),
+                    graphics_attention: Default::default(),
+                    appearance: Default::default(),
+                },
+                quitting: Arc::default(),
             },
             admitted: false,
-            quitting: false,
         };
         assert!(matches!(
             app.activate(PlatformData::new()),
@@ -302,7 +359,7 @@ mod tests {
         ));
         drop(commands);
         assert!(matches!(
-            dispatch(&app.control, Command::Open),
+            dispatch(&app.actions.control, Command::Open),
             Err(fdo::Error::Failed(_))
         ));
     }

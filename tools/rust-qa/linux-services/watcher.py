@@ -6,11 +6,15 @@ from gi.repository import Gio, GLib
 
 
 WATCHER = "org.kde.StatusNotifierWatcher"
-APP = "org.example.IfwServices"
+APP = sys.argv[2] if len(sys.argv) >= 3 else "org.example.IfwServices"
+if APP not in {"org.example.IfwServices", "org.example.IfwGuiProbe"}:
+    raise ValueError("Use one of the two private test item names")
 PEER = "org.example.WatcherControl"
 PATH = "/StatusNotifierWatcher"
 BUS = "org.freedesktop.DBus"
 MODE = sys.argv[1]
+ownership = sys.argv[3] if len(sys.argv) == 4 else "exclusive"
+flags = {"exclusive": 4, "replaceable": 5, "replace": 6}[ownership]
 if MODE not in {"accept", "delay", "refuse"} or os.environ.get("DBUS_SESSION_BUS_ADDRESS") != "unix:path=/tmp/session-bus":
     raise RuntimeError("Use a private assessment bus and a supported synthetic watcher mode")
 bus = Gio.bus_get_sync(Gio.BusType.SESSION)
@@ -57,7 +61,7 @@ def received(connection, sender, path, interface, method, arguments, invocation)
 
 for interface in desc.interfaces:
     bus.register_object(PATH, interface, received, None, None)
-code, = call(BUS, "/org/freedesktop/DBus", BUS, "RequestName", GLib.Variant("(su)", (WATCHER, 4)))
+code, = call(BUS, "/org/freedesktop/DBus", BUS, "RequestName", GLib.Variant("(su)", (WATCHER, flags)))
 if code != 1:
     raise RuntimeError("Private watcher name already exists")
 print("READY", bus.get_unique_name(), flush=True)
