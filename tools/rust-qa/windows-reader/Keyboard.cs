@@ -18,6 +18,7 @@ namespace IfwQaReader {
         [DllImport("user32.dll")] static extern bool GetGUIThreadInfo(uint thread, ref ThreadInfo info);
         [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr window, uint flag);
         [DllImport("user32.dll")] static extern IntPtr GetKeyboardLayout(uint thread);
+        [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
         [DllImport("user32.dll")] static extern uint MapVirtualKeyExW(uint code, uint mapType, IntPtr layout);
         [DllImport("user32.dll", SetLastError=true)] static extern uint SendInput(uint count, Input[] inputs, int size);
 
@@ -41,6 +42,8 @@ namespace IfwQaReader {
             ushort modifier=0, key=0, letter=0;
             bool extendedModifier=false, extendedKey=false;
             switch (gesture) {
+                case "Tab": key=0x0f; break;
+                case "Space": key=0x39; break;
                 case "SelectAll": modifier=0x1d; letter=0x41; break;
                 case "Copy": modifier=0x1d; letter=0x43; break;
                 case "Paste": modifier=0x1d; letter=0x56; break;
@@ -60,9 +63,14 @@ namespace IfwQaReader {
             var up=Stroke(key,extendedKey,true);
             var release=Stroke(modifier,extendedModifier,true);
             var events = modifier==0 ? new[] {down,up} : new[] {Stroke(modifier,extendedModifier,false),down,up,release};
-            Focus(window,pid);
+            if (gesture=="Tab" || gesture=="Space") {
+                foreach (var held in new[] {0x09,0x20,0x10,0x11,0x12,0x5b,0x5c})
+                    if ((GetAsyncKeyState(held) & 0x8000)!=0)
+                        throw new InvalidOperationException("A navigation key or modifier is already held.");
+            }
             if (IntPtr.Size!=8) throw new PlatformNotSupportedException("Expected a 64-bit Windows input observer.");
             int size=Marshal.SizeOf(typeof(Input));
+            Focus(window,pid);
             uint sent=SendInput((uint)events.Length,events,size);
             if (sent==events.Length) return events.Length;
             int error=Marshal.GetLastWin32Error();

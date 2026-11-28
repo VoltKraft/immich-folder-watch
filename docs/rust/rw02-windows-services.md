@@ -1467,3 +1467,25 @@ The immutable compiler ZIP is [artifact 15229643760](https://github.com/VoltKraf
 The local original ZIP, Actions digest, receipt, sender logs, screenshots,
 physical observations, replay and setting readbacks are retained under
 `artifacts/rust/local-windows-server-2025-x64/20261127/toast/`.
+
+## Keyboard activation of the visible Windows ARM64 Quit button
+
+The native ARM64 observer has a separate keyboard case for the visible
+fallback after Explorer declines the tray icon. It starts a fresh canonical
+GUI and worker and waits for two scans. UI Automation sets the initial focus
+on the owned filename field. Three native Tab presses must then move focus
+through `Kennwort`, `English` and `Beenden` on the same HWND. The observer
+checks the actual focused UIA element, native foreground and keyboard owner
+before each gesture. It sends one Space press on the identified button.
+The record includes the four runtime IDs and input counts. It reads no
+password contents. The command pipe stays open while both processes exit.
+[Keyboard observer](../../tools/rust-qa/windows-launcher/window-quit-keys.ps1) · [Native key events](../../tools/rust-qa/windows-reader/Keyboard.cs).
+
+Run `python -B tools/rust-qa/windows-launcher/window_quit.py --keyboard`
+in the native ARM64 display job after building the canonical input pair.
+The resulting `windows-quit-keyboard-private/` directory contains the
+button evidence, GUI log, worker and desktop receipts. The supervisor
+checks the staged profile cleanup and return to the original unlocked
+console. The separate `windows-quit-private/` trial retains the UIA
+invocation evidence. The keyboard case awaits its native result.
+[ARM64 workflow](../../.github/workflows/rust-windows-arm64-display.yaml).

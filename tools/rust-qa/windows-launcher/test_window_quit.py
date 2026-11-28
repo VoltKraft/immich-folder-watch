@@ -1,3 +1,4 @@
+from copy import deepcopy
 import unittest
 
 from window_quit import verify_quit
@@ -48,6 +49,48 @@ class WindowQuitTests(unittest.TestCase):
         for key, value in [("pid", 48), ("hwnd", 120), ("offscreen", True), ("width", 0)]:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 verify_quit(self.log, {**self.result, "button": {**self.result["button"], key: value}})
+
+    def keyboard(self):
+        result = deepcopy(self.result)
+        button = result["button"]
+        button.update(method="SendInput", buttonRuntimeId=[42, 4],
+                      keys=[{"key": k, "events": 2} for k in ("Tab", "Tab", "Tab", "Space")],
+                      focus=[{"name": name, "pid": 32, "foregroundHwnd": 101, "nativeFocusHwnd": 101,
+                              "role": "ControlType.Edit" if i <= 2 else "ControlType.Button",
+                              "runtimeId": [42, i], "hasKeyboardFocus": True, "isPassword": i == 2}
+                             for i, name in enumerate(("Dateiname", "Kennwort", "English", "Beenden"), 1)])
+        return result
+
+    def test_native_keyboard_traversal_and_invoke_are_separate_observations(self):
+        verify_quit(self.log, self.keyboard(), keyboard=True)
+        with self.assertRaises(ValueError):
+            verify_quit(self.log, self.keyboard())
+        with self.assertRaises(ValueError):
+            verify_quit(self.log, self.result, keyboard=True)
+
+    def test_space_requires_the_original_focused_visible_quit_button(self):
+        for key, value in [("hasKeyboardFocus", False), ("nativeFocusHwnd", 0), ("foregroundHwnd", 102),
+                           ("role", "ControlType.Edit"), ("pid", 33), ("name", "English"),
+                           ("runtimeId", [42, 1]), ("runtimeId", [42, 5])]:
+            result = self.keyboard()
+            result["button"]["focus"][-1][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                verify_quit(self.log, result, keyboard=True)
+
+    def test_partial_space_missing_tab_or_unprotected_password_fails(self):
+        for action in ("partial", "missing", "wrong-key", "wrong-field"):
+            result = self.keyboard()
+            button = result["button"]
+            if action == "partial":
+                button["keys"][-1]["events"] = 1
+            elif action == "missing":
+                button["keys"].pop(0)
+            elif action == "wrong-key":
+                button["keys"][-1]["key"] = "Enter"
+            else:
+                button["focus"][1]["isPassword"] = False
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                verify_quit(self.log, result, keyboard=True)
 
 
 if __name__ == "__main__":

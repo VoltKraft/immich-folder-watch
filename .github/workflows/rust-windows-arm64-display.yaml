@@ -13,6 +13,10 @@ on:
       - 'tools/rust-qa/windows-launcher/local_build.py'
       - 'tools/rust-qa/windows-launcher/window_quit.py'
       - 'tools/rust-qa/windows-launcher/window-quit.ps1'
+      - 'tools/rust-qa/windows-launcher/window-quit-keys.ps1'
+      - 'tools/rust-qa/windows-launcher/test_window_quit.py'
+      - 'tools/rust-qa/observe-windows-input.ps1'
+      - 'tools/rust-qa/windows-reader/Keyboard.cs'
       - 'tools/rust-qa/windows-inventory/**'
       - 'tools/rust-qa/gui/**'
       - 'tools/rust-qa/build-gui-probe.py'
@@ -100,6 +104,15 @@ jobs:
         shell: pwsh
         run: python -B tools/rust-qa/windows-launcher/window_quit.py
 
+      - name: Tab to the fallback Quit button and activate it with Space
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          python -B tools/rust-qa/windows-launcher/test_window_quit.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python -B tools/rust-qa/windows-launcher/window_quit.py --keyboard
+          exit $LASTEXITCODE
+
       - name: Read the existing Remote Desktop settings and aggregate WTS session states
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
         shell: pwsh
@@ -139,5 +152,6 @@ jobs:
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-display-retained-private/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-selection-private/
             artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-quit-private/
+            artifacts/rust/gui-native/aarch64-pc-windows-msvc/windows-quit-keyboard-private/
           if-no-files-found: error
           retention-days: 14

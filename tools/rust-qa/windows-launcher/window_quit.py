@@ -1,6 +1,7 @@
 """Quit the real window after the Windows Shell refuses its background tray registration."""
 import argparse
 from contextlib import closing
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -18,16 +19,35 @@ OUT = ART / "gui-native" / TARGET / "windows-quit-private"
 PAIR = ART / "windows-display-inputs"
 
 
-def verify_quit(log, result):
+def verify_keyboard(button, pid, hwnd):
+    names = ["Dateiname", "Kennwort", "English", "Beenden"]
+    focus = button.get("focus", [])
+    if (len(focus) != 4 or [row["name"] for row in focus] != names
+            or button.get("keys") != [{"key": key, "events": 2} for key in ["Tab", "Tab", "Tab", "Space"]]):
+        raise ValueError("Expected three native Tab gestures followed by Space on Quit")
+    ids = [row["runtimeId"] for row in focus]
+    if (any(not isinstance(rid, list) or not rid or not all(type(i) is int for i in rid) for rid in ids)
+            or len({tuple(rid) for rid in ids}) != len(names) or ids[-1] != button.get("buttonRuntimeId")):
+        raise ValueError("The focused UIA controls must be distinct and end on the original Quit button")
+    for row in focus:
+        role = "ControlType.Edit" if row["name"] in names[:2] else "ControlType.Button"
+        if (row["pid"] != pid or row["foregroundHwnd"] != hwnd or row["nativeFocusHwnd"] <= 0 or row["role"] != role
+                or row["hasKeyboardFocus"] is not True or row["isPassword"] is not (row["name"] == "Kennwort")):
+            raise ValueError("Keyboard input did not belong to the original focused controls")
+
+
+def verify_quit(log, result, *, keyboard=False):
     pid, worker = result["primaryPid"], result["inventoryPid"]
     button = result["button"]
     if (worker == pid or result["primaryExit"] != 0 or result["workerAliveAfterQuit"]
             or result["workerAtButton"] != [pid, "ifw-performance-worker.exe"]
             or result["window"]["pid"] != pid or result["window"]["desktopMatches"] != 1
             or button["pid"] != pid or button["hwnd"] != result["window"]["hwnd"]
-            or button["name"] != "Beenden" or button["method"] != "InvokePattern"
+            or button["name"] != "Beenden" or button["method"] != ("SendInput" if keyboard else "InvokePattern")
             or not button["enabled"] or button["offscreen"] or min(button["width"], button["height"]) <= 0):
         raise ValueError("Missing original visible Quit button, successful process exit or worker shutdown")
+    if keyboard:
+        verify_keyboard(button, pid, result["window"]["hwnd"])
     token = result["profile"]
     if not re.fullmatch(r"[a-f0-9]{32}", token):
         raise ValueError("Missing the original staging token")
@@ -60,7 +80,7 @@ def verify_quit(log, result):
         raise ValueError("Unexpected tray registration or worker restart during the window Quit")
 
 
-def observe_hosted(name, desktop, launcher, native, result):
+def observe_hosted(name, desktop, launcher, native, result, output, keyboard):
     recorder = launcher.recorder
     receipt = json.loads((PAIR / "display-build.json").read_bytes())
     build = json.loads((PAIR / "canonical/build.json").read_bytes())
@@ -77,10 +97,22 @@ def observe_hosted(name, desktop, launcher, native, result):
     result.update(source=receipt["revision"], target=TARGET, run=receipt["run"], attempt=receipt["attempt"],
                   compilerReceipt=recorder.sha(PAIR / "canonical/build.json"),
                   pairReceipt=recorder.sha(PAIR / "display-build.json"))
-    observe_window(name, desktop, launcher, native, result, gui=gui, worker=worker, images=images, output=OUT)
+    if keyboard:
+        root = QA.parents[1]
+        paths = [HERE / "window_quit.py", HERE / "window-quit.ps1", HERE / "window-quit-keys.ps1",
+                 QA / "observe-windows-input.ps1", QA / "windows-reader/Keyboard.cs",
+                 root / ".github/workflows/rust-windows-arm64-display.yaml"]
+        result["keyboardObserverSources"] = {}
+        for path in paths:
+            relative = path.relative_to(root).as_posix()
+            tracked = subprocess.check_output(["git", "cat-file", "--filters", receipt["revision"] + ":" + relative], cwd=root)
+            if path.read_bytes() != tracked:
+                raise ValueError("Keyboard observer differs from its original checkout: " + relative)
+            result["keyboardObserverSources"][relative] = hashlib.sha256(tracked).hexdigest()
+    observe_window(name, desktop, launcher, native, result, gui=gui, worker=worker, images=images, output=output, keyboard=keyboard)
 
 
-def observe_window(name, desktop, launcher, native, result, *, gui, worker, images, output, local_temp=None):
+def observe_window(name, desktop, launcher, native, result, *, gui, worker, images, output, local_temp=None, keyboard=False):
     if not native["ordinary_console"](desktop.context(), name) or not re.fullmatch(r"IfwQa_[0-9a-f]{32}", name):
         raise ValueError("Expected the observer on its private active console desktop")
     recorder = launcher.recorder
@@ -129,6 +161,8 @@ def observe_window(name, desktop, launcher, native, result, *, gui, worker, imag
                         cmd = [program, "-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-ExecutionPolicy", "Bypass",
                                "-File", str(HERE / "window-quit.ps1"), "-SubjectPid", str(app.pid),
                                "-Window", str(hwnd), "-OutputPath", str(output / "button.json")]
+                        if keyboard:
+                            cmd.append("-Keyboard")
                         with (output / "button.log").open("xb") as observer_log:
                             subprocess.run(cmd, env=env, cwd=trial, check=True, timeout=45,
                                            stdin=subprocess.DEVNULL, stdout=observer_log, stderr=subprocess.STDOUT,
@@ -145,7 +179,7 @@ def observe_window(name, desktop, launcher, native, result, *, gui, worker, imag
                             except subprocess.TimeoutExpired:
                                 app.kill()
                                 app.wait(timeout=5)
-            verify_quit(logfile.read_text(encoding="utf-8"), result)
+            verify_quit(logfile.read_text(encoding="utf-8"), result, keyboard=keyboard)
     result["after"] = desktop.context()
     if not native["ordinary_console"](result["after"], name):
         raise ValueError("The fixture desktop changed before its supervisor restored the original")
@@ -154,6 +188,7 @@ def observe_window(name, desktop, launcher, native, result, *, gui, worker, imag
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker-desktop")
+    parser.add_argument("--keyboard", action="store_true", help="Navigate to the fallback Quit button with Tab and press Space")
     args = parser.parse_args()
     if (os.name != "nt" or os.getenv("GITHUB_ACTIONS") != "true" or os.getenv("RUNNER_ARCH") != "ARM64"
             or os.getenv("RUNNER_ENVIRONMENT") != "github-hosted" or os.getenv("GITHUB_REPOSITORY") != "VoltKraft/immich-folder-watch"
@@ -162,13 +197,14 @@ def main():
     import observe as launcher
     native = runpy.run_path(str(QA / "windows-desktop/run.py"))
     desktop = native["Desktop"]()
+    output = OUT.with_name("windows-quit-keyboard-private") if args.keyboard else OUT
     result = {"verified": False, "source": os.environ["GITHUB_SHA"], "target": TARGET}
     if args.worker_desktop:
         if not re.fullmatch(r"IfwQa_[0-9a-f]{32}", args.worker_desktop):
             parser.error("Expected a generated fixture desktop")
-        record = OUT / "window-quit.json"
+        record = output / "window-quit.json"
         try:
-            observe_hosted(args.worker_desktop, desktop, launcher, native, result)
+            observe_hosted(args.worker_desktop, desktop, launcher, native, result, output, args.keyboard)
             result["verified"] = True
         except Exception as error:
             result["error"] = str(error)
@@ -176,17 +212,20 @@ def main():
         finally:
             native["write"](record, result)
         return
-    OUT.mkdir(exist_ok=False)
+    output.mkdir(exist_ok=False)
     try:
         with native["named_input_desktop"](desktop, result) as name:
-            native["run_worker"](Path(__file__).resolve(), ["--worker-desktop", name], name, QA.parents[1], result)
+            arguments = ["--worker-desktop", name]
+            if args.keyboard:
+                arguments.append("--keyboard")
+            native["run_worker"](Path(__file__).resolve(), arguments, name, QA.parents[1], result)
         result["returnedDesktop"] = desktop.context()
         if (result["workerExit"] or not result["jobClosed"] or result["cleanup"]["inputAfterRestore"] != "Default"
                 or not all(result["cleanup"].get(k) is True for k in ("switchBack", "namedClosed", "originalHandleClosed"))
                 or not native["ordinary_console"](result["returnedDesktop"], "Default")
                 or result["returnedDesktop"]["session"] != result["beforeSwitch"]["session"]):
             raise RuntimeError("Check the original GUI, button log and desktop restoration")
-        observed = json.loads((OUT / "window-quit.json").read_bytes())
+        observed = json.loads((output / "window-quit.json").read_bytes())
         if (not observed["verified"] or not observed["cleanupConfirmed"] or observed["observerPid"] != result["workerPid"]
                 or observed["before"]["session"] != result["beforeSwitch"]["session"]
                 or observed["after"]["session"] != observed["before"]["session"]):
@@ -196,7 +235,7 @@ def main():
         result["error"] = str(error)
         raise
     finally:
-        native["write"](OUT / "session.json", result)
+        native["write"](output / "session.json", result)
 
 
 if __name__ == "__main__":

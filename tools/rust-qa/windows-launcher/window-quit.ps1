@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)][int]$SubjectPid,
     [Parameter(Mandatory)][long]$Window,
-    [Parameter(Mandatory)][string]$OutputPath
+    [Parameter(Mandatory)][string]$OutputPath,
+    [switch]$Keyboard
 )
 $ErrorActionPreference = 'Stop'
 $hosted = $env:GITHUB_ACTIONS -ceq 'true' -and $env:RUNNER_ENVIRONMENT -ceq 'github-hosted' -and
@@ -51,11 +52,22 @@ if ($state.ProcessId -ne $SubjectPid -or -not $state.IsEnabled -or $state.IsOffs
     $state.BoundingRectangle.IsEmpty -or $state.BoundingRectangle.Width -le 0 -or $state.BoundingRectangle.Height -le 0) {
     throw 'The owned Quit button is not visible and enabled.'
 }
-$action = $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
 $report = [ordered]@{
     pid=$state.ProcessId; hwnd=$Window; name=$state.Name; enabled=$state.IsEnabled
     offscreen=$state.IsOffscreen; width=$state.BoundingRectangle.Width
     height=$state.BoundingRectangle.Height; method='InvokePattern'
 }
+if ($Keyboard) {
+    if (-not $hosted) { throw 'Select the native ARM64 keyboard fixture.' }
+    $report.method = 'SendInput'
+    try {
+        . (Join-Path $PSScriptRoot 'window-quit-keys.ps1')
+        Invoke-KeyboardQuit $root $button ([IntPtr]$Window) $SubjectPid $report
+    } finally {
+        [IO.File]::WriteAllText($OutputPath, ($report | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+    }
+    return
+}
+$action = $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern)
 $action.Invoke()
 [IO.File]::WriteAllText($OutputPath, ($report | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
