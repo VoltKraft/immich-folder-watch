@@ -190,3 +190,24 @@ Two separate traces of the first slow close recorded the main thread's OS wait s
 The Linux handler imports the same winit 0.30.13 that eframe already selects. Cargo added one local dependency edge to the lockfile. Regenerating the four unpacked-source graph reports yielded the prior package versions, features, checksums, native declarations and license findings. Replacing only the new `lockSha256` in each report reproduces its previous report SHA-256. The resulting lock SHA-256 is `3d266972f104fae3eb992e8198d25eace401f5c9fe1ed282aa180612fe12cc4a`. [GUI source review](rw02-gui-dependencies.md) · [Profile](../../rust/audit/gui-profile.json)
 
 This performance lane covers offline Linux x64 X11 with software rendering and warm synthetic files. Eframe's public `create_native` wrapper exposes the winit loop result. After the first completed frame, a renderer failure can also cause an internal eframe exit. Propagating and recovering such a failure requires a separate graphics test. Windows x64/ARM64, Linux ARM64, Wayland resource consumption, hardware GPU behavior, assistive technology and physical interaction have their own native evidence requirements. [Native desktop observations](rw02-native-gui.md)
+
+## Retained worker budget on Ubuntu x64 and ARM64 at 9487dbe
+
+Both native Ubuntu X11 jobs passed all 11 limits with the inventory worker managed by the GUI supervisor. Each job first measured the .NET 3.0.4 reference at `19dcbaf` on its own runner. The Rust GUI and worker came from the original Plasma compiler archives at `9487dbe`. The jobs verified their archive hashes, the source receipts and the binaries. Each job rebuilt the Vulkan presentation observer on its host and matched its SHA-256 to the original worker receipt. The workflow revision was `d118426`. [Compiler run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46114279356) · [Measurement run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46116725168) · [Shared measurement commands](../../tools/rust-qa/performance/hosted_budget.sh)
+
+The table gives the median Rust measurement and the maximum derived from that runner's .NET reference. Scan latency is the median of three trial p95s.
+
+| Measurement | x64 Rust | x64 limit | ARM64 Rust | ARM64 limit |
+| --- | ---: | ---: | ---: | ---: |
+| Startup (ms) | 256.90 | 1598.988 | 218.39 | 1504.020 |
+| Visible CPU (% of one core) | 0 | 2.533 | 0 | 2.800 |
+| Hidden CPU (% of one core) | 0 | 2.467 | 0 | 2.067 |
+| Visible RSS (MiB) | 124.129 | 245.447 | 120.531 | 254.784 |
+| Hidden RSS (MiB) | 124.129 | 249.185 | 120.531 | 256.954 |
+| Visible and hidden damage rectangles and render passes (each per second, four limits) | 0 | 0.067 | 0 | 0.067 |
+| Reopen during scan (p95 ms) | 1.01 | 16.31 | 0.97 | 16.20 |
+| Close during scan (p95 ms) | 0.47 | 15.73 | 0.36 | 15.58 |
+
+In all six Rust trials the independent observer saw reads in every one of the 100 directories. Each initial inventory reported 100,000 files and 100,000 changes on pass 0, then 100,000 files and zero changes on pass 1. Input requests used the original 25 ms interval. Each paint control observed a fresh presentation and XDamage after reopening. Both idle phases included the GUI and its worker in resource accounting.
+
+The original budget ZIPs have SHA-256 `71c30a20a3e9289b9f049f213d662d3adf7668b96fcd274b8042f450a4b6bf18` on x64 and `c9136f3880abebab82e27217926223b23e3fe19474947bd696178229a007bef5` on ARM64. Each includes both measurement reports, the GUI and worker receipts and the native observer. [x64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46116725168/artifacts/15252710556) · [ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46116725168/artifacts/15252516209)
