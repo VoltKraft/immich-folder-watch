@@ -301,6 +301,17 @@ SHA-256 `ccc46ca7d4698c60fcb2b53cf6e0f81ef7bceb4809b7706591d498632ce27a1c`.
 The Linux ARM64 evidence for this revision covers source and dependency
 resolution. Its native build and relink remain open.
 
+The focused Ubuntu 24.04 ARM64 job installs the pinned native compiler,
+reconstructs the reviewed GUI inputs and retains the original crate
+archives. Two fresh offline builds each run Clippy, exercise the five
+upload cases, and relink the modified Wayland binding. The job compares
+their source inventories, target profiles, observed upload data and
+both smoke results. It retains both native compiler receipt ZIPs.
+The SPDX and original notice files are regenerated from the first ZIP
+using its Actions digest and compared byte-for-byte. The native SPDX
+validator also checks the pinned official 2.3.1 JSON schema.
+[Focused Ubuntu ARM64 workflow](../../.github/workflows/rust-linux-arm64-combined.yaml).
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
