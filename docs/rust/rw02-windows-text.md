@@ -91,6 +91,42 @@ position or dimensions. A new native run must supply the rendered glyphs.
 python3 -m unittest discover -s tools/rust-qa/windows-text -p 'test_*.py' -v
 ```
 
+## Backward filename selection across an ordinary x64 second launch
+
+On November 28, 2026, the unlocked Windows Server 2025 x64 console ran
+the canonical executable from [compiler run 46117148186](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46117148186).
+The executable SHA-256 was `77ff50cf51c5bbd7d16e5382088b0ddc07451c6dbbe868b35ab8dc0131865105`.
+The [PowerShell observer](../../tools/rust-qa/windows-text/reopen-selection.ps1)
+at `3b5d695` started it with a private launcher profile and the existing
+synthetic tray-availability input. It established initial focus in the normal
+*Dateiname* field and pressed Home, Right five times and Shift+Left three times.
+
+| Observation in console session 1 | UI Automation selection, in UTF-16 units | Normal filename value and document text |
+| --- | --- | --- |
+| Before WM_CLOSE, primary PID 2284, HWND 590228 | `üße` at 2 | `Grüße – Sommer.jpg` |
+| After ordinary second launch, same PID, HWND 655764 | `üße` at 2 | `Grüße – Sommer.jpg` |
+| First key after reopening, Shift+Left | `rüße` at 1 | `Grüße – Sommer.jpg` |
+| Next key, x | Collapsed caret at 2 | `Gx – Sommer.jpg` |
+
+The no-argument second process (PID 5116) granted foreground permission to the
+original process. Its listener received the request from that PID and Windows
+accepted the foreground request for the new HWND. Both UIA focus checks and
+the Win32 foreground HWND matched at all four stages. The observer only read
+UIA between closing the first window and pressing Shift+Left. Extending the
+selection left before replacing it confirms its direction after reopening.
+Both processes exited with code zero. The primary drained after 70 passes.
+
+The initial observer timed out finding the first editor. After matching the
+window title and allowing up to 30 seconds for startup, two runs passed.
+Their guest result ZIP SHA-256 values were
+`63acffd6204e8bd6d67f6936079abe89685a81ccfa81d3c11977cc0ca81f751d` and
+`10f2cd6026ef70bf4de9b8587fc53ab3c585a0339de88a7f82c865f28aaf4ef0`.
+The local receipts are under
+`artifacts/rust/local-windows-server-2025-x64/20261128/gui-selection-03b0b8e/`.
+QMP reported 3,221,225,472 bytes of RAM. The guest shut down and released its
+temporary SSD layers. This observation covers the canonical x64 console
+editor.
+
 ## Ordinary filename on the reopened retained HWND
 
 The disposable Windows desktop job also runs the same eight glyph crops and three editing sequences on the retained executable. Its separate process starts with the original filename, hides through WM_CLOSE and reopens through the existing supervisor. The native observer verifies the loaded executable path and hash, the process creation time and the original HWND. The GUI must retain generation one in DX12 CPU Mailbox/Wait mode. A create/destroy hook and root hide/show events cover the field observation.
