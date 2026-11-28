@@ -338,6 +338,35 @@ using its Actions digest and compared byte-for-byte. The native SPDX
 validator also checks the pinned official 2.3.1 JSON schema.
 [Focused Ubuntu ARM64 workflow](../../.github/workflows/rust-linux-arm64-combined.yaml).
 
+## GUI startup language in the combined source audit
+
+The ordinary Linux GUI at `c361c69` loads the saved language through the
+reviewed YAML library. The combined audit reconstructed its 385 registry
+inputs inside the 473 original-source records for the full candidate.
+The verified GUI subset has SHA-256
+`1fde2469c1e00f08882bb863eca1110eb1c45fe78fe55e4b7767fcd3db0388e3`.
+The full audit checks the YAML library's source tree and library entry
+selected by Cargo. It also reconstructs the filtered compiler files for
+`base64 0.23.1` from the original archive.
+[Four GUI source reports](../../tools/rust-qa/gui/startup/README.md#current-yaml-library-at-bb3afd5)
+
+| Target | GUI packages | Combined packages | Combined registry packages |
+| --- | ---: | ---: | ---: |
+| Linux x64 | 251 | 338 | 328 |
+| Linux ARM64 | 250 | 337 | 327 |
+| Windows x64 | 135 | 250 | 240 |
+| Windows ARM64 | 135 | 249 | 239 |
+
+Fedora x64 resolved all four Cargo targets. Fifteen existing inventory
+entries gained the GUI as a consuming component. Comparing all other fields
+with the previous inventory at `2f63c15` reproduced every license, notice,
+font, shader and compiler-source digest. The four combined feature maps,
+typed trees and original source inventories also reproduced exactly.
+The updated inventory has canonical SHA-256
+`28434e461302a3c88890e1e0e29763566e5da7a0003661932bcf000e6933c302`.
+The [combined review](../../tools/rust-qa/combined-profile/review.json) has
+file SHA-256 `fe9e9fb94be8b777c4a5353a0344c5e9b9316caa148d5269bc28478dfb3d2939`.
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).

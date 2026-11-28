@@ -10,6 +10,8 @@ import subprocess
 
 from sources import (FIRST_PARTY, HERE, HYPER_KEY, HYPER_ROOT, QA, ROOT, catalog, hyper_util_source, locked,
                      read, sha256, source_config, source_profile, write)
+from gui.startup.audit_profile import StartupAudit
+from gui.startup.vendor import RECEIPT_SHA256, selected_inputs, verify_sources
 from storage.evidence import target_graph
 
 spec = importlib.util.spec_from_file_location("rw02_audit", QA / "audit-graph.py")
@@ -46,6 +48,18 @@ def normal_build(cargo, directory, target):
 def scope_for(target):
     return ["gui", "realtime", "storage", "yaml", "performance/worker"] + (
         ["linux-services", "portal-dialog"] if "linux" in target else ["windows-services"])
+
+
+def verify_gui_sources(vendor, staged):
+    """Authenticate the current GUI registry projection within the larger combined vendor."""
+    selected = selected_inputs()
+    projection = verify_sources(vendor, selected, staged)
+    receipt = vendor.parents[2] / "registry-sources.json"
+    write(receipt, projection)
+    digest = sha256(receipt)
+    if digest != RECEIPT_SHA256:
+        raise ValueError("The combined vendor differs from the reviewed GUI/YAML registry projection")
+    return digest
 
 
 def reproduce_lock(vendor, work, env, toolchain):
@@ -119,7 +133,7 @@ def resolve(vendor, env, output, toolchain):
             return audit.private_gui_input(root, key[0], approved)
         raise ValueError(f"Unexpected external compiler source for {key}")
 
-    def audit_rows(directory, selected):
+    def audit_rows(directory, selected, gui_source):
         rows = []
         for data in sorted(metadata(directory)["packages"], key=lambda p: (p["name"], p["version"])):
             key = data["name"], data["version"]
@@ -137,6 +151,12 @@ def resolve(vendor, env, output, toolchain):
                 if key == HYPER_KEY and (data["source"] is not None or manifest != HYPER_ROOT / "Cargo.toml"):
                     raise ValueError("The individual transport selected a different hyper-util source")
                 row.update(external(key))
+                if gui_source and data["source"] == REGISTRY:
+                    filtered = gui_source.filtered(data, combined[key])
+                    if filtered is not None:
+                        row["filteredCompilerSource"] = filtered
+            elif gui_source:
+                row.update(gui_source.local(data))
             elif manifest in members:
                 row["repositoryManifest"] = members[manifest]
             elif manifest == directory / "Cargo.toml":
@@ -162,8 +182,9 @@ def resolve(vendor, env, output, toolchain):
             for key in sets:
                 sources_by_key[key].add(name)
             if name in ("gui", "realtime"):
+                gui_source = StartupAudit.for_canonical(directory / "Cargo.toml", vendor, target) if name == "gui" else None
                 report = {"target": target, "lockSha256": sha256(directory / "Cargo.lock"),
-                          "packages": audit_rows(directory, sets), "excludedPackagesOrFeatures": []}
+                          "packages": audit_rows(directory, sets, gui_source), "excludedPackagesOrFeatures": []}
                 if name == "gui":
                     report.update(desktopFontAssets=approved["fonts"], textNotices=approved["noticeFiles"])
                     raw = (json.dumps(report, indent=2, sort_keys=True) + "\n").encode()

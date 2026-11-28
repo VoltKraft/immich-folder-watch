@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 from check_imports import compare
-from graphs import TARGETS, fingerprint, reproduce_lock, resolve
+from graphs import TARGETS, fingerprint, reproduce_lock, resolve, verify_gui_sources
 from licenses import inventory, totals
 from native import run_native
 import relink
@@ -38,11 +38,14 @@ def source_witness():
     files = [ROOT / "rust/toolchain-inputs.json", ROOT / "rust/Cargo.toml",
              ROOT / "rust/tests/fixtures/behavior/legacy-upload.json", QA / "audit-graph.py",
              QA / "check-toolchain.py", QA / "storage/evidence.py", QA / "gui/source_profile.py",
-             QA / "gui/src/fonts.rs", QA / "yaml/prepare.py", QA / "realtime/hyper_util_source.py",
+             QA / "gui/startup/vendor.py", QA / "gui/startup/audit_profile.py",
+             QA / "yaml/prepare.py", QA / "realtime/hyper_util_source.py",
              QA / "realtime/hyper-util-connect.patch", QA / "windows-local/combined.py", QA / "realtime/guest.py"]
     files += list((ROOT / "rust/audit").glob("*.json"))
     files += [p for d in SPIKES for p in [QA / d / "Cargo.toml", QA / d / "Cargo.lock"]]
     files += [QA / d / "inputs.json" for d in ("storage", "yaml", "realtime")]
+    for name in ("gui", "yaml"):
+        files.extend(p for p in (QA / name / "src").rglob("*") if p.is_file())
     for name in FIRST_PARTY:
         crate = ROOT / "rust/crates" / name
         files += [crate / "Cargo.toml", *(crate / "src").rglob("*.rs")]
@@ -101,6 +104,7 @@ def main():
                 source_profile.prepare(fetch=args.fetch)
             vendor, staged, text = prepare(work, local_caches(), args.fetch)
             print("Checking the four normal/build graphs and the original substrate reviews", flush=True)
+            record["guiRegistryProjectionSha256"] = verify_gui_sources(vendor, staged)
             record["emptyLockReplaySha256"] = reproduce_lock(vendor, work, env, toolchain)
             graphs, rows = resolve(vendor, env, output, toolchain)
             catalog_record = inventory(rows, vendor, staged, text)

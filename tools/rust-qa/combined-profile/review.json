@@ -1,6 +1,6 @@
 {
   "allCompilerTreesSha256": "297ae1b7111cb4e205083ab787020b04b920eee9f40f72cbe53ced10f73f18d1",
-  "inventorySha256": "363f4351b3023726684a47d0f06f47bdf0a37b6132d5f5d2b669cf821b89164d",
+  "inventorySha256": "28434e461302a3c88890e1e0e29763566e5da7a0003661932bcf000e6933c302",
   "lockSha256": "ff44785e595316c7182d7a020b5904f632c67fa0ac0e8d5d239c684794c00793",
   "registryLockCount": 472,
   "summary": {
@@ -98,7 +98,7 @@
     },
     "aarch64-unknown-linux-gnu": {
       "individualPackageCounts": {
-        "gui": 235,
+        "gui": 250,
         "linux-services": 70,
         "performance/worker": 25,
         "portal-dialog": 118,
@@ -137,7 +137,7 @@
     },
     "x86_64-unknown-linux-gnu": {
       "individualPackageCounts": {
-        "gui": 235,
+        "gui": 251,
         "linux-services": 70,
         "performance/worker": 26,
         "portal-dialog": 118,
