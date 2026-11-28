@@ -549,8 +549,9 @@ in the same read as the HTTP upgrade. The native receipt at
 `artifacts/rust/realtime-assessment/linux-plaintext-proxy-fedora-03/result.json`
 has SHA-256 `4f5d9af3656b20fa4603465e164cb4ef7894346313f357e18eec4f80ab4d388a`.
 All four audited target graphs kept their existing package and feature
-sets. Windows proxy selection, authenticated relays and full application
-integration remain open.
+sets for that Linux change. The following comparisons cover Windows
+environment and manual system settings. Authenticated relays and full
+application integration remain open.
 
 ### Windows environment proxy selection with the shipping client
 
@@ -581,10 +582,62 @@ system-provider outcome. Native Rust wire results and operating-system
 proxy resolution have their own checks.
 [Native transport procedure](../../tools/rust-qa/realtime/README.md).
 
+### Windows per-user system proxy on the local x64 guest
+
+With all proxy environment variables removed, the original 3.0.4 MSI
+assemblies used the current desktop user's connection settings. The
+observer set each configuration with WinINet, read it back with WinHTTP
+and queried the .NET provider for HTTP, WS, HTTPS and WSS.
+
+| Windows configuration | 3.0.4 observation |
+| --- | --- |
+| Direct | All four routes were direct. Separate HTTP and HTTPS sessions completed with zero relay requests. |
+| Single manual HTTP proxy | All four routes used the configured relay. For each scheme the origin saw the authenticated album GET, polling GET and POST, and WebSocket upgrade. The relay saw three absolute HTTP requests and one CONNECT for HTTP, and four CONNECTs for HTTPS. |
+| Exact loopback bypass | HTTP and HTTPS each delivered one event and closed normally without contacting the relay. |
+| Wildcard or `<local>` bypass | All four provider queries returned a direct route for the loopback host. |
+| Distinct lowercase `http=` and `https=` endpoints | HTTP and WS selected the first endpoint. HTTPS and WSS selected the second. |
+| PAC URL or automatic detection | WinHTTP reported the configured URL or detection flag. These two observations read the settings without running a PAC script or attempting WPAD discovery. |
+
+The observer verified restoration of the original WinINet options. Its
+eight configurations, including six full 3.0.4 wire sessions, are in
+`artifacts/rust/local-windows-server-2025-x64/20261127/system-proxy-3.0.4/reference.json`,
+SHA-256 `465f0cee13207b528a2b11509f84170ed6eace2a13e100cb4d7632fe3422fc2e`.
+The MSI and runtime hashes are in the environment comparison above.
+[Windows manual proxy selection in .NET 10.0.12](https://github.com/dotnet/runtime/blob/v10.0.12/src/libraries/System.Net.Http/src/System/Net/Http/SocketsHttpHandler/HttpWindowsProxy.cs).
+
+On 2026-11-28 the local Windows Server 2025 x64 guest ran both native
+executables from `79bcd3f`. It verified the Actions archive digest, both
+executable hashes and 25 source files before running 17 unit tests, 49
+transport cases and 16 additional Windows system proxy cases. All passed.
+The compiler archive SHA-256 was
+`c367b54e4a9f8626a9141534b85c793d6ad9182d527cad3af80df1ac6c5d5e02`.
+[Windows x64 compiler archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46067623264/artifacts/15232320408).
+
+For both HTTP and HTTPS, the Rust client completed a subscription event
+and a normal close with direct settings, a manual relay, each of the three
+bypasses above, distinct protocol endpoints and a usable environment proxy
+overriding a competing system relay. The direct and bypass sessions sent
+zero requests to the relay. The manual relay saw no API credentials in
+CONNECT headers. With a PAC URL or the WPAD flag set, the client returned
+`AutomaticProxy` and opened zero connections. Both the fixture and its
+supervisor read back the restored per-user proxy settings. PAC execution,
+WPAD discovery, failover among multiple proxies and changes to system
+settings during an established session remain open.
+
+The compiler archive, its receipt, the unit output and the original guest
+reports are in
+`artifacts/rust/local-windows-server-2025-x64/20261128/realtime-79bcd3f/`.
+The guest receipt `result.json` has SHA-256
+`ddb3f2e66598a0c991f896147cd2ca253330502e9b10832da0f2c579793020f2`.
+It records the hashes of `sessions.json` and `system-proxy.json` and binds
+both to the release executable with SHA-256
+`55cac956fd7f87c4b6f5e5305f8abf9c3411165f1975d2fb760e6f1957c2aeb2`.
+[Local guest procedure](../../tools/rust-qa/realtime/README.md).
+
 ## Dependency and native input review
 
 The assessment has an independent lockfile, SHA-256
-`31718bcf0f1c7e62c483c0ebd6a5ff8577e0fcc9ec1aa6830bd927286accddc5`.
+`703a0fca7a2e89252815f2f5abf8337de113e1f4189687c31e5ad3e6f0a3ad85`.
 The four normal/build target inventories cover 114 distinct registry packages,
 two first-party packages and 202 supplied notice files. The lock includes another
 38 registry packages outside those native target profiles. The audit records
@@ -592,6 +645,18 @@ original archive hashes, actual feature sets, build scripts, proc macros and
 notices. No fonts or shaders occur in the active archives. The runner verifies
 each active unpacked source tree against the original before compilation.
 [Lockfile](../../tools/rust-qa/realtime/Cargo.lock) and [per-target evidence pins](../../tools/rust-qa/realtime/inputs.json).
+
+The manual Windows adapter adds WinHTTP, NetworkManagement, IpHelper and
+Ndis features to the existing MIT-licensed `windows-sys` 0.61.2 input.
+The resolved package counts are unchanged. On x64 the audit matched 109
+registry packages, 5,232 unpacked files and 190 original notices. The adapter
+reads user settings with `WinHttpGetIEProxyConfigForCurrentUser` and the
+local interfaces with `GetUnicastIpAddressTable`. It releases both Windows
+allocations after copying their results. The four-target readback is in
+`system-proxy-3.0.4/graph-verification.json` under the evidence directory
+above, SHA-256 `605d8e758696fdfe8db9176ccac6e334b7ff2b28a96b1c007bc424e25e70a380`.
+[WinHTTP allocation contract](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpgetieproxyconfigforcurrentuser) ·
+[IP Helper table contract](https://learn.microsoft.com/en-us/windows/win32/api/netioapi/nf-netioapi-getunicastipaddresstable).
 
 | Input | Selected function and licensing |
 | --- | --- |
