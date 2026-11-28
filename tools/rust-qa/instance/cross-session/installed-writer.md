@@ -240,5 +240,34 @@ in time. Other executable names and later launches remain outside it.
 
 Local tests exercised the actual PowerShell reader with synthetic CIM
 responses and checked that the detached reader rejected missing, occupied
-and indeterminate observations. The extended CIM receipt still needs a
-native Windows run. The earlier archives used `Get-Process` and Toolhelp.
+and indeterminate observations. The earlier archives used `Get-Process`
+and Toolhelp.
+
+A fresh 3072 MiB Windows Server 2025 x64 guest ran the extended observer
+from `2e7a0f3bc10b1354bd43866b9a947b8f16d917f2`. In RDP session 2,
+the running WPF editor (PID 7548) survived the refused upgrade and exited
+through its own tray menu. Windows Installer rolled back the deliberately
+failed attempt (1603), then committed the ordinary retry (0). Before the
+successor was uninstalled, the administrator observed the original installed
+path absent and an empty `Win32_Process` result. Both queries completed
+without errors. Independently, the standard user's Toolhelp snapshot found
+zero WPF processes, the original shortcut count was zero, and launching
+the original path returned Win32 error 2. The successor's read-only
+preflight returned 21.
+
+The private MSI removal and original 3.0.4 reinstall each returned 0.
+The restored WPF editor (PID 7640) opened and quit through its tray menu.
+The detached reader matched all four synthetic profile files across the
+observed phases. After ACPI shutdown the host verified the loopback RDP
+port was closed, QEMU had exited, the disk and firmware base metadata
+matched the initial values, and both temporary overlays were removed.
+
+The originals are under
+`artifacts/rust/local-windows-server-2025-x64/20261128/cutover-committed-2e7a0f3`.
+The SHA-256 of `share/original-guest.zip` is
+`ad0c0f28f2b2d2ea3618a95ed7fc423f33affcbb90fbc69284d65c9bc6c77776`.
+Its `committed-inventory.json` has SHA-256
+`a639724e6dbafea3379f834cd9bb31c9c90e2983b60c4c5f1991154760d3b998`.
+`readback.json` identifies the original executable, private product code,
+MSI digest, transactions and profile hashes. `shutdown.json` records the host
+readback.

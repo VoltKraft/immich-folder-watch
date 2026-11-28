@@ -31,6 +31,8 @@ Both the console administrator and the standard user used the same private
 guest. The input DVD contained the observer from
 `1c5bc66e24fe0f5b067b40e77f073023134870bd` and the original release
 MSI with SHA-256
+`419938c3fec0c113bf0f33dbf1a9bd4a6748df1e7930acb20fec5fc3f265a187`.
+Its installed WPF executable had SHA-256
 `b8354424bd6c6eba133bb7939ce0de42afbe234bcbb77853b30c25dd645f8675`.
 The first guest archive under
 `artifacts/rust/local-windows-server-2025-x64/20261128/cutover-running-wpf-01/share/original-guest.zip`
