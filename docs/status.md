@@ -28,6 +28,11 @@ Documents v4. The saved FUSE path remained the label with the bus offline.
 [Native subfolder trials](rust/rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
 The editor at `b71b573` retained its focused field, backwards selection
 and first keystroke after reopening on Mutter and X11.
+The ordinary Windows x64 executable from `03b0b8e` also retained the
+selection across close and a second launch. Without resetting focus,
+Shift+Left extended the left edge and typing `x` produced
+`Gx – Sommer.jpg` in both native text interfaces.
+[Two x64 console runs](rust/rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch).
 [Folder results](rust/rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·
 [Editor results](rust/rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch).
 
@@ -91,6 +96,15 @@ console. The config and single SQLite upload row survived. Replay at
 The opposite start order still allows a legacy writer to run.
 [Orderly handover](rust/rw02-cross-session.md#ordinary-wpf-shutdown-before-rust-writer-admission) ·
 [Rust-first result](rust/rw02-cross-session.md#installed-304-worker-in-another-session).
+
+Two Windows ARM64 hosted runs observed eight ordered lock events from
+five Rust writer processes using one standard SID and two distinct logons.
+The interactive and batch sessions each refused a competing writer and
+later reacquired the file. Both jobs failed profile cleanup. After 720
+seconds in the repeat Windows reported the synthetic profile loaded,
+with all seven case processes exited and the temporary account, task,
+task folder and staging data removed. An ARM64 console/RDP pair remains open.
+[Original writer archive at 8505dad](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46121262901/artifacts/15254108999).
 
 A fresh 4 GiB x64 guest ran the read-only MSI preflight at `3913061` as
 a standard user in RDP. Both before first launch and while the WPF

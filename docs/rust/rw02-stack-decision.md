@@ -27,7 +27,13 @@ The native Ubuntu worker restart builds also passed all eleven paired
 resource limits. On Fedora x64 the canonical GUI now restores focus and
 backwards text selection when Mutter recreates the window. The newer
 Windows ARM64 application-mode trial confirmed the ordinary send and
-history cleanup. No visible Shell banner was verified.
+history cleanup. No visible Shell banner was verified. Two x64 console
+trials preserved the normal editor's backwards selection and focus
+across an ordinary second launch. On ARM64 both rebuilt variants showed
+the edited filename on private 96-DPI desktops. Their Default-desktop
+trials timed out waiting for the original field.
+[Windows x64 second launch](rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch) ·
+[ARM64 frames after the selection fix](rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
 [Ubuntu budget repeat](rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
 [Reopened editor](rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch) ·
 [ARM64 original sender](../../tools/rust-qa/windows-services/toast-history.md#ordinary-notification-in-app-state-after-quiet-time).
@@ -137,6 +143,14 @@ Rust subsequently acquired the endpoint and writer guard in the console.
 [Two Rust writers](rw02-cross-session.md#standard-user-console-and-rdp-handover-on-windows-server-2025-x64) ·
 [Both installed launch orders](rw02-cross-session.md#installed-304-worker-in-another-session).
 
+Two native Windows ARM64 runs also excluded both Rust writers across
+an interactive logon and a batch logon of one standard account, then
+reacquired the same file. In the repeat, Windows still reported the
+temporary profile loaded after 720 seconds. The five writer processes,
+temporary account, task and case data were gone. An interactive ARM64
+console/RDP pair remains outstanding.
+[ARM64 observations](../../tools/rust-qa/instance/cross-session/hosted-arm64/README.md).
+
 An exclusive handle on the existing configuration file caused the installed
 WPF Save and Apply to report a sharing violation. After release the same
 window saved the draft and started its worker. In a separate NTFS trial,
@@ -157,7 +171,7 @@ keep the stack selection open. [Stage exit criteria](../rust-rewrite-plan.md#sta
 · [Distribution availability](rw02-portal-upstream.md#additional-distribution-sources-checked-on-2026-11-22).
 
 - **Desktop.** Rust 1.100.0, egui/eframe 0.37.0, winit 0.30.13 and wgpu 30.0.0 are pinned. The four verified normal/build profiles contain 235 packages per Linux target and 135 per Windows target, with AccessKit, clipboard, Vulkan on Linux and DX12 on Windows. The desktop spikes use zbus 5.19.0 on Linux and windows 0.62.2 for Windows Shell/COM. The maintained egui/epaint change uses unicode-bidi 0.3.18. Five unmodified OFL-1.1 Noto assets supply Sans, Mono, Symbols 2, Arabic and CJK JP. Default fonts, optional emoji and inspection are excluded. Retain the source/notice and Wayland relink obligations in the combined candidate. [Manifest](../../tools/rust-qa/gui/Cargo.toml) · [Exact sources, features and fonts](rw02-gui-dependencies.md)
-- **Filesystem and state.** Four hosts passed handle-bound primitives, 5,844 scalar comparisons per casing mode at `93ecc35`, two live-WAL backups and 40 C# storage readbacks each. At `0bb39bf` each passed 246 YAML byte comparisons, 392 semantic comparisons and 224 C# readbacks using serde-saphyr 2.2.0. On each host the C# worker restarted from Rust’s returned backup after four synthetic activities. Storage uses rusqlite 0.43.0 with SQLite 3.54.1. Windows also passed encrypted loopback SMB. On tested distro Documents portals the required cooperating upload lock returned `ENOSYS`. The private backport enforced it on both architectures. Native x64 also passed an actual package upgrade and rollback with the installed Flatpak. Distribution and package maintenance remain open. The candidate guard passed on both Windows architectures across two sessions of one elevated account. The Rust guard also passed with a standard user on x64. The ARM64 standard-user case and installed legacy/candidate writer exclusion remain open under RI-AC05/08. [Filesystem](rw02-filesystem.md) · [YAML](rw02-yaml.md#four-native-anchor-and-compact-mapping-exchanges-at-0bb39bf) · [Worker restarts](rw01-storage-contract.md#native-worker-recovery-at-0bb39bf) · [Storage](rw02-storage-inputs.md) · [Portal control](rw02-portal-upstream.md) · [Writer ownership](rw02-cross-session.md)
+- **Filesystem and state.** Four hosts passed handle-bound primitives, 5,844 scalar comparisons per casing mode at `93ecc35`, two live-WAL backups and 40 C# storage readbacks each. At `0bb39bf` each passed 246 YAML byte comparisons, 392 semantic comparisons and 224 C# readbacks using serde-saphyr 2.2.0. On each host the C# worker restarted from Rust’s returned backup after four synthetic activities. Storage uses rusqlite 0.43.0 with SQLite 3.54.1. Windows also passed encrypted loopback SMB. On tested distro Documents portals the required cooperating upload lock returned `ENOSYS`. The private backport enforced it on both architectures. Native x64 also passed an actual package upgrade and rollback with the installed Flatpak. Distribution and package maintenance remain open. The candidate guard passed on both Windows architectures across two sessions of one elevated account. The Rust guard passed across standard-user console and RDP sessions on x64. On ARM64 it passed the lock sequence across an interactive and a batch session of a standard user. Two interactive ARM64 sessions and installed legacy/candidate writer exclusion remain open under RI-AC05/08. [Filesystem](rw02-filesystem.md) · [YAML](rw02-yaml.md#four-native-anchor-and-compact-mapping-exchanges-at-0bb39bf) · [Worker restarts](rw01-storage-contract.md#native-worker-recovery-at-0bb39bf) · [Storage](rw02-storage-inputs.md) · [Portal control](rw02-portal-upstream.md) · [Writer ownership](rw02-cross-session.md)
 - **Transport and watch events.** All four targets passed twenty loopback scenarios at `e2f161b`, including TLS endpoint-name rejection, delayed namespace acknowledgement, continued polling during a stalled WebSocket probe and peer-observed shutdown. Windows ARM64 also ran the transport with its reconstructed import library. Each Ubuntu target passed fifteen watch scenarios and each Windows target passed fourteen. Both Windows hosts observed actual kernel notification loss, replaced the registration and recovered all 514 files. [Transport](rw02-realtime-transport.md#tls-endpoint-identity) · [ARM64 relink](rw02-windows-imports.md) · [Watch events](rw02-watch-events.md)
 - **Native logging and combined inputs.** The Windows Event Log passed on both targets. Both Ubuntu journals returned six records at the expected priorities. The combined development profile resolves 351 active external inputs across the four architectures, including three reconstructed sources. Both Ubuntu hosts built offline and relinked a modified Wayland binding. Both Windows hosts passed the combined native smoke. All eleven canonical graph and inventory files matched across the four targets. The packaged candidate inventories, notices and SBOM remain open. [Platform logs](rw02-platform-logs.md) · [Combined graph and reconstruction](rw02-combined-profile.md) · [Dependency rules](../rust-desktop-standard.md#rds-07-dependencies-and-licensing)
 

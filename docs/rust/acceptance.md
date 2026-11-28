@@ -60,6 +60,9 @@ access on both desktops. Both native Ubuntu ARM64 clients also passed
 using the Documents v4 grant label. [Saved subfolder trials](rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
 The editor at `b71b573` also retained keyboard focus and its directional
 Unicode selection after an ordinary reopen on both backends.
+Two Windows x64 console runs also recovered the original selection in
+the replacement HWND, extended the left edge and replaced the selected
+text without refocusing the field. [Windows editor and native input](rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch).
 [Selected grants and revocation](rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·
 [Native editor measurements](rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch).
 
@@ -399,7 +402,12 @@ code 1 with zero output bytes. Neither hosted trial started an ordinary-user
 writer. On November 27 five native Rust writers subsequently demonstrated
 refusal in both directions and reacquisition in the same standard user's
 console and RDP sessions on Server 2025 x64. The unchanged managed oracle
-read the SID. ARM64 and old/new cross-session cutover remain open.
+read the SID. In ARM64 runs at `b0fb23c` and `8505dad`, five native
+Rust writers under one standard SID refused in both directions and
+reacquired the same file. Session 2 used interactive logon type 2 and
+session 0 used batch logon type 4. Both jobs failed their separate
+profile cleanup check. Two interactive sessions on ARM64 and the installed
+old/new cutover remain open. [Native ARM64 lock events and cleanup](../../tools/rust-qa/instance/cross-session/hosted-arm64/README.md).
 [Native process evidence](rw02-instance.md) and [cross-session assessment](rw02-cross-session.md).
 
 At `13e4af8` the private consoles in sessions 2 and 0 listed Basic User

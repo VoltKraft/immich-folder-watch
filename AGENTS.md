@@ -181,7 +181,9 @@ to reconcile project decisions, defaults, and recorded state.
   the [foreground keyboard launch](docs/rust/rw02-instance.md#second-launch-from-a-foreground-test-window)
   and actual Shell activation for the same retained executable. Verify its
   [ordinary filename after reopening](docs/rust/rw02-windows-text.md#ordinary-filename-on-the-reopened-retained-hwnd)
-  with the native glyph and editing observer. Use the same executable for
+  with the native glyph and editing observer. Exercise the [focused selection
+  across an ordinary second launch](docs/rust/rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch)
+  with the original first keystroke on the reopened editor. Use the same retained executable for
   [mixed-DPI and RDP observations](docs/rust/rw02-windows-display.md#required-observations-on-a-disposable-native-desktop)
   on a disposable Windows test desktop.
   Select the [archived x64 CPU executable](docs/rust/rw02-windows-display.md#display-checks-with-the-measured-x64-cpu-executable)
@@ -230,6 +232,8 @@ to reconcile project decisions, defaults, and recorded state.
   For a [standard-user writer trial](docs/rust/rw02-cross-session.md),
   use the tested native writer and its identity oracle in two sessions of
   the same account. Verify the Actions digest before reusing a hosted build.
+  Read back the [hosted ARM64 writer events and profile cleanup](tools/rust-qa/instance/cross-session/hosted-arm64/README.md)
+  separately for the interactive and batch logon trial.
   Use the [installed WPF handover trial](tools/rust-qa/instance/cross-session/wpf-handover.md)
   to follow a normal tray Quit on the original RDP desktop before Rust acquires the writer.
   Use the [read-only MSI preflight](tools/rust-qa/instance/cross-session/installed-writer.md)
