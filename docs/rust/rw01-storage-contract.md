@@ -650,3 +650,26 @@ points hit another window. All three MSI uninstalls passed.
 [x64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250633/artifacts/15158022801) ·
 [ARM64 private](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250633/artifacts/15158295634) ·
 [ARM64 Default](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45905250633/artifacts/15157364158).
+
+## Installed ARM64 worker and foreground at 1910195
+
+On the Default desktop, the original 3.0.4 worker committed the first PNG
+and Rust returned a standalone database from the live 16-frame WAL.
+The observer identified the WPF window in session 2 at startup and just
+before Quit. The foreground class and executable were unavailable at both
+points. The menu helper independently found the same foreground HWND
+66050 (PID 8344) at all sixteen client coordinates. It stopped before
+moving the cursor. The full restart on this desktop remains open.
+[Default desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46098223429/artifacts/15244742070)
+(`9dee284398d36dc55f78c17252144b79c2f8b5556b4d7ea77bb5a10042b89b50`).
+
+On the private input desktop, the second installed worker opened Rust's
+backup, preserved ROWID 1 and uploaded the second PNG at ROWID 2. Both
+processes exited zero through the shipping Quit command. Both jobs
+drained and the original Default desktop was restored. The logs confirm
+the start of the worker flush. Its completion remains unobserved.
+Detached replay at the original commit verified the live backup on
+Default and the full restore on the private desktop. Both original ZIPs
+matched the Actions digests and both runners removed the MSI.
+[Private desktop archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46098223429/artifacts/15244666276)
+(`a20ef7c89885a63cf42803cc3f72e20b4a1df54999f67742c247b89287b8189c`).

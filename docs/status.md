@@ -30,6 +30,14 @@ Quit menu anchor points in both runs. The private desktop trials passed.
 [ARM64 activation run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46067133157) ·
 [ARM64 backup run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46067133243).
 
+QEMU reported 4,294,967,296 bytes of base memory and zero hot-plugged
+bytes from the running local x64 test guest. On Windows ARM64 at
+`1910195`, detached replay verified the first worker's live backup on
+Default and the complete installed restart on the private desktop. On
+Default all sixteen Quit points still hit one other window. Its process
+name remains unknown.
+[Backup and desktop observations](rust/rw01-storage-contract.md#installed-arm64-worker-and-foreground-at-1910195).
+
 On November 27 the archived Windows x64 GUI passed the RDP and mixed-DPI
 checks on a local Windows Server 2025 Standard Evaluation VM. Windows
 measured 96 and 192 DPI and the observer verified visible edits in the same
