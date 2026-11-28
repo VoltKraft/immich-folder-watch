@@ -182,9 +182,8 @@ SHA-256 `7e7eb7eab5fd7057e51c0f2695ca89a7b4c66f299ad1a0fd900618535a63ba4a`.
 Replay it with `replay_linux_tls_basic_proxy.py --digest <report.json>`.
 For the ten earlier scenarios with a Digest-capable binary, use
 `--basic-with-digest`. The ordinary Linux suite also verifies the two
-algorithms with both correct and incorrect credentials. The wire evidence
-covers qop `auth`; repeated nonce replay policies and plaintext Digest
-are separate cases.
+algorithms with both correct and incorrect credentials. These observations cover qop `auth`. The fixed-nonce comparison below adds
+count validation. Plaintext Digest remains a separate case.
 
 The Linux transport selects the MIT license for RustCrypto `md-5` 0.11.0 and
 `sha2` 0.11.1. The exact MD5 archive matches crates.io and source revision
@@ -195,3 +194,41 @@ files for both packages. All previously selected target packages and features
 are identical to the previous inventories. The two Windows package sets are
 identical as well. [Reviewed hashes and original notices](../../tools/rust-qa/realtime/inputs.json) ·
 [RustCrypto MD5 sources](https://github.com/RustCrypto/hashes/tree/b5051e5a5e7dc86a6c27c1ec7a390744ebcfb97a/md5).
+
+### Native Ubuntu and Windows receipts at ed9268e
+
+On Ubuntu x64 and ARM64, each native process passed 66 wire scenarios and
+19 unit tests. Each of the two Digest algorithms completed thirteen
+authenticated tunnels after thirteen anonymous challenges. The peer
+received a normal WebSocket close. Each wrong-password control stopped
+ten credentialed attempts before origin TLS. On Windows ARM64, all 49
+wire scenarios and 18 unit tests for that target passed. Detached
+readback matched every indexed output and 35 source files per archive.
+[Native transport run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46102630472).
+
+### Multiple requests with the same proxy nonce
+
+A Fedora relay that checks nonce counts accepted the earlier executable's
+first correct request and declined all six subsequent attempts with the same
+count. None of its four positive Digest cases reached a realtime event.
+The revised transport keeps the count and random client nonce together
+for each of the last 32 server nonces on the configured proxy. Concurrent
+requests reserve distinct counts. Eight parallel calls in the native unit
+test used 1 through 8. A different nonce started at 1, followed by 9 for
+the original nonce. The table retains only fixed-size hashes and counters.
+A failure to generate or reserve a Digest response stops the request.
+[Digest nonce-count definition](https://www.rfc-editor.org/rfc/rfc7616#section-3.4).
+
+In each of the four successful comparisons at the loopback relay, the
+corrected Rust executable used counts 1 through 9. Both credentials
+and the requested authority were verified before TLS. All four negative
+cases produced zero authenticated requests. The signed .NET control ran
+with its historical relay behavior. The binary SHA-256 is
+`460febc0520dce4595186e93533dbfaef527dcf515b77b09c0a98fcf183f609b`.
+Twenty unit tests and all 66 wire cases passed on Fedora x64. Replay the
+sixteen paired cases with `--digest-counts`. The baseline and corrected
+reports are in `artifacts/rust/realtime-assessment/` as
+`linux-tls-digest-count-baseline-01.json` (SHA-256
+`a9b57ffbe2ac7cdd6a92a37a219af13cc9fa761630155845ec3cbd255891ffe5`)
+and `linux-tls-digest-count-final-01.json` (SHA-256
+`e6d6a45d5aa61557d50d1e29efe3051ccbd1066c0619c61af1b9c039fc7fdf79`).

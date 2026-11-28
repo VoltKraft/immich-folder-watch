@@ -22,7 +22,7 @@ class Authentication:
 
     def proxy_url(self, port, authority):
         if self.case.startswith("https-digest-"):
-            self.digest = DigestPeer(self.password, authority, self.case.split("-")[2])
+            self.digest = DigestPeer(self.password, authority, self.case.split("-")[2], check_counts=True)
         supplied = self.password + "wrong" if self.case.endswith("-refused") else self.password
         return f"http://fixture:{quote(supplied, safe='')}@127.0.0.1:{port}"
 
@@ -97,7 +97,13 @@ class Authentication:
                 assert stats["originRedirect"] >= 2
             elif self.case != "https-basic-origin-407":
                 assert not stats and not outer.get("clientHellos")
-        return {"attempts": self.attempts, "proxy": outer, "tlsAlerts": alerts, "client": dict(trace),
+        digest_evidence = {}
+        if self.digest:
+            accepted = sum(row[2] == 200 for row in self.attempts)
+            observed = sorted(self.digest.counts)
+            assert observed == list(range(1, accepted + 1)), observed
+            digest_evidence = {"acceptedNonceCounts": observed}
+        return {**digest_evidence, "attempts": self.attempts, "proxy": outer, "tlsAlerts": alerts, "client": dict(trace),
                 "origin": dict(stats), "directConnections": direct.accepted_connections,
                 "redirectConnections": redirect.accepted_connections, "closePacketsAtPeer": list(origin.close_packets)}
 

@@ -73,7 +73,7 @@ def check_cases(cases, fixed, digest_capable=False):
             assert attempts.keys() == {supplied} and attempts[supplied] >= 2
 
 
-def check_digest(cases, digest_capable):
+def check_digest(cases, digest_capable, require_counts=False):
     modes = {f"digest-{scheme}{policy}{password}"
              for scheme in ("sha256", "md5") for policy in ("", "-legacy") for password in ("", "-incorrect")}
     assert Counter((c["client"], c["mode"]) for c in cases) == {
@@ -96,6 +96,8 @@ def check_digest(cases, digest_capable):
             assert not case["fixtureRejection"]
             outcome = ("correct", "authority", 200) if accepted else ("incorrect", "authority", 407)
             assert counts == {outcome: initial}
+            if require_counts:
+                assert case["acceptedNonceCounts"] == (list(range(1, initial + 1)) if accepted else [])
         else:
             assert not counts
         assert case["inventory"] == case["event"] == accepted
@@ -113,11 +115,12 @@ if __name__ == "__main__":
     mode.add_argument("--baseline", action="store_true", help="compare the original preemptive client")
     mode.add_argument("--digest-reference", action="store_true", help="check the signed Digest reference and Basic-only candidate")
     mode.add_argument("--digest", action="store_true", help="require the authority-bound Digest candidate response")
+    mode.add_argument("--digest-counts", action="store_true", help="also require distinct consecutive counts for a reused nonce")
     mode.add_argument("--basic-with-digest", action="store_true", help="check the ten Basic cases with a Digest-capable candidate")
     args = parser.parse_args()
     report = json.loads(args.receipt.read_text())
-    if args.digest_reference or args.digest:
-        check_digest(report["cases"], digest_capable=args.digest)
+    if args.digest_reference or args.digest or args.digest_counts:
+        check_digest(report["cases"], digest_capable=args.digest or args.digest_counts, require_counts=args.digest_counts)
         print("Verified sixteen original TLS Digest observations.")
     else:
         check_cases(report["cases"], fixed=not args.baseline, digest_capable=args.basic_with_digest)

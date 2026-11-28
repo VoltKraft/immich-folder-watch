@@ -3,8 +3,11 @@ use md5::{Digest, Md5};
 use percent_encoding::percent_decode_str;
 use reqwest::{Url, header};
 use sha2::Sha256;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::fmt::Write;
+use std::sync::Mutex;
+
+use crate::Error;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Algorithm {
@@ -36,6 +39,50 @@ impl Algorithm {
 }
 
 type Fields = BTreeMap<String, String>;
+
+// Multiple requests may be challenged concurrently by the same configured proxy.
+#[derive(Default)]
+pub(super) struct DigestState {
+    recent: Mutex<VecDeque<NonceUse>>,
+}
+
+struct NonceUse {
+    server: [u8; 32],
+    client: u128,
+    count: u32,
+}
+
+impl DigestState {
+    fn next(&self, nonce: &str) -> Result<(String, u32), Error> {
+        // Keep recent server nonces across rotations and bound the per-proxy storage.
+        const CAPACITY: usize = 32;
+        let server = Sha256::digest(nonce).into();
+        let mut recent = self.recent.lock().map_err(|_| Error::Protocol)?;
+        let entry = if let Some(index) = recent.iter().position(|entry| entry.server == server) {
+            let count = recent[index].count.checked_add(1).ok_or(Error::Protocol)?;
+            let mut entry = recent.remove(index).ok_or(Error::Protocol)?;
+            entry.count = count;
+            entry
+        } else {
+            let mut random = [0; 16];
+            rustls::crypto::ring::default_provider()
+                .secure_random
+                .fill(&mut random)
+                .map_err(|_| Error::Protocol)?;
+            if recent.len() == CAPACITY {
+                recent.pop_front();
+            }
+            NonceUse {
+                server,
+                client: u128::from_be_bytes(random),
+                count: 1,
+            }
+        };
+        let used = (format!("{:032x}", entry.client), entry.count);
+        recent.push_back(entry);
+        Ok(used)
+    }
+}
 
 struct Challenge {
     fields: Fields,
@@ -135,6 +182,7 @@ impl Challenge {
         password: &str,
         authority: &str,
         cnonce: &str,
+        count: u32,
     ) -> Option<header::HeaderValue> {
         let realm = self.fields.get("realm")?;
         let nonce = self.fields.get("nonce")?;
@@ -149,7 +197,7 @@ impl Challenge {
             hash(&format!("CONNECT:{authority}"))
         };
         let response = if let Some(qop) = self.qop {
-            hash(&format!("{ha1}:{nonce}:00000001:{cnonce}:{qop}:{ha2}"))
+            hash(&format!("{ha1}:{nonce}:{count:08x}:{cnonce}:{qop}:{ha2}"))
         } else {
             hash(&format!("{ha1}:{nonce}:{ha2}"))
         };
@@ -183,7 +231,7 @@ impl Challenge {
         ]);
         if let Some(qop) = self.qop {
             parts.push(format!("qop={qop}"));
-            parts.push("nc=00000001".into());
+            parts.push(format!("nc={count:08x}"));
         }
         if self.qop.is_some() || self.session {
             parts.push(format!("cnonce={}", quoted(cnonce)));
@@ -250,25 +298,33 @@ pub(super) fn authorization(
     headers: &header::HeaderMap,
     proxy: &Url,
     api: &Url,
-) -> Option<header::HeaderValue> {
+    state: &DigestState,
+) -> Result<Option<header::HeaderValue>, Error> {
     let selected = headers
         .get_all(header::PROXY_AUTHENTICATE)
         .iter()
         .filter_map(|value| value.to_str().ok())
         .flat_map(challenges)
-        .max_by_key(|c| (c.algorithm, c.session))?;
-    let user = percent_decode_str(proxy.username()).decode_utf8().ok()?;
+        .max_by_key(|c| (c.algorithm, c.session));
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let user = percent_decode_str(proxy.username())
+        .decode_utf8()
+        .map_err(|_| Error::Origin)?;
     let password = percent_decode_str(proxy.password().unwrap_or(""))
         .decode_utf8()
-        .ok()?;
-    let authority = format!("{}:{}", api.host_str()?, api.port_or_known_default()?);
-    let mut random = [0; 16];
-    rustls::crypto::ring::default_provider()
-        .secure_random
-        .fill(&mut random)
-        .ok()?;
-    let cnonce = format!("{:032x}", u128::from_be_bytes(random));
-    selected.header(&user, &password, &authority, &cnonce)
+        .map_err(|_| Error::Origin)?;
+    let authority = format!(
+        "{}:{}",
+        api.host_str().ok_or(Error::Origin)?,
+        api.port_or_known_default().ok_or(Error::Origin)?
+    );
+    let (cnonce, count) = state.next(selected.fields.get("nonce").ok_or(Error::Protocol)?)?;
+    selected
+        .header(&user, &password, &authority, &cnonce, count)
+        .map(Some)
+        .ok_or(Error::Protocol)
 }
 
 #[cfg(test)]
@@ -294,6 +350,7 @@ mod tests {
                     "kit-password",
                     "127.0.0.1:28431",
                     "fixture-cnonce",
+                    1,
                 )
                 .unwrap();
             let text = value.to_str().unwrap();
@@ -301,6 +358,28 @@ mod tests {
             assert!(text.contains(&format!("response=\"{expected}\"")));
             assert!(text.contains("uri=\"127.0.0.1:28431\""));
         }
+    }
+
+    #[test]
+    fn parallel_requests_use_distinct_counts_and_a_rotated_nonce_starts_at_one() {
+        let state = DigestState::default();
+        let results = std::thread::scope(|scope| {
+            let readers: Vec<_> = (0..8)
+                .map(|_| scope.spawn(|| state.next("first").unwrap()))
+                .collect();
+            readers
+                .into_iter()
+                .map(|r| r.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        let mut counts = results.iter().map(|(_, count)| *count).collect::<Vec<_>>();
+        counts.sort_unstable();
+        assert_eq!(counts, (1..=8).collect::<Vec<_>>());
+        assert!(results.iter().all(|(client, _)| client == &results[0].0));
+        let rotated = state.next("second").unwrap();
+        assert_eq!(rotated.1, 1);
+        assert_ne!(rotated.0, results[0].0);
+        assert_eq!(state.next("first").unwrap(), (results[0].0.clone(), 9));
     }
 
     #[test]

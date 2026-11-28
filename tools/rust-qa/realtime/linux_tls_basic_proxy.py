@@ -32,7 +32,8 @@ def observe(client, mode):
     digest = None
     if mode.startswith("digest-"):
         from digest_peer import DigestPeer
-        digest = DigestPeer(secret, authority, mode.split("-")[1], legacy_root="legacy" in mode)
+        digest = DigestPeer(secret, authority, mode.split("-")[1], legacy_root="legacy" in mode,
+                            check_counts=client == "candidate")
     lock = threading.Lock()
     rows = []
 
@@ -137,7 +138,8 @@ def observe(client, mode):
                       "fixtureRejection": "Protocol" in process.stderr.split(),
                       "netDevices": socket.if_nameindex(), "leafDerSha256": certificates["127.0.0.1"],
                       "caPemSha256": hashlib.sha256((keys / "ca.crt").read_bytes()).hexdigest(),
-                      "observations": rows}))
+                      "observations": rows,
+                      **({"acceptedNonceCounts": sorted(digest.counts)} if digest and digest.check_counts else {})}))
 
 
 if __name__ == "__main__":

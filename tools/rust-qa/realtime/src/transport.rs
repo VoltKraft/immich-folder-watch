@@ -237,6 +237,8 @@ fn http_client(allow_http: bool, roots: Option<&[Certificate]>) -> reqwest::Clie
 struct TunnelProxy {
     basic: Client,
     #[cfg(target_os = "linux")]
+    digest: crate::digest_proxy::DigestState,
+    #[cfg(target_os = "linux")]
     credentials: Url,
     #[cfg(target_os = "linux")]
     endpoint: Url,
@@ -257,7 +259,7 @@ impl TunnelProxy {
         };
         #[cfg(target_os = "linux")]
         if let Some(credential) =
-            crate::digest_proxy::authorization(headers, &self.credentials, _api)
+            crate::digest_proxy::authorization(headers, &self.credentials, _api, &self.digest)?
         {
             let proxy = reqwest::Proxy::https(self.endpoint.clone())?.custom_http_auth(credential);
             return Ok(Some(
@@ -325,6 +327,8 @@ impl Transport {
                         .build()?;
                     tls_proxy = Some(TunnelProxy {
                         basic,
+                        #[cfg(target_os = "linux")]
+                        digest: crate::digest_proxy::DigestState::default(),
                         #[cfg(target_os = "linux")]
                         credentials: credential_url,
                         #[cfg(target_os = "linux")]
