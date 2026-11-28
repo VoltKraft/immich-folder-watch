@@ -269,6 +269,38 @@ target graphs in `artifacts/rust/combined-profile/runs/digest-offline-ed9268e-02
 Its `result.json` has SHA-256
 `053f2793ee3fcb9cf3565ac01561fd1c21fb53dba82c3853cc02c78be9da426f`.
 
+For a new Windows x64 build, transfer the compiler ZIP and its published
+digest to the local VM. The target-specific SPDX test reads the compiled
+units and verifies that the Linux-only `md-5` package is absent even
+though the four-target source inventory includes it. The earlier Server
+2025 receipt belongs to the `36190f1` lock and executable.
+[Windows x64 compiler and guest procedure](../../tools/rust-qa/windows-local/README.md#combined-profile-on-server-2025-at-36190f1).
+
+### Native Linux x64 Digest inventory at 2f63c15
+
+The native Fedora x64 build at `2f63c15` produced 403 compiler units
+from 338 Cargo packages. The compiler reported one `md-5` library with
+an empty feature set. Its original dependency file lists the selector
+and `src/compress/soft.rs`. The release executable had SHA-256
+`2476487e3c5e6451d74091bf036d491ee32a9a79c0c366ddc9b47b0835a0f04f`.
+Clippy, the headless smoke test and all five held-file upload cases
+passed. Rebuilding with the changed Wayland XML moved the linked
+interface from version 1 to version 2. The native receipt is
+`artifacts/rust/combined-profile/runs/digest-native-2f63c15/result.json`,
+SHA-256 `064a4b07906c8c7bbc89f81ca8d6d53c99da9ccefe54cd72a967bfc74f6f3f24`.
+
+The SPDX document passed the official 2.3.1 schema with 447 packages
+and 1,067 relationships. The native notice archive contained 1,802
+members, including both original license files for `md-5`. Their bytes
+matched the upstream source archive. The check also matched the
+compression-source paths and hashes across the SPDX and notice records.
+The compiler dependency file, ordinary executable, SPDX document and
+notice ZIP are indexed by
+`artifacts/rust/combined-profile/verification/digest-2f63c15/verification.json`,
+SHA-256 `ccc46ca7d4698c60fcb2b53cf6e0f81ef7bceb4809b7706591d498632ce27a1c`.
+The Linux ARM64 evidence for this revision covers source and dependency
+resolution. Its native build and relink remain open.
+
 ## Reproduction
 
 The native command also runs the [five held-file upload cases](rw02-legacy.md#legacy-upload-identities-from-the-held-file).
