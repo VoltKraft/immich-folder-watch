@@ -34,18 +34,25 @@ def verify_quit(log, result):
     tray = re.findall(rf"^TRAY_REGISTER phase=initial pid={pid} hwnd=([1-9][0-9]*) id=23 token={token} added=0 version4=0$", log, re.M)
     if len(tray) != 1:
         raise ValueError("Expected one refused registration for the original tray receiver")
-    required = [f"INVENTORY_WORKER pid={worker}", r"gui_tray\.initial\.add=false",
-                rf"TRAY_REGISTER phase=initial pid={pid} hwnd={tray[0]} id=23 token={token} added=0 version4=0",
-                "READY Visible Unavailable",
-                rf"TRAY_CLEANUP pid={pid} hwnd={tray[0]} id=23 registered=0 removed=0",
-                f"WORKER_EXIT pid={worker} reason=quit success=true", "CONTROL_READER_STOPPED",
-                r"DRAINED passes=[1-9][0-9]*"]
-    offset = 0
-    for pattern in required:
+    def at(pattern):
         matches = list(re.finditer("^" + pattern + "$", log, flags=re.MULTILINE))
-        if len(matches) != 1 or matches[0].start() < offset:
-            raise ValueError("Missing ordered GUI or inventory receipt: " + pattern)
-        offset = matches[0].end()
+        if len(matches) != 1:
+            raise ValueError("Expected one GUI or inventory receipt: " + pattern)
+        return matches[0].start()
+
+    start = at(f"INVENTORY_WORKER pid={worker}")
+    refused = at(r"gui_tray\.initial\.add=false")
+    registration = at(rf"TRAY_REGISTER phase=initial pid={pid} hwnd={tray[0]} id=23 token={token} added=0 version4=0")
+    ready = at("READY Visible Unavailable")
+    cleanup = at(rf"TRAY_CLEANUP pid={pid} hwnd={tray[0]} id=23 registered=0 removed=0")
+    worker_exit = at(f"WORKER_EXIT pid={worker} reason=quit success=true")
+    stopped = at("CONTROL_READER_STOPPED")
+    drained = at(r"DRAINED passes=[1-9][0-9]*")
+    # Quit wakes the inventory owner before the GUI loop returns. Its exit can
+    # precede or follow tray cleanup. Both owners finish before the reader stops.
+    if not (start < refused < registration < ready < min(cleanup, worker_exit)
+            and max(cleanup, worker_exit) < stopped < drained):
+        raise ValueError("The GUI drained before completing its startup and both shutdown paths")
     for sweep, changed in enumerate([1, 0]):
         if log.splitlines().count(f"INVENTORY_COMPLETE files=1 changed={changed} pass={sweep}") != 1:
             raise ValueError("The original worker did not scan the synthetic file twice")

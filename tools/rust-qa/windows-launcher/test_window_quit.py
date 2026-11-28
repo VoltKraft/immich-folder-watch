@@ -22,6 +22,17 @@ class WindowQuitTests(unittest.TestCase):
     def test_one_visible_window_and_original_worker_complete(self):
         verify_quit(self.log, self.result)
 
+    def test_quit_can_finish_the_worker_before_joining_the_tray_thread(self):
+        lines = self.log.splitlines()
+        cleanup, worker_exit = lines.index("TRAY_CLEANUP pid=32 hwnd=120 id=23 registered=0 removed=0"), lines.index("WORKER_EXIT pid=38 reason=quit success=true")
+        lines[cleanup], lines[worker_exit] = lines[worker_exit], lines[cleanup]
+        verify_quit("\n".join(lines), self.result)
+
+    def test_rejects_a_worker_that_was_still_running_when_the_gui_drained(self):
+        line = "WORKER_EXIT pid=38 reason=quit success=true"
+        with self.assertRaises(ValueError):
+            verify_quit(self.log.replace(line, "") + "\n" + line, self.result)
+
     def test_requires_native_refusal_worker_activity_and_full_shutdown(self):
         for line in self.log.splitlines():
             with self.subTest(line=line), self.assertRaises(ValueError):
