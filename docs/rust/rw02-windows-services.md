@@ -1488,4 +1488,22 @@ button evidence, GUI log, worker and desktop receipts. The supervisor
 checks the staged profile cleanup and return to the original unlocked
 console. The separate `windows-quit-private/` trial retains the UIA
 invocation evidence. The keyboard case awaits its native result.
+
+The first ARM64 attempt at `82b8530` compiled both GUI executables.
+Worker staging stopped before the keyboard step. The shared review had
+accepted the optional YAML `localization.language` field at `f2202ee`,
+but the Windows staging script still required the previous worker entry
+hash. The job skipped all runtime steps and uploaded zero artifacts.
+The original job log has SHA-256
+`a3a11024a9d430e7fc1bc0cf624dcc88188cd2c38d222b9b05768f099f66c667`.
+[Original ARM64 job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46136008198/job/140951347865)
+
+Windows staging now verifies each of the three original worker files
+against the [shared review](../../tools/rust-qa/performance/worker-inputs.json).
+The reconstructed Windows entry has SHA-256
+`f7af44c8f26c5f753bfcf387605ad977f7a8bdb6be9ea0516d8c7f13f9a133ca`.
+Removing the 313 bytes added at `f2202ee` reproduces the compiled-source
+digest `35a0153c419e3b12a8a0e1b5cc0a4ccc5168dc97f991a78eee36f66cbc891be3`
+from the earlier native `07c0d70` archive. The local staging test also
+checks rejection of a missing or changed digest for each file.
 [ARM64 workflow](../../.github/workflows/rust-windows-arm64-display.yaml).

@@ -13,9 +13,6 @@ HERE = Path(__file__).resolve().parent
 QA = HERE.parent
 ROOT = HERE.parents[2]
 ORIGINAL = QA / "performance/worker"
-SOURCE_HASH = "edee4a245a8aee38963ce1ee54ce05ad78d5a12f3b4b34deeb73eba2cdbf1a68"
-LOCK_HASH = "6d1876027b3c8d55ce479471e51a5c4d0f356e00597c393abeb7b16a1a270905"
-MANIFEST_HASH = "dbc101945286359d703e79fdb3bedab24429964ecffb0991985cd2e3a059bfa6"
 WORKER_PROFILE = QA / "performance/worker-inputs.json"
 
 
@@ -32,12 +29,12 @@ def replace_once(source, old, new):
 
 def stage_workspace(project):
     entry = ORIGINAL / "src/main.rs"
-    if any(sha(path) != digest for path, digest in
-           ((entry, SOURCE_HASH), (ORIGINAL / "Cargo.lock", LOCK_HASH), (ORIGINAL / "Cargo.toml", MANIFEST_HASH))):
+    review = json.loads(WORKER_PROFILE.read_bytes())
+    if any(sha(path) != review.get(path.relative_to(ROOT).as_posix())
+           for path in (entry, ORIGINAL / "Cargo.lock", ORIGINAL / "Cargo.toml")):
         raise ValueError("Windows inventory requires the approved worker source, manifest and lock")
     crate = ROOT / "rust/crates/safe-fs"
     approved = [ROOT / "rust/Cargo.toml", crate / "Cargo.toml", *sorted((crate / "src").glob("*.rs"))]
-    review = json.loads(WORKER_PROFILE.read_text(encoding="utf-8"))
     reviewed_fs = {name: digest for name, digest in review.items() if name.startswith("rust/")}
     if {path.relative_to(ROOT).as_posix(): sha(path) for path in approved} != reviewed_fs:
         raise ValueError("The handle-bound native filesystem source differs from the reviewed worker profile")
