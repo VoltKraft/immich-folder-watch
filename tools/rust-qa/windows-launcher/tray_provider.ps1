@@ -836,7 +836,7 @@ try {
             $lease.button=$button; $lease.state=$State
             return $true
         }
-        try { $null=Open-IfwTrayOverflow $flyout $beforeChange $beforeAction $selection }
+        try { $null=Open-IfwTrayOverflow $flyout $beforeChange $beforeAction $selection -SelectVisibleButton:([bool]$menuAction) }
         finally {
             if ($null -eq $lease.state) {
                 Write-Event 'chevron-diagnostic' @{selection=$selection; observerUICulture=[Globalization.CultureInfo]::CurrentUICulture.Name}

@@ -120,6 +120,22 @@ foreach ($case in @('missing','duplicate','foreign-process','offscreen','disable
             ($case -eq 'not-button' -and $first.controlType -ne 50033)) { throw "Lost native capability for $case" }
     }
 }
+$original=$button
+foreach ($case in @('offscreen-and-pane','multiple-visible','unbound')) {
+    $button=[IfwChevronTest.AutomationElement]::new()
+    $button.Label='Show hidden icons'; $button.Patterns=@('invoke')
+    $other=[IfwChevronTest.AutomationElement]::new(); $other.Label=$button.Label
+    $other.Current.IsOffscreen=$case -ne 'multiple-visible'
+    $pane=[IfwChevronTest.AutomationElement]::new(); $pane.Label=$button.Label; $pane.Current.ControlType=[IfwChevronTest.ControlType]::Pane
+    $root.Children=@($other,$button,$pane)
+    $selection=@{}; $record=@{}
+    $state=Open-IfwTrayOverflow $record { $true } { $case -ne 'unbound' } $selection -SelectVisibleButton
+    $expected=if ($case -eq 'offscreen-and-pane') { 1 } else { 0 }
+    if ($button.Actions -ne $expected -or $other.Actions -or $pane.Actions -or
+        $selection.names[0].count -ne 3 -or $selection.names[0].visibleButtons -ne (1 + [int]($case -eq 'multiple-visible')) -or
+        (($null -ne $state) -ne [bool]$expected)) { throw "Incorrect menu selection for $case" }
+}
+$button=$original
 $guard=[pscustomobject]@{}
 $guard | Add-Member ScriptMethod ButtonHit { $script:reads++; if ($script:changed -and $script:reads -gt 1) { return 63 }; return 62 }
 $surface=@{root=51; shellPid=81; hit=62; point=@(806,744)}
@@ -146,4 +162,4 @@ foreach ($case in @('other-root','foreign-uia','changed-uia','changed-native')) 
         throw "Reported unbound system control capabilities for $case"
     }
 }
-Write-Output 'Fourteen selection controls and five passive taskbar hit controls passed.'
+Write-Output 'Seventeen selection controls and five passive taskbar hit controls passed.'

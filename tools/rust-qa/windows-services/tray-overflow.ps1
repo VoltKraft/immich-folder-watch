@@ -18,7 +18,11 @@ function Get-IfwOverflowWindow([uint32]$ExplorerId) {
     return [IntPtr]::Zero
 }
 
-function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null, [scriptblock]$BeforeAction = $null, [hashtable]$Selection = $null) {
+function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null, [scriptblock]$BeforeAction = $null, [hashtable]$Selection = $null,
+                            [switch]$SelectVisibleButton) {
+    if ($SelectVisibleButton -and ($null -eq $BeforeChange -or $null -eq $BeforeAction)) {
+        throw 'Visible-button selection requires both native taskbar and physical button checks'
+    }
     # An interested caller retains only the checks made during this lookup of the four known names.
     if ($null -eq $Selection) { $Selection = @{} }
     $Selection.gate = 'taskbar-owner'
@@ -48,14 +52,21 @@ function Open-IfwTrayOverflow($Record, [scriptblock]$BeforeChange = $null, [scri
         $elements = $root.FindAll([Windows.Automation.TreeScope]::Descendants, $named)
         $check = @{ name = $name; count = $elements.Count }
         $Selection.names += $check
-        if ($elements.Count -ne 1) { continue }
-        $button = $elements[0]
-        $current = $button.Current
-        if ($current.ProcessId -ne $explorer) { $check.rejected = 'foreign-process'; continue }
-        if ($current.IsOffscreen) { $check.rejected = 'offscreen'; continue }
-        if (-not $current.IsEnabled) { $check.rejected = 'disabled'; continue }
-        $type = $current.ControlType
-        if ($type -ne [Windows.Automation.ControlType]::Button) { $check.rejected = 'not-button'; $check.controlType = $type.Id; continue }
+        if (-not $SelectVisibleButton -and $elements.Count -ne 1) { continue }
+        $visible = @(
+            foreach ($element in $elements) {
+                $current = $element.Current
+                if ($current.ProcessId -ne $explorer) { $check.rejected = 'foreign-process'; continue }
+                if ($current.IsOffscreen) { $check.rejected = 'offscreen'; continue }
+                if (-not $current.IsEnabled) { $check.rejected = 'disabled'; continue }
+                $type = $current.ControlType
+                if ($type -ne [Windows.Automation.ControlType]::Button) { $check.rejected = 'not-button'; $check.controlType = $type.Id; continue }
+                $element
+            }
+        )
+        if ($SelectVisibleButton) { $check.visibleButtons = $visible.Count }
+        if ($visible.Count -ne 1) { continue }
+        $button = $visible[0]
         $provider = $null
         if ($button.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$provider)) {
             $state = $provider.Current.ExpandCollapseState
