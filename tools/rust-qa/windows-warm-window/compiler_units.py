@@ -1,14 +1,29 @@
 """Authenticate a reconstructed library from the Cargo stream and its actual build outputs."""
 import hashlib
+import json
 from pathlib import Path
 
 
 VARIANT_INPUTS = (
     "candidate.patch", "presentation.patch", "dispatch.patch", "retained-hidden-input.patch",
     "eframe-hidden-input.patch", "eframe-source.json", "eframe_source.py", "loop_wake.rs",
-    "winit-retained-visibility.patch", "winit-source.json", "compiler_units.py",
+    "language-profile.json", "winit-retained-visibility.patch", "winit-source.json", "compiler_units.py",
     "windows_present.rs", "dwm_transitions.rs", "ui_trace.rs", "win32_clock.rs", "build.py",
 )
+
+
+def language_profile():
+    return json.loads(Path(__file__).with_name("language-profile.json").read_bytes())
+
+
+def retained_pins(base, canonical_lock):
+    """Select the reviewed manifest/lock pair without changing the legacy source receipt."""
+    if canonical_lock == base["canonicalLockSha256"]:
+        return base
+    language = language_profile()["retained"]
+    if canonical_lock != language["canonicalLockSha256"]:
+        raise ValueError("Unreviewed canonical GUI lock for Windows reconstruction")
+    return {**base, **language}
 
 
 def compiled_library(messages, gui, build, package, features):

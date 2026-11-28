@@ -76,3 +76,52 @@ Nine of the eleven measurements met the frozen same-host limits. The single expe
 Among 253 file-qualified reopens, 73 individual request-to-visible times exceeded the 21.702 ms WPF p95 limit. Those 73 intervals totaled 2,530.9571 ms. Twenty overlapped an armed registration for a combined 169.2054 ms. None received a frame grant during the request. Twenty-two overlapped a native DXGI present for a combined 2.6072 ms. Of these 73 reopens, 68 had a file-qualified first present after visibility, with a further median delay of 1.9744 ms. The readiness intervals can also service window input. The time spent inside `ShowWindow`, in dispatch and in the external visibility poll cannot be separated with this trace.
 
 The source-bound detached reader returned 0 for the observed mechanism and recorded `over-limit` for resources. Actions archive 15152852412 contains 112 CRC-verified entries and 64,690,760 bytes, with SHA-256 `181b806f08feaeba5479aa4bef38cc45ab7d1784512df54907116fb85c1f28af`. The independent request-by-request calculation is retained in `artifacts/rust/hosted-windows-transitions/45890992463/reopen-intervals.json` with SHA-256 `d00687ae376d8358fc44c2d9b39f2b8824ef1b178f71ab1c35c9128d3fe3dc84`. [Original native job](https://github.com/VoltKraft/immich-folder-watch/actions/runs/45890992463/job/140153319371).
+
+## Reconstructing Windows variants with the Linux startup reader
+
+The Linux startup GUI adds a target-specific path dependency on
+`../yaml`. Cargo needs its manifest while resolving the Windows lock. The
+retained builder copies the first-party sibling and supplies the reviewed
+directory registry in the relocated project. It selects the measured GUI,
+retained and frame-ready digests for the exact ordinary lock and checks the
+canonical manifest before applying any patches. The original eframe 0.37.0
+and winit 0.30.13 archives, library trees, notices and features keep their
+independent identities. [Profile pins](../windows-warm-window/language-profile.json)
+and [startup source reconstruction](../gui/startup/README.md).
+
+From the repository root, with the pinned Rust toolchain, original assessment
+crate cache and reviewed font/text inputs available, run the portable source
+comparison on Fedora. Each invocation creates a new directory under
+`artifacts/rust/windows-warm-window`. The historical option snapshots the ordinary GUI at `c63d91c`. The last
+command uses the source-bound startup project. Its exact lock selects the reviewed 385-crate
+offline directory from the GUI registry.
+
+```sh
+python3 -B tools/rust-qa/windows-frame-cost/replay_profiles.py --historical
+python3 -B tools/rust-qa/windows-frame-cost/replay_profiles.py
+python3 -B tools/rust-qa/windows-frame-cost/replay_profiles.py \
+  --canonical artifacts/rust/combined-profile/editor-language-replay-verified/project/tools/rust-qa/gui
+```
+
+The historical replay, `profile-replay-4axe30kv`, produced the exact 16-member
+ordinary source ZIP from Windows run `45979619561`, SHA-256
+`9881edc6683df62a5d804ac6a1062e000c7f348a28193f10eb92d07fbacf7ec7`.
+The startup replay, `profile-replay-h1he2jx8`, retained the ten YAML sibling
+files with the matched metadata in its 26-member ZIP, SHA-256
+`f596a303ee8ef7e86c3c433d818dce89566aeb40f1237be1564e00214f26c462`.
+Each replay independently rebuilt its source ZIP twice. The ordinary and
+retained Windows x64 and ARM64 graphs had 135 package/version/feature rows,
+identical for corresponding targets across both GUI profiles. The two x64
+diagnostic graphs had the same 136 rows, including the timing crate. The
+one-shot patch reproduced all measured private source digests. The
+`profile.json` reports have SHA-256 `c4ca90fdd8197a24ea5a9028a48eb87a5fec3611e426ba636bb8760dc8cfdd25`
+and `acab7fc5ccce70e5097abb47d04161e56556572e6ffa03cc3892e256d0205c0c`
+respectively.
+
+The current checkout reproduced the same three graphs and private compiler
+sources in `profile-replay-5piv2hxm`. Compared with the frozen startup project,
+its source ZIP differed only in `yaml/src/anchors.rs` and `yaml/src/model.rs`.
+Its ZIP has SHA-256
+`54c73704ea41695a46c067d451977c9aa9d4cbbf5dcd33f952ab07d63535685c`. These trials
+verify reconstruction and Cargo resolution on Fedora. A native Windows compiler receipt and runtime evidence for the
+integrated GUI require separate executions.

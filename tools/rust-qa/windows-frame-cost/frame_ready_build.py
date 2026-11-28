@@ -36,9 +36,20 @@ def expected_sources(base, pins):
     return dict(application=application, libraries={**base["trees"], **pins["libraries"]})
 
 
-def stage(out):
-    gui, rows, sources = prepare.stage(out)
+def profile_pins(sources):
     pins = read(HERE / "frame-ready-pins.json")
+    original = sources["application"]["main.rs"]
+    if original != pins["files"]["src/main.rs"][0]:
+        language_main = prepare.warm.language_profile()["frameReadyMain"]
+        if original != language_main[0]:
+            raise ValueError("Unreviewed retained main source for frame readiness")
+        pins["files"]["src/main.rs"] = language_main
+    return pins
+
+
+def stage(out, *, canonical=None):
+    gui, rows, sources = prepare.stage(out, canonical=canonical)
+    pins = profile_pins(sources)
     for name, (before, _) in pins["files"].items():
         prepare.checked(gui / name, before)
     env = dict(os.environ, GIT_CEILING_DIRECTORIES=str(out.resolve()))
@@ -98,7 +109,7 @@ def verify(out, record):
     receipt = read(out / "frame-ready-build.json")
     if receipt["supplement"] != prepare.sha(out / "frame-ready-source.zip"):
         raise ValueError("The one-shot source archive changed")
-    pins = read(HERE / "frame-ready-pins.json")
+    pins = profile_pins(receipt["source"])
     with ZipFile(out / "frame-ready-source.zip") as archive:
         expected = set(FILES) | {"compiled/" + n for n in [*pins["files"], GATE]}
         if (set(archive.namelist()) != expected or len(archive.namelist()) != len(expected)

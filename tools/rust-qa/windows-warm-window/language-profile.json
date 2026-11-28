@@ -1,0 +1,17 @@
+{
+  "main": "4edc76ff7af596588264cf0c6ea8d3f55c13bde1eb21b585ce7dc73bd9abf74e",
+  "retained": {
+    "canonicalLockSha256": "bdda6dc843f34b90bbe9efd99c84e994fd293a5d6ad88c52f6c70ceb8ea97679",
+    "canonicalManifestSha256": "40293313b276c9023e69b75741d356af9388c29f80566a892a2e08c0201d85fb",
+    "retainedLockSha256": "be65e75e02c15396387240cda7fb7dbc2ee178987253cc8a6a40f3a5ef7bcf49",
+    "retainedManifestSha256": "e479402502c6fe5ded823e005b84bc0b73bc7a5934931fc79d240fffe36e0592"
+  },
+  "frameCompilerFiles": {
+    "Cargo.lock": "6e7d2a2e1c6cb9f8b6e44adf8f0ef53bfaa435792330f4fd2da517ef675b3c80",
+    "manifests/native-gui-assessment/Cargo.toml": "9346bfd9ba85a8ffa0d7b021f6590a85ae54011bae06254e284460610d82ffff"
+  },
+  "frameReadyMain": [
+    "0660062611fc6d920fac69b82c793c677e467dcc4881c4ae2ac3e24cc782fcbe",
+    "285d0613ef49348c43f7ac4c80be4b88052a2b9ca3289a2303ccd7c906090b08"
+  ]
+}

@@ -312,7 +312,7 @@ def compiler_receipt(out, report, *, prefix="diagnostic", receipt_key="diagBuild
         if any(sha256(z.read(name)).hexdigest() != report["diagnosticInputs"][name] for name in files):
             raise ValueError("The original compiler source archive differs from this diagnosis")
         source_pins = json.loads(z.read("sources.json"))
-        prepare.verify_compiler_sources(z.read, sources["trees"], pins=source_pins)
+        prepare.verify_compiler_sources(z.read, sources["trees"], pins=source_pins, canonical_lock=ordinary["canonicalLock"])
         if (z.read("ordinary-source.zip") != (base / "eframe-source.zip").read_bytes()
                 or z.read("notices/ifw-frame-timing/LICENSE") != (prepare.ROOT / "LICENSE").read_bytes().replace(b"\r\n", b"\n")):
             raise ValueError("The original ordinary sources or diagnostic license changed")

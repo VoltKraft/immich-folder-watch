@@ -24,7 +24,7 @@ sys.path.insert(0, str(QA))
 from gui import source_profile
 from windows_observer import isolated_windows_vm
 import eframe_source
-from compiler_units import VARIANT_INPUTS, compiled_library
+from compiler_units import VARIANT_INPUTS, compiled_library, language_profile
 
 
 def sha(path):
@@ -32,20 +32,43 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def stage(project):
+def originals(canonical):
+    pins = eframe_source.pins_for(canonical)
+    eframe_source.checked_bytes(canonical / "Cargo.toml", pins["canonicalManifestSha256"])
+    language = language_profile()
+    if pins["canonicalLockSha256"] == language["retained"]["canonicalLockSha256"]:
+        return {**ORIGINALS, "main.rs": language["main"]}
+    return ORIGINALS
+
+
+def stage(project, *, canonical=None):
+    canonical = GUI if canonical is None else canonical
+    original = originals(canonical)
     gui = project / "tools/rust-qa/gui"
-    for name, expected in ORIGINALS.items():
-        if sha(GUI / "src" / name) != expected:
+    for name, expected in original.items():
+        if sha(canonical / "src" / name) != expected:
             raise ValueError(f"Review the change against the new canonical {name}")
     gui.mkdir(parents=True)
     for name in ("Cargo.toml", "Cargo.lock"):
-        shutil.copyfile(GUI / name, gui / name)
-    shutil.copytree(GUI / "src", gui / "src")
+        shutil.copyfile(canonical / name, gui / name)
+    shutil.copytree(canonical / "src", gui / "src")
     # Cargo's first-party paths and the reconstructed, audited text source trees retain their layout.
-    shutil.copytree(GUI / "artifacts/text", gui / "artifacts/text")
+    shutil.copytree(canonical / "artifacts/text", gui / "artifacts/text")
+    if original["main.rs"] == language_profile()["main"]:
+        from gui.startup import vendor
+        yaml = canonical.parent / "yaml"
+        copied = gui.parent / "yaml"
+        shutil.copytree(yaml / "src", copied / "src")
+        for name in ("Cargo.toml", "Cargo.lock"):
+            shutil.copyfile(yaml / name, copied / name)
+        registry = ROOT / "artifacts/rust/assessment-cache/registry"
+        reviewed_directory = vendor.compiler_directory(registry, canonical)
+        config = project / ".cargo"
+        config.mkdir()
+        vendor.configure_cargo_home(config, reviewed_directory)
     lifecycle = project / "rust/crates/desktop-lifecycle"
-    shutil.copytree(ROOT / "rust/crates/desktop-lifecycle", lifecycle)
-    shutil.copyfile(ROOT / "rust/Cargo.toml", project / "rust/Cargo.toml")
+    shutil.copytree(canonical.parents[2] / "rust/crates/desktop-lifecycle", lifecycle)
+    shutil.copyfile(canonical.parents[2] / "rust/Cargo.toml", project / "rust/Cargo.toml")
     env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(project.parent)}
     for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
         env.pop(key, None)
@@ -63,14 +86,14 @@ def stage(project):
         library.write("\nmod win32_clock;\npub use win32_clock::{counter, frequency, thread_id};\n")
         library.write('#[cfg(all(windows, target_arch = "x86_64"))]\nmod dwm_transitions;\n'
                       '#[cfg(all(windows, target_arch = "x86_64"))]\npub use dwm_transitions::observe_transitions;\n')
-    eframe_source.prepare(gui)
+    eframe_source.prepare(gui, canonical)
     return gui
 
 
 def feature_rows(manifest, target, env):
     tree = subprocess.check_output(["cargo", "tree", "--frozen", "--workspace", "--target", target, "--edges", "normal,build",
                                     "--prefix", "none", "--format", "{p}|{f}", "--manifest-path", str(manifest)],
-                                   env=env, text=True)
+                                   cwd=manifest.parent, env=env, text=True)
     rows = set()
     for line in tree.splitlines():
         if line == "[build-dependencies]":
@@ -184,7 +207,7 @@ def main(target, *, isolated_vm=False, compile_only=False):
                   baselineReceipt=sha(ordinary_path), baseline=sha(canonical),
                   binary=compiler["application"]["sha256"],
                   canonicalGraph=graph, canonicalLock=lock, lock=sha(gui / "Cargo.lock"),
-                  selectedFeatureRows=len(selected), compilerEvidence=compiler, canonicalInputs=ORIGINALS,
+                  selectedFeatureRows=len(selected), compilerEvidence=compiler, canonicalInputs=originals(GUI),
                   eframeSource=sources, eframeUnit=libraries["eframe"], winitUnit=libraries["winit"],
                   baseFonts={p.name: sha(p) for p in sorted((ROOT / "rust/assets/fonts").glob("*.ttf"))},
                   fallbackFonts={name: asset["sha256"] for name, asset in approved["fonts"].items()},

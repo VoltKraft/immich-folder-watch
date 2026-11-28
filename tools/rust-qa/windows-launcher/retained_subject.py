@@ -12,7 +12,8 @@ def select(target, canonical_exe, canonical, graph_path, sha, *, isolated_vm=Fal
     api, cold, warm, directory, paired = subjects(target, isolated_vm=isolated_vm)
     report = directory / "build.json"
     record = json.loads(report.read_bytes())
-    pins = json.loads((WARM / "eframe-source.json").read_bytes())
+    units = runpy.run_path(str(WARM / "compiler_units.py"), run_name="ifw_launcher_compiler_units")
+    pins = units["retained_pins"](json.loads((WARM / "eframe-source.json").read_bytes()), canonical["lockSha256"])
     winit_pins = json.loads((WARM / "winit-source.json").read_bytes())
     graph = json.loads(graph_path.read_bytes())
     if (cold != canonical_exe or warm == cold or record["binary"] == record["baseline"]
@@ -32,7 +33,7 @@ def select(target, canonical_exe, canonical, graph_path, sha, *, isolated_vm=Fal
             or sha(staged / "Cargo.lock") != record["lock"]
             or record["selectedFeatureRows"] != sum(len(p["featureSets"]) for p in packages)):
         raise ValueError("The retained compiler sources or selected packages differ from the native build")
-    verify_library = runpy.run_path(str(WARM / "compiler_units.py"), run_name="ifw_launcher_compiler_units")["compiled_library"]
+    verify_library = units["compiled_library"]
     with (directory / "compiler.jsonl").open(encoding="utf-8") as stream:
         messages = [json.loads(line) for line in stream]
     libraries = {}

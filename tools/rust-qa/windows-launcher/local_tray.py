@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path, PureWindowsPath
 import re
+import runpy
 import shutil
 import socket
 import subprocess
@@ -67,7 +68,9 @@ def stage(archive, digest, destination):
         graph = json.loads(kit.read("canonical/graph.json"))
         inventory = index["inventory"]
         policy = json.loads((ROOT / "rust/audit/gui-profile.json").read_bytes())
-        pins = json.loads((QA / "windows-warm-window/eframe-source.json").read_bytes())
+        directory = QA / "windows-warm-window"
+        choose = runpy.run_path(str(directory / "compiler_units.py"))["retained_pins"]
+        pins = choose(json.loads((directory / "eframe-source.json").read_bytes()), normal["lockSha256"])
         winit_pins = json.loads((QA / "windows-warm-window/winit-source.json").read_bytes())
         if (index["target"] != TARGET or normal["target"] != TARGET or warm["target"] != TARGET
                 or not re.fullmatch("[0-9a-f]{40}", index["revision"])

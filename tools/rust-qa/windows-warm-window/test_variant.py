@@ -119,12 +119,28 @@ class WarmTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 read(invalid)
 
+    def test_selects_only_the_reviewed_manifest_pair_for_each_canonical_lock(self):
+        source = builder.eframe_source
+        base = json.loads(source.PINS.read_bytes())
+        language = builder.language_profile()["retained"]
+        self.assertIs(source.retained_pins(base, base["canonicalLockSha256"]), base)
+        expected = {**base, **language}
+        self.assertEqual(source.retained_pins(base, language["canonicalLockSha256"]), expected)
+        with self.assertRaisesRegex(ValueError, "Unreviewed canonical GUI lock"):
+            source.retained_pins(base, "0" * 64)
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            (project / "Cargo.lock").write_bytes((builder.GUI / "Cargo.lock").read_bytes())
+            (project / "Cargo.toml").write_text("[package]\nname='unexpected'\n")
+            with self.assertRaisesRegex(ValueError, "Changed source input"):
+                builder.originals(project)
+
     def test_staging_preserves_the_shared_inputs(self):
         if not (builder.GUI / "artifacts/text/egui").is_dir():
             self.skipTest("requires the reconstructed canonical GUI inputs")
         with tempfile.TemporaryDirectory() as temp:
             gui = builder.stage(Path(temp) / "stage")
-            builder.eframe_source.verify_lock(gui, json.loads(builder.eframe_source.PINS.read_bytes()))
+            builder.eframe_source.verify_lock(gui, builder.eframe_source.pins_for(builder.GUI))
             for name in ("src/windows_worker.rs", "src/windows_control_input.rs", "src/windows_tray.rs",
                          "src/windows_tray_state.rs", "src/windows_tray_shell.rs", "src/windows_tray_menu.rs",
                          "src/fonts.rs", "src/linux.rs", "src/tray-icon.argb"):
@@ -137,7 +153,7 @@ class WarmTests(unittest.TestCase):
             canonical = (builder.GUI / "src/main.rs").read_text(encoding="utf-8")
             drop = canonical.split("impl Drop for Window {", 1)[1].split("impl eframe::App", 1)[0]
             self.assertIn("impl Drop for Window {" + drop, retained)
-            for name, digest in builder.ORIGINALS.items():
+            for name, digest in builder.originals(builder.GUI).items():
                 self.assertEqual(builder.sha(builder.GUI / "src" / name), digest)
                 self.assertNotEqual(builder.sha(gui / "src" / name), digest)
 
@@ -145,7 +161,7 @@ class WarmTests(unittest.TestCase):
         if not (builder.GUI / "artifacts/text/egui").is_dir():
             self.skipTest("requires the reconstructed canonical GUI inputs")
         source = builder.eframe_source
-        pins = json.loads(source.PINS.read_bytes())
+        pins = source.pins_for(builder.GUI)
         winit = json.loads(source.WINIT_PINS.read_bytes())
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -158,7 +174,7 @@ class WarmTests(unittest.TestCase):
                                            "archiveSha256": builder.sha(archive)})
                 archives.append(archive)
             self.assertEqual(archives[0].read_bytes(), archives[1].read_bytes())
-            expected = {"pins.json": source.PINS, source.PATCH.name: source.PATCH,
+            expected = {source.PATCH.name: source.PATCH,
                         source.APPLICATION_PATCH.name: source.APPLICATION_PATCH, "winit-pins.json": source.WINIT_PINS,
                         source.WINIT_PATCH.name: source.WINIT_PATCH, "notices/winit/LICENSE": gui / source.WINIT_PACKAGE / "LICENSE"}
             for family, folder in (("canonical", builder.GUI), ("retained", gui)):
@@ -166,9 +182,14 @@ class WarmTests(unittest.TestCase):
                     expected[family + "/" + filename] = folder / filename
             for filename, evidence in pins["notices"].items():
                 expected["notices/" + filename] = builder.ROOT / evidence["path"]
+            if (gui.parent / "yaml/Cargo.toml").is_file():
+                sibling = gui.parent / "yaml"
+                for p in [sibling / "Cargo.toml", sibling / "Cargo.lock", *sorted((sibling / "src").rglob("*.rs"))]:
+                    expected["yaml/" + p.relative_to(sibling).as_posix()] = p
             packages = {review["crate"] + ".crate": review["archiveSha256"] for review in (pins, winit)}
             with ZipFile(archives[0]) as bundle:
-                self.assertEqual(bundle.namelist(), sorted([*packages, *expected]))
+                self.assertEqual(bundle.namelist(), sorted(["pins.json", *packages, *expected]))
+                self.assertEqual(json.loads(bundle.read("pins.json")), pins)
                 for package, digest in packages.items():
                     self.assertEqual(hashlib.sha256(bundle.read(package)).hexdigest(), digest)
                 for member, original in expected.items():

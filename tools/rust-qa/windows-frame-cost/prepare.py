@@ -59,17 +59,21 @@ def extract(gui, name, row, bundle, *, destination=None):
         bundle[f"notices/{name}/{notice}"] = checked(package / notice, digest)
 
 
-def verify_compiler_sources(read, trees, *, pins=PINS):
+def verify_compiler_sources(read, trees, *, pins=PINS, canonical_lock=None):
+    files_expected = pins["compilerFiles"]
+    language = warm.language_profile()
+    if canonical_lock == language["retained"]["canonicalLockSha256"]:
+        files_expected = {**files_expected, **language["frameCompilerFiles"]}
     files = {"Cargo.lock", *(f"manifests/{name}/Cargo.toml" for name in (*LIBS, "native-gui-assessment"))}
-    if (set(pins["compilerFiles"]) != files or trees != pins["compilerTrees"]
-            or any(sha256(read(name)).hexdigest() != pins["compilerFiles"][name] for name in files)):
+    if (set(files_expected) != files or trees != pins["compilerTrees"]
+            or any(sha256(read(name)).hexdigest() != files_expected[name] for name in files)):
         raise ValueError("The reconstructed compiler manifests, lock or library trees differ")
 
 
-def stage(out):
-    gui = warm.stage(out / "project")
+def stage(out, *, canonical=None):
+    gui = warm.stage(out / "project", canonical=canonical)
     ordinary_bundle = out / "ordinary-source.zip"
-    ordinary = warm.eframe_source.source_bundle(gui, ordinary_bundle)
+    ordinary = warm.eframe_source.source_bundle(gui, ordinary_bundle, canonical)
     pre = {p.name: sha(p) for p in [*sorted((gui / "src").glob("*.rs")), gui / "src/tray-icon.argb"]}
     original_lock = tomllib.loads((gui / "Cargo.lock").read_text(encoding="utf-8"))
     selected = warm.feature_rows(gui / "Cargo.toml", TARGET, environment(out))
@@ -137,7 +141,7 @@ def stage(out):
         bundle[f"manifests/{name}/Cargo.toml"] = (folder / "Cargo.toml").read_bytes()
     bundle["Cargo.lock"] = (gui / "Cargo.lock").read_bytes()
     trees = {name: warm.source_profile.tree_info(gui / path) for name, path in LIBS.items()}
-    verify_compiler_sources(bundle.__getitem__, trees)
+    verify_compiler_sources(bundle.__getitem__, trees, canonical_lock=ordinary["pins"]["canonicalLockSha256"])
     sources = dict(ordinarySource=ordinary["archiveSha256"], ordinaryInputs=pre,
                    archive=warm.eframe_source.write_archive(out / "source.zip", bundle),
                    trees=trees,
