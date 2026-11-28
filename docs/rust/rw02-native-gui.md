@@ -1114,6 +1114,35 @@ selection. Each backend also passed its four lifecycle cases. The separate
 [Fedora tray-loss test](../../tools/rust-qa/gui/tray-loss-quit.md) exercised
 activating Quit and observed the inventory worker drain.
 
+### Saved language at Linux editor and tray startup
+
+A staged GUI from `c63d91c` reads the saved language after acquiring
+the user instance and before publishing its window or tray. Four Fedora
+x64 launches covered German and English system locales, with and without
+the opposite saved preference. AT-SPI read the expected editor controls.
+The first menu revision exposed all three actions in the same language,
+the original inventory worker found another synthetic file and Quit
+closed both processes. The profile bytes remained identical.
+The signed 3.0.4 assemblies also read each of those four original
+configuration files and selected the same effective language. The
+final native compiler report contains 310 units and the editor library
+passed 22 tests.
+[First-window and tray observations](../../tools/rust-qa/gui/startup/README.md#fedora-desktop-readback).
+
+The offline source reconstruction for this experiment reuses 385 reviewed
+registry inputs. The Linux target graphs contain 251 packages on x64 and
+250 on ARM64. The Windows renderer retains its 135-package selection
+on each architecture. Full source and notice audits reproduced all four
+ordinary reports. In each staged Windows report only the lock digest
+changed. [Four-target audit](../../tools/rust-qa/gui/startup/README.md#full-source-feature-and-notice-audits).
+Replaying the Windows retained-window, timing and
+one-shot frame patches on Fedora yielded the original third-party library
+trees and 136 diagnostic feature rows including the timing helper. The
+measured input digests are in
+`artifacts/rust/combined-profile/retained-language-iyj_knxv/measured-pins.json`.
+These measurements cover source reconstruction. Adoption in the ordinary
+cross-platform build and native GUI checks at the integrated revision remain open.
+
 ## Reproduction
 
 At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed

@@ -13,15 +13,28 @@ WAL on all four native targets. Two newer profiles retained every original
 byte and filename. A supported read-only file was also refused, and the
 writable control passed a real update and rollback. The 3 GiB Windows x64
 guest ran both Rust and C# and shut down after the trial. The separate
-Windows ARM64 FAT/recovery step failed. The local reinstalled WPF editor
+Windows ARM64 recovery fixture failed to compile its copied storage source.
+At `fc2738f` both native readers recovered all eight cases, including
+two full FAT16 volumes, and C# passed 208 assertions. The local reinstalled WPF editor
 also showed the exact Unicode album from a returned native Rust document
 and preserved all four input files through an orderly tray Quit.
 The Fedora YAML reader matched the signed 3.0.4 reference for all 34
 ordinary profiles at `d9b9e72`, then for the 89 comparisons including
 explicit scalar tags at `c63d91c`.
 [Database evidence](rust/rw02-storage-inputs.md#schema-version-in-a-quiescent-wal) ·
+[ARM64 recovery repeat](rust/rw02-storage-faults.md#recovery-through-the-existing-profile-opener-at-fc2738f-2026-11-28) ·
 [Returned Windows profile](../tools/rust-qa/instance/cross-session/transaction/rust-return.md#local-windows-x64-result) ·
 [YAML comparisons](rust/rw02-yaml.md#explicit-scalar-tags-on-typed-properties).
+
+At `bb3afd5`, the Fedora YAML reader also passed all 45 signed float
+comparisons and all 14 scalar-alias comparisons. The signed 3.0.4
+assemblies reopened, validated and saved 20 Rust outputs. Separately,
+a Linux GUI built from the staged `c63d91c` sources selected the
+correct initial editor and tray language on all four Fedora desktops.
+The running inventory worker honored the same profile. The ordinary
+cross-platform build still needs the integrated input profile.
+[Typed YAML values](rust/rw02-yaml.md#grouped-floats-and-untagged-scalar-aliases) ·
+[Linux startup language](rust/rw02-native-gui.md#saved-language-at-linux-editor-and-tray-startup).
 
 At `c268a82` the Fedora x64 editor showed the German and English notice
 after its tray watcher exited. A normal second launch reopened the same

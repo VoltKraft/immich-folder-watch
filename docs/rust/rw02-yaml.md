@@ -161,6 +161,12 @@ same 30 packages. The run receipt under
 `artifacts/rust/yaml-assessment/runs/grouped-float-alias-fedorax64-01/result.json`
 has SHA-256 `085f35d2f56a03668294821340dc70523ebddbc345ab5b49fe688b369aebdbaa`.
 
+An independent Fedora x64 repeat of the 23 profiles that identified
+the two conversion differences agreed with the signed 3.0.4 assemblies
+in every case at `bb3afd5`. The previous executable agreed on eight.
+The corrected native executable has SHA-256
+`6dedb16534da56e969006d869c773bb6245a269aafee0ec81afb59116663799e`.
+
 ## Reading the original YAML file bytes
 
 The shipping loader calls `File.ReadAllText`. Its byte-order mark selects

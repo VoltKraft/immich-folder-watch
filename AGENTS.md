@@ -198,6 +198,7 @@ to reconcile project decisions, defaults, and recorded state.
   and retain source-bound observations for each target in the acceptance record.
   Preserve the [source-reviewed GUI notices and font pins](docs/rust/rw02-gui-dependencies.md)
   when changing the candidate desktop profile.
+  Run the [Windows x64 YAML exchange in the local guest](tools/rust-qa/windows-local/yaml.md).
   Keep [YAML source filtering and byte-level C# readback](docs/rust/rw02-yaml.md),
   the [100- and 300-folder profiles](docs/rust/rw02-yaml.md#ordinary-profiles-with-100-and-300-folders),
   [physical Unicode separators saved by .NET](docs/rust/rw02-yaml.md#physical-unicode-breaks-in-shipping-saves),

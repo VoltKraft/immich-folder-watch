@@ -52,6 +52,14 @@ three committed version/value pairs. The x64 Windows trial ran in the
 local VM. Live-writer handoff and production migration remain open.
 [Quiescent WAL results](rw02-storage-inputs.md#schema-version-in-a-quiescent-wal).
 
+At `fc2738f` the native Windows ARM64 recovery fixture opened each restored
+profile through the reviewed adapter. Both readers recovered eight cases,
+including two full FAT16 volumes. On the local Windows x64 guest the
+reinstalled 3.0.4 WPF editor displayed the original Unicode album edited by
+Rust and preserved all four synthetic profile files through Quit.
+[ARM64 recovery and detached images](rw02-storage-faults.md#recovery-through-the-existing-profile-opener-at-fc2738f-2026-11-28) ·
+[Installed WPF readback](../../tools/rust-qa/instance/cross-session/transaction/rust-return.md#local-windows-x64-result).
+
 The ordinary visible Quit after tray loss passed on Fedora x64 at
 `c268a82`. The observer measured the focused button and pressed Space.
 The original worker had found a second file while hidden and exited
