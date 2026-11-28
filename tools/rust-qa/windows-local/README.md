@@ -133,6 +133,50 @@ The original guest ZIP in
 `artifacts/rust/local-windows-server-2025-x64/20261128/gui-cdb69d4/`
 has SHA-256 `190ccc11c3de3dacd4cf94aab9d202a1837645beeac2d021d2e348960b15c6f8`.
 
+### GUI tests and focused filename edits at 03b0b8e
+
+The local Server 2025 x64 guest ran both original compiler outputs from
+`03b0b8ea10a27434fbe8ea1376b277ed2c9258d5`. The host checked the original
+ZIP sizes, Actions digests, binary and compiler receipts, dependency graph
+and Git source digests. The ordinary GUI receipt identified its companion
+test kit. [Original compiler run](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46117148186).
+
+| Original input | SHA-256 |
+| --- | --- |
+| [Five Cargo test executables](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46117148186/artifacts/15252353325) | `8a495982b451398905377621504f955e93e617ad985e6f6ceeccceeaa9eddcd8` |
+| [Ordinary GUI archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46117148186/artifacts/15252213846) | `25f34748b164edaf09cabe13021b6bce80e0ac9487c34d1a99e5de692956549c` |
+
+The standard user ran 29 passing cases in the offline 3072 MiB guest.
+The Windows tray contributed 11, the foreground-request controller 2,
+the GUI library 5, launcher delivery 4 and the application 7. The host
+checked all five original logs. The two foreground-request cases exercise
+the controller's decision to request focus. The separate
+[editor observation](../windows-text/run.py) started the ordinary
+`native-gui-assessment.exe` and measured its actual foreground window.
+The initial observer launch stopped during Python import. A repeat on the
+same desktop supplied the observer directory to the embedded interpreter.
+
+UI Automation confirmed keyboard focus in the ordinary German filename
+editor of PID 952, HWND `0x70212`, on the unlocked Default console
+desktop in session 1. The physical field contained eight distinct glyph
+masks. Native cursor movement, selection and deletion passed for `界` in
+`あ界⬟.jpg`, `ث` in `L-بتث-R.jpg` and `ت` in `L-ب12ت-R.jpg`. Both
+UI Automation text interfaces returned the expected filename after each
+deletion. The host independently checked the PNG and its raw pixels,
+the three edit records and the original window and executable identities.
+These measurements cover the visible window before shutdown. Selection
+restoration across a close and reopen remains unmeasured in this trial.
+
+The evidence is under
+`artifacts/rust/local-windows-server-2025-x64/20261128/gui-03b0b8e/`.
+The Cargo results in `original-guest-results.zip` have SHA-256
+`a14699d32cf9813d01f59e85d6878e9c77186ce0c31b709d129255a56443c95d`.
+The separate editor results in `ifw-text2/original.zip` have SHA-256
+`f776bcdd0e9cbe9792264a79d8bffb819c6bb09ce7cd6a3a476f7a7479e930f5`.
+QMP reported 3,221,225,472 bytes of base memory and zero hot-plugged
+bytes. Windows shut down through ACPI, the QEMU process exited and the
+host released the temporary SSD layers.
+
 ## Combined native profile
 
 The [x64 profile compiler](../../../.github/workflows/rust-windows-x64-combined-build.yaml)
