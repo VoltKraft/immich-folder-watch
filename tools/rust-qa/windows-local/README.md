@@ -246,6 +246,40 @@ QMP reported 3,221,225,472 bytes of base memory and zero hot-plugged
 bytes. Windows shut down through ACPI, the QEMU process exited and the
 host released the temporary SSD layers.
 
+### Native GUI tests at 446fc1f
+
+The local Windows Server 2025 x64 guest ran all 30 tests from
+`446fc1f7cd0b2ac7f0cfb3d7df79b4ecfb4770c1` in the standard account's
+console session 1. All five test executables exited zero. The host
+independently read their logs and checked the 29 cases observed at
+`03b0b8e` plus the added case for a rejected tray icon version. That
+case verifies that the background launcher asks to show the window
+and that an outstanding icon remains tracked when removal fails.
+The 30 cases comprise 12 Windows tray tests, two foreground-request tests,
+five GUI library tests, four launcher-delivery tests and seven application
+tests. All ran without filtering or skips.
+
+The original test kit and ordinary GUI archives matched their Actions
+digests. The host verified five x64 test executables and the ordinary GUI
+image, the Cargo compiler stream, the dependency graph, and 32 test and
+30 ordinary-build source entries against Git. The ordinary GUI receipt
+identified the test kit receipt by SHA-256.
+
+| Original compiler archive | SHA-256 |
+| --- | --- |
+| [GUI test kit](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46138706497/artifacts/15261705063) | `b67740951337c769dd45df341ce92de622a3397740a6de7cc8850feecc045dac` |
+| [Ordinary GUI](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46138706497/artifacts/15260833003) | `453cb7710500a034a717437d3084f558ab6eac1ccaf40c87ec9501cd06244e64` |
+
+The guest returned its eight original result files over the serial port.
+The 3,659-byte `original-guest-results.zip` matched the guest's SHA-256
+`bf07bb41e595221e24e83a2252ef3719eafbd292bddf724f605270c76c36ae2c`.
+It is under `artifacts/rust/local-windows-server-2025-x64/20261128/gui-446fc1f/`
+alongside the original compiler archives, per-executable replay and
+shutdown record. QEMU reported 3,072 MiB of base RAM, zero hot-plugged
+memory and the guest ran without a network adapter. Windows shut down
+through ACPI. The host verified the original backing-image metadata and
+released the temporary SSD layers.
+
 ## Combined native profile
 
 The [x64 profile compiler](../../../.github/workflows/rust-windows-x64-combined-build.yaml)
