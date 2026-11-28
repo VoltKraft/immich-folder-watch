@@ -30,11 +30,23 @@ screen evidence together. Its last step requires independent confirmation
 of both visible labels. When the point provider misses a label, the
 original crop remains available for visual review.
 
-After both observers exit, the focused job queries the Windows Shell
-notification state and reads the Notifications and Do not disturb switches
-through Windows Settings. It records the exact two automation IDs' states
-when available. It closes the Settings window it opened. An existing
-Settings window is left alone. These are post-observation readings.
+The original console job queries both notification switches after the
+sender exits. A second job uses its own fresh ARM64 runner. Before sending,
+it opens Windows Settings and requires notifications to be on. If Do not
+disturb is on, the fixture saves a run- and session-bound rollback record
+to disk, switches Do not disturb off and verifies the new state. After the
+sender, it restores the original setting and opens Settings once more for
+an independent read. Each observation identifies and closes its own Settings
+window. When Do not disturb is already off, the comparison records that
+state before and after the sender.
+
+Extract either complete archive into a separate directory. Supply its
+sender directory and the corresponding policy to replay the console
+identity, Settings script digest, original state and any restoration.
+
+```powershell
+python -B tools/rust-qa/windows-services/toast_console.py --check-policy permitted $historyDirectory
+```
 
 The earlier [ARM64 history at 3d55500](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46043105348/artifacts/15244648584)
 contained both messages. The normal sender returned success from Show,
@@ -61,12 +73,11 @@ Shell popup at the notification corner and the visible CoreWindow
 candidates on the same desktop. The expected title and body must appear
 inside the Shell's normal toast view and have distinct physical hit
 points on the original Shell HWND. The observer
-captures the screen crop containing both labels. Windows notification
-settings stay under the runner's control.
+captures the screen crop containing both labels.
 
-The workflow retains the history and physical observations in separate
-artifacts. To verify a positive physical observation, extract both
-archives and run the command below. Replay checks the original sender's
+The focused workflow retains the history and physical observations in one
+archive per console. To verify a positive physical observation, extract
+both directories from the same archive and run the command below. Replay checks the original sender's
 Show interval, its run and revision, the observer's native process and
 desktop, and the image digest. An empty history or an unobserved popup
 leaves the corresponding native check open.

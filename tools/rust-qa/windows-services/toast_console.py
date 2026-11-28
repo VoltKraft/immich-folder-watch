@@ -34,6 +34,62 @@ def corroborates_labels(banner, popup):
                     for key, label in zip(("title", "body"), popup["labels"])))
 
 
+def verify_policy(directory, policy):
+    native = json.loads((directory / "result.json").read_bytes())
+    target = TARGET["ARM64"][0]
+    if "host" in native or native["target"] != target or not ordinary_console(native["desktop"], "Default"):
+        raise ValueError("The settings comparison requires the original hosted ARM64 console")
+    identity = {key: native[key] for key in ("head", "run", "attempt")}
+    identity.update(session=native["desktop"]["session"],
+                    scriptSha256=native["observerInputs"]["tools/rust-qa/windows-services/toast_settings.ps1"])
+    stem = "toast-settings-" + target
+
+    def receipt(suffix):
+        item = json.loads((directory.parent / (stem + suffix + ".json")).read_text(encoding="utf-8-sig"))
+        if any(item.get(key) != value for key, value in identity.items()):
+            raise ValueError("A settings observation belongs to a different session, run or script")
+        return item
+
+    def window(item, action, status):
+        if (item["action"] != action or item["status"] != status or item["afterSender"] is not (action != "Permit")
+                or item["opened"] is not True or item["closed"] is not True or item["pid"] <= 0 or not item["hwnd"]):
+            raise ValueError(f"The {action} observation lacks its original Settings window or confirmed close")
+        for key in ("notifications", "doNotDisturb"):
+            if item[key]["count"] != 1 or item[key]["state"] not in ("On", "Off"):
+                raise ValueError(f"The {action} observation did not identify a unique {key} switch")
+
+    read = receipt("")
+    window(read, "Read", "observed")
+    evidence = dict(policy=policy, notifications=read["notifications"]["state"], doNotDisturb=read["doNotDisturb"]["state"])
+    if policy == "original":
+        if any((directory.parent / (stem + suffix + ".json")).exists() for suffix in ("-intent", "-permit", "-restore")):
+            raise ValueError("Unexpected change receipts on the original console")
+        return evidence
+    if policy != "permitted":
+        raise ValueError("Unknown notification policy comparison")
+    permit, restore = receipt("-permit"), receipt("-restore")
+    window(permit, "Permit", "permitted")
+    original = permit["doNotDisturb"]["state"]
+    if (permit["notifications"]["state"] != "On" or evidence["notifications"] != "On"
+            or permit["doNotDisturb"]["enabled"] is not True or evidence["doNotDisturb"] != original
+            or permit["finalDoNotDisturb"]["count"] != 1 or permit["finalDoNotDisturb"]["state"] != "Off"):
+        raise ValueError("The console was not permitted before the sender or its original settings were not recovered")
+    if original == "On":
+        intent = receipt("-intent")
+        window(restore, "Restore", "restored")
+        if (intent["control"] != "SystemSettings_Notifications_QuietHours_MuteNotification_Enabled_ToggleSwitch"
+                or (intent["original"], intent["desired"]) != ("On", "Off") or permit.get("toggleRequested") is not True
+                or restore["notifications"]["state"] != "On" or restore["doNotDisturb"]["state"] != "Off"
+                or restore.get("toggleRequested") is not True or restore["finalDoNotDisturb"]["count"] != 1
+                or restore["finalDoNotDisturb"]["state"] != "On"):
+            raise ValueError("The owned Do not disturb change and restoration were not both observed")
+    elif (permit.get("toggleRequested") or (directory.parent / (stem + "-intent.json")).exists()
+          or restore["action"] != "Restore" or restore["status"] != "no-owned-change"
+          or restore["afterSender"] is not True or restore["opened"] or restore.get("toggleRequested")):
+        raise ValueError("The originally permitted console received an unexpected change")
+    return {**evidence, "beforeSenderDoNotDisturb": "Off", "toggleRestored": original == "On"}
+
+
 def verify(directory, frames):
     native = json.loads((directory / "result.json").read_bytes())
     if native["status"] != "passed":
@@ -173,9 +229,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--observe-arm64", action="store_true", help="Observe the existing sender in its native rewrite job")
     parser.add_argument("--require-visible", action="store_true", help="require independent confirmation of both visible labels")
+    parser.add_argument("--check-policy", choices=("original", "permitted"), help="verify the Settings receipts beside the sender directory")
     parser.add_argument("native", type=Path, nargs="?")
     parser.add_argument("frames", type=Path, nargs="?")
     args = parser.parse_args()
+    if args.check_policy and args.native and not (args.observe_arm64 or args.frames or args.require_visible):
+        print(json.dumps(verify_policy(args.native, args.check_policy), indent=2))
+        raise SystemExit(0)
+    if args.check_policy:
+        parser.error("--check-policy takes just the native sender directory")
     if args.observe_arm64 and not (args.native or args.frames or args.require_visible):
         raise SystemExit(observe_arm64())
     if args.observe_arm64 or not (args.native and args.frames):

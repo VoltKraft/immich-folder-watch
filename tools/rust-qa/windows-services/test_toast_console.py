@@ -16,6 +16,56 @@ from toast_console import CleanupUnconfirmed, armed_screen, check_venue, corrobo
 
 
 class PhysicalVenueTests(unittest.TestCase):
+    def test_policy_replay_requires_untouched_original_or_matching_transition_and_restoration(self):
+        with TemporaryDirectory() as folder:
+            target = TARGET["ARM64"][0]
+            directory = Path(folder) / ("toast-history-" + target)
+            directory.mkdir()
+            original = dict(head="test-head", run="12", attempt="1")
+            script = "tools/rust-qa/windows-services/toast_settings.ps1"
+            desktop = dict(session=2, activeConsoleSession=2, stationVisible=True, windowStation="WinSta0",
+                           wts=dict(session=2, connectionState=0, lockFlags=1), threadDesktop="Default",
+                           inputDesktop="Default", threadReceivesInput=True, inputObjectReceivesInput=True)
+            (directory / "result.json").write_text(json.dumps(dict(**original, target=target, desktop=desktop,
+                                                                   observerInputs={script: "fixture-sha"})))
+            identity = dict(**original, session=2, scriptSha256="fixture-sha")
+            on = dict(state="On", count=1, enabled=True)
+            off = {**on, "state": "Off"}
+            seen = dict(**identity, action="Read", afterSender=True, status="observed", opened=True, closed=True,
+                        pid=40, hwnd=90, notifications=on, doNotDisturb=on)
+
+            def emit(suffix, item):
+                path = Path(folder) / ("toast-settings-" + target + suffix + ".json")
+                path.write_text(json.dumps(item))
+                return path
+
+            emit("", seen)
+            self.assertEqual(toast_console.verify_policy(directory, "original")["doNotDisturb"], "On")
+            permit = {**seen, "action": "Permit", "status": "permitted", "afterSender": False,
+                      "toggleRequested": True, "finalDoNotDisturb": off}
+            restore = {**seen, "action": "Restore", "status": "restored", "doNotDisturb": off,
+                       "toggleRequested": True, "finalDoNotDisturb": on}
+            emit("-permit", permit)
+            emit("-restore", restore)
+            intent = dict(**identity, original="On", desired="Off",
+                          control="SystemSettings_Notifications_QuietHours_MuteNotification_Enabled_ToggleSwitch")
+            intent_path = emit("-intent", intent)
+            self.assertTrue(toast_console.verify_policy(directory, "permitted")["toggleRestored"])
+            with self.assertRaises(ValueError):
+                toast_console.verify_policy(directory, "original")
+            for bad in ({"session": 3}, {"scriptSha256": "other"}, {"doNotDisturb": on},
+                        {"finalDoNotDisturb": off}, {"closed": False}):
+                emit("-restore", {**restore, **bad})
+                with self.subTest(change=bad), self.assertRaises(ValueError):
+                    toast_console.verify_policy(directory, "permitted")
+            emit("-restore", {**seen, "action": "Restore", "status": "no-owned-change", "opened": False})
+            emit("", {**seen, "doNotDisturb": off})
+            emit("-permit", {**permit, "doNotDisturb": off, "toggleRequested": False})
+            with self.assertRaises(ValueError):
+                toast_console.verify_policy(directory, "permitted")
+            intent_path.unlink()
+            self.assertFalse(toast_console.verify_policy(directory, "permitted")["toggleRestored"])
+
     def test_clean_observer_start_failure_preserves_original_sender_once(self):
         child = MagicMock()
         child.__enter__.side_effect = OSError("could not start observer")
