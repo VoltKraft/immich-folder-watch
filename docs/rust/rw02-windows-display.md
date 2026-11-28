@@ -166,6 +166,29 @@ session after the worker exits. This trial requires a stationary source
 frame and leaves the mixed-DPI and RDP results unset.
 [Private source-frame supervisor](../../tools/rust-qa/windows-display/private_source.py).
 
+At `595019f` both GUIs completed the private source-frame trial on the
+single 1024 × 768, 96-DPI ARM64 console display. Both sampled fields
+were already visible. Each supervisor observed its original GUI HWND
+and hidden witness before and after the edit, ended the worker job,
+and verified the return to the unlocked Default desktop in session 2.
+Independent comparison of the original 276 × 18 pixel PNG pairs gave
+the following results.
+
+| GUI | Changed pixels | Changed columns | Changed rows |
+| --- | ---: | ---: | ---: |
+| Canonical | 681 | 86 | 18 |
+| Retained | 645 | 84 | 18 |
+
+In the two separate Default observations on that host, another window
+still covered each field center. Both reverted the temporary topmost
+request and exited cleanly. Those two required measurements failed the
+workflow while its two private measurements passed. The original archive
+has 43,198,814 bytes and SHA-256
+`1a88aee3bab886f989b8fec8837536430824259369865befac94c8ef1575f3a8`.
+Its three ARM64 executables, original compiler evidence, four result
+manifests, both session receipts and 89 Git sources verified.
+[Original ARM64 frames, session receipts and builds](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46105469235/artifacts/15247554601).
+
 The same focused ARM64 job reads the effective `AllowTSConnections` setting,
 its local or group-policy source, the TermService state, and the TCP
 listeners on the configured RDP port. The listener class is `none`,
@@ -179,6 +202,26 @@ separate verified frame from a connected session.
 [Terminal Services settings](https://learn.microsoft.com/en-us/windows/win32/termserv/win32-terminalservicesetting) ·
 [TCP listener state and owner](https://learn.microsoft.com/en-us/windows/win32/fwp/wmi/nettcpipprov/msft-nettcpconnection) ·
 [WTS protocol values](https://learn.microsoft.com/en-us/windows/win32/api/wtsapi32/ne-wtsapi32-wts_info_class).
+
+At `0ae5d1c`, the Windows ARM64 runner reported that its server setting
+allowed new Remote Desktop connections. TermService was running. A TCP
+listener on the configured port matched its service PID and had class
+`other-or-any`. The WTS enumeration returned four entries with protocol
+0, one active, one disconnected and two in the listen state. It returned
+zero entries with protocol 2. The venue receipt SHA-256 is
+`fe745d44fa6b2b2bef73f5578981da02b1525d5332baf05835d2c14f4cad05c2`.
+An authorized, connected native ARM64 RDP desktop and two displays with
+different DPI remain prerequisites for the respective rendering trials.
+
+The two private ARM64 frame measurements repeated on this second runner
+at 96 DPI. The canonical edit changed 645 pixels in 84 columns and 18
+rows. The retained edit changed 681 pixels in 86 columns and 18 rows.
+Both crops again measured 276 × 18 pixels, and each supervisor verified
+the return to the unlocked Default desktop. Both Default fields remained
+covered. Independent replay verified the original PNGs, session receipts,
+compiler outputs and 92 source files. The 43,199,735-byte archive has
+SHA-256 `e74aa06b2df05d101a540d54ce05f5744dc3101c4141a5193f20743402523107`.
+[Original ARM64 repeat and venue receipt](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46105893287/artifacts/15247523506).
 
 The local Intel x64 KVM host has a Windows Server x64 guest. For native
 Windows ARM64 mixed-DPI and RDP measurements, Microsoft documents local
