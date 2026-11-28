@@ -1147,6 +1147,25 @@ The isolated Fedora renderer also reproduced all 18 original images at
 100% and 150% scale. Across six frames every CPU-to-Vulkan pixel comparison
 was within two channel levels. [Six-frame replay](../../tools/rust-qa/windows-cpu-paint/headless/README.md#editor-with-the-staged-linux-startup-language).
 
+On Fedora x64 the same staged executable ran from an installed test Flatpak.
+With German saved on an English desktop and English saved on a German
+desktop, the first visible editor and the first tray menu both used the saved
+preference. An external AT-SPI client found a GTK control on the test desktop
+but could not find either installed Rust editor. Inside the sandbox the
+accessibility registry answered `GetRegisteredEvents` on its supplied proxy.
+The session bus reported `ServiceUnknown` for the status service queried
+by the Unix AccessKit adapter. [Installed results and proxy observations](../../tools/rust-qa/gui/flatpak/README.md).
+
+An otherwise identical private build at `9cbbf41` used the AT-SPI
+application bus supplied by Flatpak. On the installed Fedora x64 ref an
+external client matched each focus change to its original application.
+Orca spoke the filename, password, language and Quit controls in both saved
+languages. The original binary on the same runtime produced only Tab key
+echoes. Both binaries exited normally when the bus was absent. The
+candidate retained the original package permissions and AccessKit notices.
+[Native compiler and source receipt](../../tools/rust-qa/gui/flatpak-accessibility/README.md) ·
+[Installed focus, speech and audio results](../../tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs).
+
 ## Reproduction
 
 At `2e7ed89`, Windows x64 passed the full keyboard sequence. Focus traversed

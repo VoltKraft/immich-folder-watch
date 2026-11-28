@@ -15,6 +15,26 @@ display, and the user currently has no separate ARM64 test system.
 [Local x64 display trial](rust/rw02-windows-display.md#local-windows-server-2025-x64-display-trial) ·
 [ARM64 console](rust/rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
 
+The Fedora x64 Flatpak check recorded at `70f9713` used the staged
+editor built from `c63d91c`. Two launches of the same installed commit
+showed the respective saved German and English languages.
+All eight visible labels and both initial tray menus matched. The
+unmodified Unix accessibility adapter did not expose those windows to
+the external AT-SPI client. A GTK control was visible on the same test
+desktop. On unpackaged X11 and Mutter the private German-first trials
+now set the editor's language independently of Orca and the desktop.
+[Installed Flatpak](../tools/rust-qa/gui/flatpak/README.md) ·
+[Desktop and Orca controls](../tools/rust-qa/gui/tray-loss-quit.md#starting-the-german-editor-on-an-english-test-desktop).
+
+In the private Flatpak build at `9cbbf41`, Orca spoke all four
+focused controls in each saved language. The external reader matched
+both applications to the original Flatpak proxies. The same ref also
+started and exited with no accessibility bus. At `1862b75` the ordinary
+Fedora GUI compiled from 372 authenticated archives, matched all 289
+compiler units to its native graph and passed all 40 tests.
+[Installed screen reader comparison](../tools/rust-qa/gui/flatpak/README.md#screen-reader-comparison-on-installed-refs) ·
+[Ordinary Linux compiler inputs](rust/rw02-gui-dependencies.md#offline-compiler-inputs-for-the-ordinary-linux-gui).
+
 At `9d4d550`, the SQLite preflight read the committed version from the
 WAL on all four native targets. Two newer profiles retained every original
 byte and filename. A supported read-only file was also refused, and the
