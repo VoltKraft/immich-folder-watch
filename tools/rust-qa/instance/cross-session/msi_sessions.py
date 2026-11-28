@@ -52,8 +52,8 @@ def ordinary(accounts, pid, sid, image, session, created=None):
     return token
 
 
-def launch_wpf(work, session, sid, accounts):
-    for order in ORDERS:
+def launch_wpf(work, session, sid, accounts, orders=ORDERS):
+    for order in orders:
         area = work / order
         wait(area, 'launch-wpf.json', timeout=140)
         with subprocess.Popen([APP], cwd=APP.parent) as proc:
