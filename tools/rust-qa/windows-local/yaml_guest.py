@@ -20,7 +20,7 @@ from workspace import test_counts
 
 sys.path.insert(0, str(QA / "yaml"))
 from local_vm import DLL, EXE, RECEIPT, TARGET, build_inputs, verify_test_build
-from run import exchange
+from run import exchange, isolated
 
 
 def unpack(archive, expected, revision, fixtures, area):
@@ -69,8 +69,7 @@ def run(archive, expected, output, dotnet):
     if os.environ.get("GITHUB_ACTIONS") or platform.node().casefold() != "ifw-qa25":
         raise ValueError("Use the disposable local Windows x64 VM")
     verify_host()
-    if output == ROOT / "artifacts/rust" or not output.is_relative_to(ROOT / "artifacts/rust"):
-        raise ValueError("Choose a new output below the checkout's artifacts/rust directory")
+    output = isolated(output)
     machine = runpy.run_path(str(QA / "windows-performance/build.py"))["pe_machine"]
     if dotnet.name.lower() != "dotnet.exe" or sha256(dotnet) != DOTNET or machine(dotnet) != 0x8664:
         raise ValueError("Select the reviewed .NET 10.0.12 Windows x64 host")
