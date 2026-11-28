@@ -193,6 +193,17 @@ All six portal unit tests and twenty safe-fs unit and integration tests
 passed on Fedora x64. Independent review checked the Linux ABI, buffer
 bound, descriptor lifetime, per-component descent and display fallback.
 
+Ubuntu ARM64 at `5aeb45f` reproduced the nested enumeration on X11 and
+Wayland. Both installed clients displayed the exact FUSE path with
+Documents v4, including when the session bus was unavailable. After
+revocation both returned `ENOENT`, the host read the marker bytes, and
+the control grant still opened. Independent replay verified the native
+ELF (`4e85831070dbbe8a26e29880f99cabbf57d178e86f10d011b68d7b9abb010b33`),
+the 14 compiler and 14 observer inputs, and both parented dialogs.
+The original archive SHA-256 is
+`5236b5e4ba44d5c38165988949c73b624874c5b8a87e7bc68f804a1eb3bed2e3`.
+[Original ARM64 archive](https://github.com/VoltKraft/immich-folder-watch/actions/runs/46121226451/artifacts/15253449178).
+
 ## Notifications and autostart
 
 On Fedora x64 the private notification observer now publishes each complete

@@ -411,6 +411,15 @@ The report under `upload-readback-xhk9fs1o/readback.json` has SHA-256
 
 ## Ordinary second launch of the Linux GUI
 
+The Fedora x64 X11 repeat at `5aeb45f` combined the editor selection
+fix with the worker built from the updated safe-fs inputs. A normal second
+launch and another with `--background` kept the original primary and worker. The next inventory observed
+the new synthetic file in 4.6425 seconds. Quit drained the worker and both
+processes exited. The host verified the 13 worker source hashes against
+the reviewed profile. The local report
+`artifacts/rust/performance/portal-subfolder-5aeb45f-second-launch.json`
+has SHA-256 `c5d96dbcb28d289d5ac6fc81d2ff247010289d78565dc0bc7980c1761d2441ab`.
+
 The shipping Flatpak starts its executable for each launch. When the Linux
 coordinator finds a primary, it asks that process to show its window. On
 Fedora 45 x64, starting the Rust GUI at `21e794f` again took the application

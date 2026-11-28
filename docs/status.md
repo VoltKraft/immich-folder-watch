@@ -23,6 +23,8 @@ On Fedora x64 both installed clients also opened a saved subfolder and
 read its label through the held directory with the session bus unavailable.
 After the parent grant was revoked, both returned `ENOENT` while the
 original marker remained on the host.
+The Ubuntu ARM64 repeat at `5aeb45f` passed under X11 and Wayland with
+Documents v4. The saved FUSE path remained the label with the bus offline.
 [Native subfolder trials](rust/rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
 The editor at `b71b573` retained its focused field, backwards selection
 and first keystroke after reopening on Mutter and X11.

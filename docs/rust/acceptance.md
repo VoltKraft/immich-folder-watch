@@ -56,7 +56,8 @@ desktops. Each client retained grant-relative access.
 On Fedora x64 two fresh installed clients also reopened a saved subfolder
 through its parent grant. With an unreachable session bus the directory's
 own label remained available. Revoking the parent removed subfolder
-access on both desktops. [Saved subfolder trials](rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
+access on both desktops. Both native Ubuntu ARM64 clients also passed
+using the Documents v4 grant label. [Saved subfolder trials](rw02-portal-dialog.md#reopening-a-subfolder-of-an-existing-grant).
 The editor at `b71b573` also retained keyboard focus and its directional
 Unicode selection after an ordinary reopen on both backends.
 [Selected grants and revocation](rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·
