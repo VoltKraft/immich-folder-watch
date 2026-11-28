@@ -48,16 +48,12 @@ def replay(folder):
     require(case["passed"] and case["oracleSidMatched"] and case["lockSequenceObserved"] and case["profileGuardRemoved"]
             and case["participantsExited"] == 7 and case["batchRightsSource"] == "temporary SID in host.json",
             "The native case is incomplete")
-    require(case["originalBootstrapExit"] == case["schedulerExit"] == case["cleanupExit"] == 0
-            and read(folder / "cleanup.json")["cleanupVerified"], "Task or participant exit failed")
-    scheduler = read(folder / "scheduler.json")
-    require(host["taskFolderTrusteesMatched"] and re.fullmatch(r"\\IfwWriterArm_[0-9a-f]{32}", host["taskFolder"]) and
-            host["taskFolder"] == scheduler["taskFolder"] == read(folder / "cleanup.json")["taskFolder"],
-            "The scheduled action did not use the owned task folder")
-    require(scheduler["registered"] and scheduler["cleanupVerified"] and scheduler["lastTaskResult"] == 0
-            and scheduler["definition"]["logonType"] == 2 and scheduler["definition"]["runLevel"] == 0
-            and scheduler["definition"]["fixedActionMatched"] and scheduler["definition"]["currentSidMatched"],
-            "The task did not use the expected standard-user S4U principal")
+    require(case["originalBootstrapExit"] == host["taskLastResult"] == 0, "Task or participant exit failed")
+    require(host["taskFolderTrusteesMatched"] and re.fullmatch(r"\\IfwWriterArm_[0-9a-f]{32}", host["taskFolder"])
+            and re.fullmatch(r"\{?[0-9a-fA-F-]{36}\}?", host["taskInstance"]), "Unexpected task folder or instance")
+    definition = host["taskDefinition"]
+    require(definition == {"logonType": 1, "runLevel": 0, "currentSidMatched": True, "fixedActionMatched": True,
+                           "triggers": 0, "actionCount": 1}, "Unexpected authenticated task principal or action")
     sid = host["sidSha256"]
     sessions = {"original":host["runnerSession"], "scheduled":0}
     require(sessions["original"] > 0 and qualifies(case["controller"])

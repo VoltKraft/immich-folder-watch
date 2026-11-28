@@ -54,7 +54,5 @@ jobs:
             artifacts/rust/arm64-standard-writer/case.json
             artifacts/rust/arm64-standard-writer/worker-done.json
             artifacts/rust/arm64-standard-writer/original-bootstrap-done.json
-            artifacts/rust/arm64-standard-writer/scheduler.json
-            artifacts/rust/arm64-standard-writer/cleanup.json
           if-no-files-found: error
           retention-days: 14

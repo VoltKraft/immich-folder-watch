@@ -15,7 +15,7 @@ import uuid
 from batch import batch_rights, eligible
 from fixture import (Accounts, HERE, HOSTED, LOCAL_WRITER, MARKER, ROOT, guard_id, instance, read,
                      subject_env, verified_process, wait, write, participants_exited)
-from standard import AMBIENT, EXISTING, STANDARD, TEMPORARY, qualifies, required_authority, unchanged_authority
+from standard import AMBIENT, EXISTING, STANDARD, qualifies, required_authority, unchanged_authority
 from worker import PHASES
 
 TARGETS = {"X64": "x86_64-pc-windows-msvc", "ARM64": "aarch64-pc-windows-msvc"}
@@ -158,14 +158,9 @@ def finish_process(proc):
 
 def scheduled(area, args, result, reference):
     env, accounts, sid, exe = prepare(area, args, result, result["mode"], reference)
-    if result["mode"] == TEMPORARY:
-        # The provisioning host reads the new user's direct assignment. An ordinary user
-        # can observe its own batch logon but cannot enumerate policy for other group SIDs.
-        result["batchRightsSource"] = "temporary SID in host.json"
-    else:
-        result["batchRightsBefore"] = batch_rights(accounts)
-        if not eligible(result["batchRightsBefore"]):
-            raise RuntimeError("Current account lacks an existing effective batch-logon assignment")
+    result["batchRightsBefore"] = batch_rights(accounts)
+    if not eligible(result["batchRightsBefore"]):
+        raise RuntimeError("Current account lacks an existing effective batch-logon assignment")
     powershell = shutil.which("powershell.exe")
     if not powershell:
         raise RuntimeError("The local system Windows PowerShell is required")
@@ -201,10 +196,9 @@ def scheduled(area, args, result, reference):
                                              stdin=subprocess.DEVNULL, stdout=logfile, stderr=subprocess.STDOUT,
                                              timeout=45, check=False)
                     result["cleanupExit"] = cleanup.returncode
-                    if result["mode"] != TEMPORARY:
-                        result["batchRightsAfter"] = batch_rights(accounts)
-                        if result["batchRightsAfter"] != result["batchRightsBefore"]:
-                            raise RuntimeError("The observed current-account batch-logon assignment changed")
+                    result["batchRightsAfter"] = batch_rights(accounts)
+                    if result["batchRightsAfter"] != result["batchRightsBefore"]:
+                        raise RuntimeError("The observed current-account batch-logon assignment changed")
     if (result["schedulerExit"] or result["originalBootstrapExit"] or result["cleanupExit"]
             or read(area / "scheduler.json").get("lastTaskResult") != 0
             or not read(area / "scheduler.json").get("cleanupVerified")

@@ -8,10 +8,10 @@ import uuid
 
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parent), str(HERE)]
-from fixture import Accounts, HOSTED, participants_exited, read, write
+from fixture import Accounts, HOSTED, participants_exited, read, wait, write
 from inputs import DIGEST, TARGET, verify
 from native_build import stage
-from observe import scheduled
+from observe import finish_process, native_handover, original, prepare
 from standard import TEMPORARY, qualifies
 
 
@@ -44,15 +44,29 @@ def run(root):
         raise ValueError("Invalid generated task name")
     area.mkdir()
     result = {"mode": TEMPORARY, "passed": False, "lockSequenceObserved": False, "target": TARGET,
-              "revision": settings["revision"], "runId": settings["runId"], "runAttempt": settings["runAttempt"]}
+              "revision": settings["revision"], "runId": settings["runId"], "runAttempt": settings["runAttempt"],
+              "batchRightsSource": "temporary SID in host.json"}
+    local = None
     try:
-        scheduled(area, SimpleNamespace(target=TARGET, output=output), result, (exe, oracle, build))
+        env, accounts, sid, writer = prepare(area, SimpleNamespace(target=TARGET), result, TEMPORARY, (exe, oracle, build))
+        local = original(area, env)
+        # The host starts only its pre-registered ordinary-user action with fixed arguments.
+        (area / "start-peer").touch(exist_ok=False)
+        native_handover(area, accounts, sid, writer, None, result)
+        result["passed"] = all(wait(area, file)["passed"] for file in ("original-bootstrap-done.json", "worker-done.json"))
     except Exception as exc:
         result.update(passed=False, error=f"{type(exc).__name__}: {exc}")
     finally:
         try:
+            if not result["passed"]:
+                (area / "abort").touch()
+            if local is not None:
+                finish_process(local)
+                result["originalBootstrapExit"] = local.returncode
+                if local.returncode:
+                    result["passed"] = False
             result["participantsExited"] = participants_exited(area)
-            for name in ("original-bootstrap-done", "worker-done", "scheduler", "cleanup"):
+            for name in ("original-bootstrap-done", "worker-done"):
                 file = area / (name + ".json")
                 if file.is_file():
                     shutil.copyfile(file, output / file.name)

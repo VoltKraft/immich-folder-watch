@@ -39,15 +39,7 @@ function Invoke-BatchAssignment([string]$Action) {
     if ($LASTEXITCODE -ne 0) {throw "The temporary account batch-logon $Action failed."}
     return ($raw | ConvertFrom-Json)
 }
-function Assert-TaskGone {
-    if (!$taskFolder) {return $true}
-    $tasks = $taskFolder
-    try {$task = $tasks.GetTask($taskName)}
-    catch {
-        if ($_.Exception.GetBaseException().HResult -eq -2147024894) {return $true}
-        throw
-    }
-    # Recovery uses only our dedicated task name, original SID and unprivileged fixed action.
+function Assert-FixedTask($task) {
     $d = $task.Definition
     $principal = $d.Principal.UserId
     if ($principal -notmatch '^S-1-') {
@@ -56,11 +48,22 @@ function Assert-TaskGone {
     $fixed = Join-Path $folder 'source/tools/rust-qa/instance/cross-session/worker.py'
     $area = Join-Path $work $taskName
     if ($d.RegistrationInfo.Source -cne "ImmichFolderWatch rewrite fixture $taskName" -or $principal -ne $user.SID.Value -or
-        $d.Principal.RunLevel -ne 0 -or $d.Principal.LogonType -ne 2 -or $d.Triggers.Count -ne 0 -or
-        $d.Actions.Count -ne 1 -or $d.Actions.Item(1).Path -ine $python -or
+        $d.Principal.RunLevel -ne 0 -or $d.Principal.LogonType -ne 1 -or $d.Triggers.Count -ne 0 -or
+        $d.Actions.Count -ne 1 -or $d.Actions.Item(1).Type -ne 0 -or $d.Actions.Item(1).Path -ine $python -or
+        $d.Actions.Item(1).WorkingDirectory -ine $area -or $task.Path -cne ("\$taskFolderName\$taskName") -or
         $d.Actions.Item(1).Arguments -cne ('-I -B "' + $fixed + '" "' + $area + '"')) {
         throw 'The task name matched a different definition.'
     }
+}
+function Assert-TaskGone {
+    if (!$taskFolder) {return $true}
+    $tasks = $taskFolder
+    try {$task = $tasks.GetTask($taskName)}
+    catch {
+        if ($_.Exception.GetBaseException().HResult -eq -2147024894) {return $true}
+        throw
+    }
+    Assert-FixedTask $task
     . (Join-Path $PSScriptRoot '../scheduler_cleanup.ps1')
     [void](Stop-IfwOwnedTaskInstances $task $null)
     $deadline = [DateTime]::UtcNow.AddSeconds(12)
@@ -110,17 +113,41 @@ try {
     $schedule = New-Object -ComObject Schedule.Service
     $schedule.Connect()
     $taskRoot = $schedule.GetFolder('\')
-    $folderDacl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;$($user.SID.Value))"
+    $folderDacl = 'D:P(A;;FA;;;SY)(A;;FA;;;BA)'
     $taskFolder = $taskRoot.CreateFolder($taskFolderName, $folderDacl)
     $report.taskFolder = $taskFolder.Path
     $descriptor = [Security.AccessControl.RawSecurityDescriptor]::new($taskFolder.GetSecurityDescriptor(4))
     $allowed = @($descriptor.DiscretionaryAcl | ForEach-Object {$_.SecurityIdentifier.Value})
-    $expected = @('S-1-5-18','S-1-5-32-544',$user.SID.Value)
-    $report.taskFolderTrusteesMatched = $allowed.Count -eq 3 -and !(Compare-Object ($allowed | Sort-Object) ($expected | Sort-Object))
+    $expected = @('S-1-5-18','S-1-5-32-544')
+    $report.taskFolderTrusteesMatched = $allowed.Count -eq 2 -and !(Compare-Object ($allowed | Sort-Object) ($expected | Sort-Object))
     if (!$report.taskFolderTrusteesMatched) {throw 'Unexpected trust on the new Scheduler folder.'}
     if ($taskFolder.Path -cne "\$taskFolderName" -or $taskFolder.GetTasks(1).Count -ne 0 -or $taskFolder.GetFolders(0).Count -ne 0) {
         throw 'Expected a fresh empty folder for the single standard-user task.'
     }
+    $definition = $schedule.NewTask(0)
+    $definition.RegistrationInfo.Source = "ImmichFolderWatch rewrite fixture $taskName"
+    $qualifiedUser = "$env:COMPUTERNAME\$name"
+    $definition.Principal.UserId = $qualifiedUser
+    $definition.Principal.LogonType = 1  # TASK_LOGON_PASSWORD, normal local batch logon
+    $definition.Principal.RunLevel = 0  # TASK_RUNLEVEL_LUA
+    $definition.Settings.AllowDemandStart = $true
+    $definition.Settings.DisallowStartIfOnBatteries = $false
+    $definition.Settings.StopIfGoingOnBatteries = $false
+    $definition.Settings.ExecutionTimeLimit = 'PT4M'
+    $definition.Settings.MultipleInstances = 2
+    $area = Join-Path $work $taskName
+    $fixed = Join-Path $folder 'source/tools/rust-qa/instance/cross-session/worker.py'
+    $action = $definition.Actions.Create(0)
+    $action.Path = $python
+    $action.Arguments = '-I -B "' + $fixed + '" "' + $area + '"'
+    $action.WorkingDirectory = $area
+    # The disposable credential is supplied only to the local scheduler API, separately from its fixed command.
+    $task = $taskFolder.RegisterTaskDefinition($taskName,$definition,2,$qualifiedUser,
+        [Net.NetworkCredential]::new('',$pwdChars).Password,1,$folderDacl)
+    Assert-FixedTask $task
+    $report.taskDefinition = [ordered]@{fixedActionMatched=$true; currentSidMatched=$true
+        logonType=$task.Definition.Principal.LogonType; runLevel=$task.Definition.Principal.RunLevel
+        triggers=$task.Definition.Triggers.Count; actionCount=$task.Definition.Actions.Count}
     $before = Get-Service seclogon
     $report.serviceBefore = $before.Status.ToString()
     $report.startTypeBefore = $before.StartType.ToString()
@@ -151,9 +178,29 @@ try {
         $info.ArgumentList.Add($arg)
     }
     $process = [Diagnostics.Process]::Start($info)
-    if (!$process.WaitForExit(390000)) {throw 'The ordinary-user controller did not finish in time.'}
+    $deadline = [DateTime]::UtcNow.AddSeconds(65)
+    while (!(Test-Path -LiteralPath "$area/start-peer") -and !$process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 100
+    }
+    if (!(Test-Path -LiteralPath "$area/start-peer")) {throw 'The ordinary controller did not prepare its marked guard.'}
+    $running = $task.Run($null)
+    $report.taskInstance = $running.InstanceGuid
+    $deadline = [DateTime]::UtcNow.AddSeconds(300)
+    while (!$process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+        if ($task.GetInstances(0).Count -eq 0 -and $task.State -ne 2 -and
+            $task.LastTaskResult -notin @(0,267009,267011)) {
+            $report.taskLastResult = $task.LastTaskResult
+            throw 'The registered fixed task exited unsuccessfully.'
+        }
+        Start-Sleep -Milliseconds 200
+    }
+    if (!$process.HasExited) {throw 'The ordinary-user controller did not finish in time.'}
     $report.controllerExit = $process.ExitCode
     if ($process.ExitCode -ne 0) {throw 'The ordinary-user Windows ARM64 handover failed.'}
+    $deadline = [DateTime]::UtcNow.AddSeconds(12)
+    while ($task.GetInstances(0).Count -gt 0 -and [DateTime]::UtcNow -lt $deadline) {Start-Sleep -Milliseconds 100}
+    $report.taskLastResult = $task.LastTaskResult
+    if ($task.GetInstances(0).Count -ne 0 -or $report.taskLastResult -ne 0) {throw 'The fixed task did not exit successfully.'}
 } catch {
     $failed = $true
     $report.error = $_.Exception.GetBaseException().Message.Replace($name,'[test user]') -replace 'S-1-(\d+-)+\d+', '[SID]'
@@ -203,7 +250,7 @@ try {
                     throw 'Unexpected observation directory link.'
                 }
             }
-            foreach ($file in @('case','scheduler','cleanup','original-bootstrap-done','worker-done')) {
+            foreach ($file in @('case','original-bootstrap-done','worker-done')) {
                 $path = Join-Path $work "receipts/$file.json"
                 if (Test-Path -LiteralPath $path -PathType Leaf) {
                     $observed = Get-Item -LiteralPath $path

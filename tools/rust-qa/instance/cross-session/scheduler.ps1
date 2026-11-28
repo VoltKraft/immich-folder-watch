@@ -16,7 +16,7 @@ if ($taskName -cnotmatch '^IfwQaCross_[a-f0-9]{32}$' -or
     throw 'Expected a new marked profile directly under the disposable runner temp directory.'
 }
 $config = [IO.File]::ReadAllText((Join-Path $areaPath 'controller.json')) | ConvertFrom-Json
-if ($config.mode -cnotin @('hosted-S4U-ambient','hosted-S4U','hosted-temporary-standard')) { throw 'Expected a fixed hosted guard trial.' }
+if ($config.mode -cnotin @('hosted-S4U-ambient','hosted-S4U')) { throw 'Expected a fixed hosted guard trial.' }
 $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $sha = [Security.Cryptography.SHA256]::Create()
 try {
@@ -61,15 +61,7 @@ function Save-Report($Name) {
 try {
     $service = New-Object -ComObject 'Schedule.Service'
     $service.Connect()  # local Task Scheduler only
-    $schedulerPath = '\'
-    if ($config.mode -ceq 'hosted-temporary-standard') {
-        $stagingName = (Get-Item -LiteralPath $areaPath).Parent.Parent.Name
-        if ($stagingName -cnotmatch '^IfwWriterArm_[0-9a-f]{32}$') {throw 'Expected the isolated writer task folder.'}
-        $schedulerPath += $stagingName
-    }
-    $report.stage = 'open task folder'
-    $folder = $service.GetFolder($schedulerPath)
-    $report.taskFolder = $folder.Path
+    $folder = $service.GetFolder('\')
     if ($VerifyCleanup) {
         $task = Find-ThisTask
         if ($null -ne $task) {
@@ -78,7 +70,6 @@ try {
             $report.recoveredRegistration = $true
         }
     } else {
-        $report.stage = 'prepare definition'
         $definition = $service.NewTask(0)
         $definition.RegistrationInfo.Source = $source
         $definition.RegistrationInfo.Description = 'One-shot synthetic writer lock observation.'
@@ -94,7 +85,6 @@ try {
         $action.Path = $python
         $action.Arguments = $fixedArgs
         $action.WorkingDirectory = $areaPath
-        $report.stage = 'register own S4U task'
         $task = $folder.RegisterTaskDefinition($taskName, $definition, 2, $currentSid, $null, 2, $null)  # TASK_CREATE
         $owns = $true
         $registeredXml = $task.Xml
@@ -104,7 +94,6 @@ try {
             logonType=$task.Definition.Principal.LogonType; runLevel=$task.Definition.Principal.RunLevel
             actionCount=$task.Definition.Actions.Count; fixedActionMatched=$true
             executionTimeLimit=$task.Definition.Settings.ExecutionTimeLimit }
-        $report.stage = 'run own S4U task'
         $running = $task.Run($null)
         $report.instance = $running.InstanceGuid
         $start = [DateTime]::UtcNow
