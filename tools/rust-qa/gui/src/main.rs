@@ -602,6 +602,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         commands,
         filename: "Grüße – Sommer.jpg".to_owned(),
         password: String::new(),
+        #[cfg(target_os = "linux")]
+        german: native.startup_german,
+        #[cfg(windows)]
         german: true,
         passes: 0,
         graphics: graphics::Graphics::new(),

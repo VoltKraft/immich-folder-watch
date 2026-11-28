@@ -39,6 +39,17 @@ def profile():
     return reviewed
 
 
+def historical_text_profile_sha256(revision):
+    data = subprocess.check_output(["git", "show", revision + ":rust/audit/gui-text-inputs.json"], cwd=ROOT)
+    original = json.loads(data)
+    current = profile()
+    for record in (original, current):
+        record.pop("nativeFeatureReports")
+    if current != original:
+        raise ValueError("The current GUI text sources, notices or fonts differ from the historical build")
+    return hashlib.sha256(data).hexdigest()
+
+
 def replay_manifest(name, destination):
     digest = REPLAY_MANIFESTS[name]
     if destination.is_file() and sha(destination) == digest:
@@ -71,15 +82,18 @@ def fetch_replay_registry(env):
                        cwd=project, env=env, check=True)
 
 
-def verify_native_graph(target, env, output=None):
+def verify_native_graph(target, env, output=None, *, directory_source=None):
     reviewed = json.loads((REVIEW.parent / "gui-profile.json").read_text(encoding="utf-8"))
     lock = sha(HERE / "Cargo.lock")
     if lock != reviewed["lockSha256"]:
         raise ValueError("The GUI lock differs from its reviewed native profile")
     with tempfile.TemporaryDirectory(dir=CACHE) as scratch:
         report = Path(scratch) / "graph.json"
-        subprocess.run([sys.executable, str(HERE.parent / "audit-graph.py"), str(HERE / "Cargo.toml"), target,
-                        str(report), "--verify-unpacked"], env=env, check=True)
+        args = [sys.executable, str(HERE.parent / "audit-graph.py"), str(HERE / "Cargo.toml"), target,
+                str(report), "--verify-unpacked"]
+        if directory_source is not None:
+            args.extend(["--startup-vendor", str(directory_source)])
+        subprocess.run(args, env=env, check=True)
         digest = sha(report)
         if digest != reviewed["targetReportSha256"][target]:
             raise ValueError(f"Resolved GUI inputs differ from the reviewed {target} graph: {digest}")

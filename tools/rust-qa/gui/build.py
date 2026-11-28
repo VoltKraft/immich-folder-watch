@@ -50,7 +50,7 @@ def main(args):
         audit_env = dict(os.environ, PATH=str(toolchain / "bin") + os.pathsep + os.environ["PATH"],
                          CARGO_HOME=home, CARGO_TARGET_DIR=str(build))
         graph_file = Path(home) / "graph.json" if args.clippy or args.test else build / "gui-graph.json"
-        _, graph_sha = source_profile.verify_native_graph(target, audit_env, graph_file)
+        _, graph_sha = source_profile.verify_native_graph(target, audit_env, graph_file, directory_source=directory)
         packages = json.loads(graph_file.read_bytes())["packages"]
     command = ["bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
                "--ro-bind", "/usr", "/usr", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",

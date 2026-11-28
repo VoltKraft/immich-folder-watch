@@ -25,10 +25,10 @@ pub(super) struct Labels {
     publishing: bool,
 }
 
-impl Default for Labels {
-    fn default() -> Self {
+impl Labels {
+    pub(super) fn new(german: bool) -> Self {
         Self {
-            german: true,
+            german,
             revision: 1,
             publishing: false,
         }
@@ -293,7 +293,10 @@ mod tests {
             },
             quitting: Arc::default(),
         };
-        (Menu::new(actions, SharedLabels::default()), commands)
+        (
+            Menu::new(actions, Arc::new(Mutex::new(Labels::new(true)))),
+            commands,
+        )
     }
 
     #[test]
@@ -357,7 +360,7 @@ mod tests {
 
     #[test]
     fn language_changes_share_one_writer_until_the_latest_revision_is_sent() {
-        let mut labels = Labels::default();
+        let mut labels = Labels::new(true);
         assert_eq!(labels.change(true), None);
         assert_eq!(labels.change(false), Some(2));
         assert_eq!(labels.change(true), None);

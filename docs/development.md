@@ -328,14 +328,11 @@ Windows runner. [Platform log commands and results](rust/rw02-platform-logs.md).
 
 Run `python3 tools/rust-qa/verify-gui-inputs.py` to verify the original font and
 supplemental notice bytes offline. `--fetch-missing` restores a missing input
-by its reviewed upstream revision and digest. For the separate development GUI
-assessment, fetch its lock once and generate one source and feature inventory
-per supported target. For example, from the repository root:
-
-```bash
-cargo fetch --locked --manifest-path tools/rust-qa/gui/Cargo.toml
-python3 tools/rust-qa/audit-graph.py tools/rust-qa/gui/Cargo.toml x86_64-unknown-linux-gnu artifacts/rust/gui-run/audit/x86_64-unknown-linux-gnu.json
-```
+by its reviewed upstream revision and digest. The native GUI build below
+fetches the locked archives and writes the selected target's complete source
+and feature inventory to `artifacts/rust/gui-native/<target>/graph.json`.
+On Linux it audits the filtered directory source used by Cargo, including
+the YAML library used to select the startup language.
 
 The [desktop input review](rust/rw02-gui-dependencies.md) records embedded
 third-party code and protocol terms that require additional notices. From an

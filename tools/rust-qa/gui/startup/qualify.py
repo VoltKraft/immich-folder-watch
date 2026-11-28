@@ -165,7 +165,7 @@ def compile_gui(vendor, toolchain, output, build):
     inputs = [p for p in (output / "project").rglob("*") if p.is_file() and "artifacts" not in p.relative_to(output / "project").parts]
     write(output / "native.json", {"target": target, "compiler": compiler, "binarySha256": sha256(binary),
           "supplySha256": sha256(output / "supply.json"), "unitTestLogSha256": sha256(output / "units-test.log"),
-          "textAndFontProfileSha256": sha256(source_profile.REVIEW),
+          "textAndFontProfileSha256": source_profile.historical_text_profile_sha256(BASE),
           "unitsCount": count, "unitsSha256": sha256(log),
           "sources": {p.relative_to(output / "project").as_posix(): sha256(p) for p in sorted(inputs)}})
 

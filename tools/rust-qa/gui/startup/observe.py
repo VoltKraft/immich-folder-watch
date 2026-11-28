@@ -145,6 +145,15 @@ def launch(args):
     build = json.loads(compiled.read_bytes())
     if build["target"] != platform.machine() + "-unknown-linux-gnu" or digest(gui) != build["binarySha256"]:
         raise ValueError("GUI bytes differ from the verified native compiler receipt")
+    if "compilerSources" in build:
+        sys.path.insert(0, str(GUI))
+        from compiler_inputs import linux_project_sources
+        paths = {p.relative_to(root).as_posix(): digest(p) for p in linux_project_sources(root)}
+        if (paths.pop("tools/rust-qa/gui/Cargo.lock") != build["lockSha256"] or paths != build["compilerSources"]
+                or digest(compiled.parent / "compiler.jsonl") != build["compilerStreamSha256"]
+                or digest(compiled.parent / "graph.json") != build["graphSha256"]
+                or digest(compiled.parent / "registry-sources.json") != build["registryReceiptSha256"]):
+            raise ValueError("The ordinary GUI no longer matches its sources or compiler archive")
     receipt = worker.parent / "worker.inputs.json"
     binding = json.loads(receipt.read_bytes())
     worker_sources = json.loads((GUI.parent / "performance/worker-inputs.json").read_bytes())
@@ -152,6 +161,7 @@ def launch(args):
             or any(digest(root / name) != checksum for name, checksum in worker_sources.items())):
         raise ValueError("Worker bytes differ from its native compiler receipt")
     output.mkdir(parents=True)
+    shutil.copyfile(compiled, output / "gui-compiler.json")
     app = output / "app"
     app.mkdir()
     for original, name in ((gui, "native-gui-assessment"), (worker, "ifw-performance-worker")):
@@ -205,5 +215,6 @@ if __name__ == "__main__":
         parser.add_argument("--output", type=Path, required=True)
         parser.add_argument("--sdk", type=Path, required=True, help="Pinned local .NET SDK root")
         parser.add_argument("--signed-repo", type=Path, required=True, help="Local original shipping OSTree repository")
-        parser.add_argument("--compiler-receipt", type=Path, required=True, help="native.json from qualify.py")
+        parser.add_argument("--compiler-receipt", type=Path, required=True,
+                            help="build.json from the ordinary native build or native.json from qualify.py")
         launch(parser.parse_args())

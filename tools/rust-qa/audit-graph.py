@@ -167,7 +167,10 @@ def main():
     if args.startup_vendor:
         from gui.startup.audit_profile import StartupAudit
         from gui import source_profile
-        staged = StartupAudit(manifest, args.startup_vendor, args.target)
+        if manifest == REPOSITORY / "tools/rust-qa/gui/Cargo.toml":
+            staged = StartupAudit.for_canonical(manifest, args.startup_vendor, args.target)
+        else:
+            staged = StartupAudit(manifest, args.startup_vendor, args.target)
         approved = source_profile.validate()
     elif manifest == REPOSITORY / "tools/rust-qa/gui/Cargo.toml":
         from gui import source_profile

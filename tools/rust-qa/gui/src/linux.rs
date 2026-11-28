@@ -189,6 +189,7 @@ pub(super) struct Primary {
     connection: Connection,
     installed_socket: Option<legacy::Guard>,
     publisher: Arc<menu::Publisher>,
+    pub(super) startup_german: bool,
     watcher: watcher::Watcher,
 }
 
@@ -288,7 +289,10 @@ pub(super) fn start(control: Control) -> Result<Option<(Primary, bool)>, Box<dyn
             Err(error) => return Err(error.into()),
             Ok(_) => return Err("Unexpected D-Bus ownership result for a new connection".into()),
         };
-        let labels = menu::SharedLabels::default();
+        let startup = ifw_yaml_assessment::startup_language::load();
+        let startup_german =
+            startup.language == ifw_yaml_assessment::startup_language::Language::German;
+        let labels = Arc::new(Mutex::new(menu::Labels::new(startup_german)));
         connection
             .object_server()
             .at(menu::PATH, menu::Menu::new(actions.clone(), labels.clone()))
@@ -308,6 +312,7 @@ pub(super) fn start(control: Control) -> Result<Option<(Primary, bool)>, Box<dyn
                 connection,
                 installed_socket,
                 publisher,
+                startup_german,
                 watcher,
             },
             available,

@@ -33,7 +33,8 @@ def check_stock(stock):
     if (sha256(stock / "native.json") != RECEIPT or record["target"] != TARGET
             or sha256(stock / "compiler.jsonl") != record["unitsSha256"]
             or sha256(stock / "supply.json") != record["supplySha256"]
-            or sha256(source_profile.REVIEW) != record["textAndFontProfileSha256"]):
+            or source_profile.historical_text_profile_sha256("c63d91c42eae9f71f07a2d1816214a1e16609ef8")
+            != record["textAndFontProfileSha256"]):
         raise ValueError("The original language GUI inputs differ from the measured native compiler receipt")
     for name, digest in record["sources"].items():
         if sha256(stock / "project" / name) != digest:

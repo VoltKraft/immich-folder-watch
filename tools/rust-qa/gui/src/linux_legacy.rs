@@ -429,11 +429,13 @@ mod tests {
             control,
             crate::linux::INSTALLED_NAME,
         ));
-        let publisher = menu::Publisher::new(connection.clone(), Default::default());
+        let labels = Arc::new(std::sync::Mutex::new(menu::Labels::new(true)));
+        let publisher = menu::Publisher::new(connection.clone(), labels);
         let primary = Primary {
             connection,
             installed_socket: Some(guard),
             publisher,
+            startup_german: true,
             watcher,
         };
         // Retaining a language control across bus loss must allow the primary to drain.
