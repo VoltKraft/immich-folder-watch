@@ -73,6 +73,12 @@ public static class IfwToastPoint {
     [DllImport("user32",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int count);
     [DllImport("user32")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr v);
     public static IntPtr Root(int x, int y) { return GetAncestor(WindowFromPoint(new Point{X=x,Y=y}),2); }
+    public static bool Covers(IntPtr h, int x, int y, int width, int height) {
+        for (int row=0; row<height; row++)
+            for (int col=0; col<width; col++)
+                if (Root(x+col,y+row)!=h) return false;
+        return true;
+    }
     public static uint Pid(IntPtr h) { uint pid; GetWindowThreadProcessId(h,out pid); return pid; }
     public static string Class(IntPtr h) { var s=new StringBuilder(256); GetClassName(h,s,s.Capacity); return s.ToString(); }
     public static IntPtr[] CoreWindows() {
@@ -91,6 +97,11 @@ public static class IfwToastPoint {
     $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
     $session = [Diagnostics.Process]::GetCurrentProcess().SessionId
     if ($HostedArm64) {
+        $helper = Join-Path $PSScriptRoot 'toast_roots.ps1'
+        . $helper
+        $report.modernRootsSha256 = Get-ObserverDigest $helper
+        $report.discovery = [Collections.Generic.List[object]]::new()
+        $viewFilter = Get-ToastViewFilter
         $report.session = $session
         $report.diagnostics = [ordered]@{samples=0; firstQpc=$null; lastQpc=$null; visibleCoreWindowVisits=0
             shellWindowVisits=0; viewQueries=0; normalViewMatches=0; onscreenViewVisits=0; staleElements=0}
@@ -99,6 +110,7 @@ public static class IfwToastPoint {
         (Join-Path $env:SystemRoot 'SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe')
         (Join-Path $env:SystemRoot 'SystemApps\Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe')
     )
+    if ($HostedArm64) { $shellImages = @(Get-ToastShellImages) }
     $conditionType = [Windows.Automation.AutomationElement]
     $scope = [Windows.Automation.TreeScope]::Descendants
     $start = [Diagnostics.Stopwatch]::StartNew()
@@ -115,24 +127,18 @@ public static class IfwToastPoint {
     $conditions = @($titles | ForEach-Object {
         [Windows.Automation.PropertyCondition]::new($conditionType::NameProperty,$_)
     })
-    function Read-PhysicalPopup([IntPtr]$root) {
+    function Read-PhysicalPopup([IntPtr]$root, $uiaRoot) {
         if ($root -eq [IntPtr]::Zero -or [IfwToastPoint]::Class($root) -cne 'Windows.UI.Core.CoreWindow') { return }
         $ownerId = [IfwToastPoint]::Pid($root)
         $owner = Get-Process -Id $ownerId -ErrorAction SilentlyContinue
         if (!$owner -or $owner.SessionId -ne $session -or $shellImages -inotcontains $owner.Path) { return }
         if ($HostedArm64) { $report.diagnostics.shellWindowVisits++ }
-        $window = $conditionType::FromHandle($root)
+        $window = if ($null -ne $uiaRoot) { $uiaRoot } else { $conditionType::FromHandle($root) }
         if ($window.Current.ProcessId -ne $ownerId) { return }
         $surface = $window
         $normalView = $null
         if ($HostedArm64) {
-            $type = [Windows.Automation.PropertyCondition]::new($conditionType::ControlTypeProperty,[Windows.Automation.ControlType]::Window)
-            $ids = @('NormalToastView','Normal Toast View' | ForEach-Object {
-                [Windows.Automation.PropertyCondition]::new($conditionType::AutomationIdProperty,$_)
-            })
-            $toastId = [Windows.Automation.OrCondition]::new($ids[0],$ids[1])
-            $filter = [Windows.Automation.AndCondition]::new($type,$toastId)
-            $views = $window.FindAll([Windows.Automation.TreeScope]::Subtree,$filter)
+            $views = $window.FindAll([Windows.Automation.TreeScope]::Subtree,$viewFilter)
             $report.diagnostics.viewQueries++
             $report.diagnostics.normalViewMatches += $views.Count
             if ($views.Count -ne 1) { return }
@@ -148,7 +154,7 @@ public static class IfwToastPoint {
             $node = $matches.Item(0)
             $properties = $node.Current
             $b = $properties.BoundingRectangle
-            if ($properties.ProcessId -ne $ownerId -or $properties.IsOffscreen -or $b.IsEmpty) { return }
+            if ($properties.Name -cne $titles[$labels.Count] -or $properties.ProcessId -ne $ownerId -or $properties.IsOffscreen -or $b.IsEmpty) { return }
             $x = [int]($b.X+$b.Width/2)
             $y = [int]($b.Y+$b.Height/2)
             if ([IfwToastPoint]::Root($x,$y) -ne $root) { return }
@@ -164,9 +170,22 @@ public static class IfwToastPoint {
         $bitmap = [Drawing.Bitmap]::new($width,$height)
         $graphics = [Drawing.Graphics]::FromImage($bitmap)
         try {
+            if ($HostedArm64) {
+                $viewBounds = $surface.Current.BoundingRectangle
+                if ($left -lt $viewBounds.Left -or $top -lt $viewBounds.Top -or
+                    $left+$width -gt $viewBounds.Right -or $top+$height -gt $viewBounds.Bottom -or
+                    ![IfwToastPoint]::Covers($root,$left,$top,$width,$height)) { return }
+            }
             $graphics.CopyFromScreen($left,$top,0,0,$bitmap.Size)
             foreach ($label in $labels) {
                 if ([IfwToastPoint]::Root($label.point[0],$label.point[1]) -ne $root) { return }
+            }
+            if ($HostedArm64 -and (![IfwToastPoint]::Covers($root,$left,$top,$width,$height) -or
+                [IfwToastPoint]::Pid($root) -ne $ownerId)) { return }
+            if ($HostedArm64) {
+                $normalView.bounds = @($viewBounds.Left,$viewBounds.Top,$viewBounds.Right,$viewBounds.Bottom)
+                $normalView.coveredPixelsBefore = $width*$height
+                $normalView.coveredPixelsAfter = $width*$height
             }
             $bitmap.Save("$OutputDirectory\popup.png",[Drawing.Imaging.ImageFormat]::Png)
         } finally { $graphics.Dispose(); $bitmap.Dispose() }
@@ -194,18 +213,26 @@ public static class IfwToastPoint {
     while ([Diagnostics.Stopwatch]::GetTimestamp() -le $showEnd + 10L * $report.frequency -and !(Test-Path "$NativeDirectory\result.json")) {
         $report.beginQpc = [Diagnostics.Stopwatch]::GetTimestamp()
         $root = [IfwToastPoint]::Root(($area.Right-260),($area.Bottom-97))
-        $candidates = @($root)
+        $candidates = @(@{hwnd=$root; node=$null})
         if ($HostedArm64) {
             $coreWindows = @([IfwToastPoint]::CoreWindows())
+            $modern = Get-ToastModernRoots $shellImages $viewFilter $session
+            $candidates = @(Get-ToastCandidates $root $coreWindows $modern)
+            $visible = [Collections.Generic.HashSet[long]]::new()
+            foreach ($h in $coreWindows) { [void]$visible.Add($h.ToInt64()) }
+            if ($modern.foreground.core -and $modern.foreground.visible) { [void]$visible.Add($modern.foreground.hwnd) }
+            foreach ($item in $modern.nodes) { [void]$visible.Add($item.hwnd) }
+            $report.discovery.Add(@{qpc=$report.beginQpc; foreground=$modern.foreground; classic=$coreWindows.Count
+                children=$modern.visited; uiaCore=$modern.handled; handlelessShell=$modern.handlelessShell
+                unresolvedShell=$modern.unresolvedShell; errors=$modern.errors; uiaQueried=$modern.queried; uniqueCore=$visible.Count})
             $report.diagnostics.samples++
             if ($null -eq $report.diagnostics.firstQpc) { $report.diagnostics.firstQpc = $report.beginQpc }
             $report.diagnostics.lastQpc = $report.beginQpc
-            $report.diagnostics.visibleCoreWindowVisits += $coreWindows.Count
-            $candidates += @($coreWindows | Where-Object { $_ -ne $root })
+            $report.diagnostics.visibleCoreWindowVisits += $visible.Count
         }
         $observed = $null
         foreach ($candidate in $candidates) {
-            try { $observed = Read-PhysicalPopup $candidate }
+            try { $observed = Read-PhysicalPopup ([IntPtr]$candidate.hwnd) $candidate.node }
             catch [Windows.Automation.ElementNotAvailableException] {
                 if ($HostedArm64) { $report.diagnostics.staleElements++ }
                 continue

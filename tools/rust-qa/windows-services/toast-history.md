@@ -344,3 +344,32 @@ Do not disturb switches. The per-sender banner preference for this test
 identity remains unknown.
 [WinRT notifier setting](https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.setting) ·
 [Windows per-app notification settings](https://support.microsoft.com/en-us/windows/experience/notifications-and-do-not-disturb-in-windows)
+
+### Foreground and desktop-root coverage on Windows ARM64
+
+Each physical sweep adds the current foreground HWND and the immediate UI
+Automation children of the input desktop to the physical point and the
+classic enumerator. The raw receipt records the foreground HWND, PID, native
+CoreWindow and visibility flags, and per-source candidate counts. UI
+Automation supplies the top-level provider directly. A Shell child without
+an HWND can supply an on-screen ordinary toast view whose center resolves
+to a native CoreWindow owned by that same Shell PID. Unresolved Shell
+children and provider errors have separate counts. The probe reads window
+identities without saving unrelated desktop labels or window images.
+[UI Automation desktop children](https://learn.microsoft.com/en-us/dotnet/api/system.windows.automation.automationelement.findall)
+
+The independent accessibility observer verifies the session, user, executable
+and physical hits. A candidate screenshot requires the two exact, fresh
+labels under a recognized Shell popup. The ARM64 recorder checks the capture
+area against that view and its native window before and after the screen copy.
+The two observers must still identify the same native HWND, Shell PID and
+label runtime IDs in the original sender's timed interval for
+`--require-visible` to pass. Offline replay binds the discovery helper to the
+native compiler receipt and recounts each sweep, including foreground
+CoreWindows omitted by classic enumeration.
+
+The notifier's documented setting returns the app-wide notification state.
+The documented Settings URI opens the Notifications page. The comparison
+records the separate banner switch for the synthetic AUMID as unknown.
+[WinRT notification states](https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.notificationsetting) ·
+[Windows Settings URIs](https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-settings)

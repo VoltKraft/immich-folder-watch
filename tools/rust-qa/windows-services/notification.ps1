@@ -97,7 +97,7 @@ public static class IfwNoticeDesktop {
         Path.Combine(windows,@"SystemApps\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\StartMenuExperienceHost.exe")
     };
     static void Close(IntPtr h) { if (!CloseHandle(h)) throw new Win32Exception(Marshal.GetLastWin32Error()); }
-    static Root Describe(IntPtr hwnd) {
+    public static Root Describe(IntPtr hwnd) {
         uint pid, session, cloaked;
         uint tid = GetWindowThreadProcessId(hwnd,out pid);
         if (tid == 0 || !OnDefault(GetThreadDesktop(tid)) || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
@@ -211,8 +211,8 @@ function Read-Label($Node, $Root, [string]$Expected, $Container, [bool]$AllowPar
     }
 }
 
-function Match-Notice($HostWindow, $TitleCondition, $BodyCondition) {
-    $uia = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$HostWindow.hwnd)
+function Match-Notice($HostWindow, $TitleCondition, $BodyCondition, $UiRoot) {
+    $uia = if ($null -ne $UiRoot) { $UiRoot } else { [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$HostWindow.hwnd) }
     if ($uia.Current.ProcessId -ne $HostWindow.pid) { return }
     $scope = [Windows.Automation.TreeScope]::Descendants
     $titles = $uia.FindAll($scope,$TitleCondition)
@@ -282,10 +282,11 @@ function Match-Notice($HostWindow, $TitleCondition, $BodyCondition) {
     }
 }
 
-function Read-NoticeRoots($roots) {
+function Read-NoticeRoots($roots, $uiRoots=@()) {
     $errorsSeen = 0; $lastHresult = $null; $found = $null; $unclassified = $null
-    foreach ($candidate in $roots) {
-        try { $found = Match-Notice $candidate $titleCondition $bodyCondition }
+    $candidates = @($roots | ForEach-Object { @{hostWindow=$_; node=$null} }) + @($uiRoots)
+    foreach ($candidate in $candidates) {
+        try { $found = Match-Notice $candidate.hostWindow $titleCondition $bodyCondition $candidate.node }
         catch [System.Windows.Automation.ElementNotAvailableException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
         catch [Runtime.InteropServices.COMException] { $errorsSeen++; $lastHresult=$_.Exception.HResult; continue }
         if ($null -ne $found) {
@@ -294,10 +295,30 @@ function Read-NoticeRoots($roots) {
         }
     }
     if ($null -eq $found -or -not $found.ContainsKey('popup') -and $null -ne $unclassified) { $found = $unclassified }
-    return @{roots=$roots.Count; match=$found; errors=$errorsSeen; lastHresult=$lastHresult}
+    return @{roots=$candidates.Count; match=$found; errors=$errorsSeen; lastHresult=$lastHresult}
 }
 
-function Read-NoticeScan { Read-NoticeRoots ([IfwNoticeDesktop]::Roots()) }
+$modernArm = $Kind -ceq 'WinrtNormal' -and !$IsolatedVm -and $env:RUNNER_ARCH -ceq 'ARM64'
+if ($modernArm) {
+    . (Join-Path $PSScriptRoot 'toast_roots.ps1')
+    $toastImages = @(Get-ToastShellImages)
+    $viewFilter = Get-ToastViewFilter
+    $session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+}
+function Read-NoticeScan {
+    $roots = [IfwNoticeDesktop]::Roots()
+    if (!$modernArm) { return Read-NoticeRoots $roots }
+    $modern = Get-ToastModernRoots $toastImages $viewFilter $session
+    $extra = @(foreach ($candidate in @(Get-ToastCandidates 0 @() $modern)) {
+        $owner = [IfwNoticeDesktop]::Describe([IntPtr]$candidate.hwnd)
+        if ($null -ne $owner -and ($null -eq $candidate.node -or $owner.pid -eq $candidate.pid)) {
+            @{hostWindow=$owner; node=$candidate.node}
+        }
+    })
+    $result = Read-NoticeRoots $roots $extra
+    $result.errors += $modern.errors
+    return $result
+}
 
 function Watch-Notice([string]$Fixture, [string]$Token, [scriptblock]$ReadScan) {
     $frequency = [Diagnostics.Stopwatch]::Frequency

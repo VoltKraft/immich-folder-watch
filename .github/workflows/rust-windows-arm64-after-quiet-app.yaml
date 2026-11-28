@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   after_quiet:
+    name: Observe the original sender through foreground and desktop UI Automation roots
     if: github.ref == 'refs/heads/rewrite/rust'
     uses: ./.github/workflows/rust-windows-arm64-notification.yaml
     with:

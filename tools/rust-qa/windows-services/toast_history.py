@@ -369,6 +369,9 @@ def replay(directory, result):
         if (not points.is_file() or sha(points) != build["evidenceFiles"].get(points.name)
                 or points.read_text(encoding="utf-8").splitlines().count("WinRT popup selection passed.") != 1):
             raise ValueError("The native build did not verify the popup selection control")
+        if ("tools/rust-qa/windows-services/toast_roots.ps1" in build["sourceFiles"]
+                and points.read_text(encoding="utf-8").splitlines().count("Foreground and UIA toast root selection passed.") != 1):
+            raise ValueError("The native build did not exercise foreground and desktop root selection")
     if READINESS_SOURCE in build["sourceFiles"]:
         required_checks.append("notifier-readiness")
     if DISPLAY_NAME_SOURCE in build["sourceFiles"] and result.get("registryIdentityInitiallyAbsent") is not True:

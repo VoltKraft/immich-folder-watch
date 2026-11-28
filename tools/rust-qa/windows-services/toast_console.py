@@ -14,6 +14,38 @@ import toast_history
 from notification_probe import CleanupUnconfirmed, ordinary_console
 
 
+ROOTS_SOURCE = "tools/rust-qa/windows-services/toast_roots.ps1"
+
+
+def check_discovery(captured):
+    """Recount each modern discovery sweep, including foreground windows missed by classic enumeration."""
+    rows, diagnostics = captured["discovery"], captured["diagnostics"]
+    if not rows or len(rows) != diagnostics["samples"]:
+        raise ValueError("Missing the original physical discovery sweeps")
+    last, total = 0, 0
+    for row in rows:
+        qpc = row["qpc"]
+        fg = row["foreground"]
+        if (type(qpc) is not int or qpc <= last
+                or any(type(fg[k]) is not int or fg[k] < 0 for k in ("hwnd", "pid"))
+                or any(type(fg[k]) is not bool for k in ("core", "visible"))
+                or bool(fg["hwnd"]) != bool(fg["pid"]) or not fg["hwnd"] and (fg["core"] or fg["visible"])
+                or any(type(row[k]) is not int or row[k] < 0 for k in
+                       ("classic", "children", "uiaCore", "handlelessShell", "unresolvedShell", "errors", "uniqueCore"))
+                or type(row["uiaQueried"]) is not bool or not row["uiaQueried"] and (row["children"] or not row["errors"])
+                or row["uiaCore"] > row["children"] or not row["unresolvedShell"] <= row["handlelessShell"] <= row["children"]):
+            raise ValueError("Invalid foreground or desktop-child discovery receipt")
+        visible_fg = int(fg["core"] and fg["visible"])
+        if not max(visible_fg, int(bool(row["uiaCore"])), row["classic"]) <= row["uniqueCore"] <= (
+                visible_fg + row["classic"] + row["uiaCore"]):
+            raise ValueError("The visible CoreWindow count omits an independently observed root")
+        total += row["uniqueCore"]
+        last = qpc
+    if (total != diagnostics["visibleCoreWindowVisits"]
+            or (rows[0]["qpc"], last) != (diagnostics["firstQpc"], diagnostics["lastQpc"])):
+        raise ValueError("The original per-source observations differ from the physical totals")
+
+
 def check_venue(native, captured):
     if native.get("host") == "isolated-vm":
         if native["target"] == TARGET["X64"][0] and "host" not in captured and captured.get("target", native["target"]) == native["target"]:
@@ -21,8 +53,21 @@ def check_venue(native, captured):
     elif "host" not in native and native["target"] == TARGET["ARM64"][0] and captured.get("host") == "github-hosted":
         if (all(native[key] and native[key] == captured[key] for key in ("target", "head", "run", "attempt"))
                 and captured["scriptSha256"] == native["observerInputs"]["tools/rust-qa/windows-services/toast_console.ps1"]):
+            if ROOTS_SOURCE in native["observerInputs"]:
+                if captured.get("modernRootsSha256") != native["observerInputs"][ROOTS_SOURCE]:
+                    raise ValueError("The modern window observer differs from the archived sources")
+                check_discovery(captured)
             return
     raise ValueError("The native sender and physical observer must belong to the same supported desktop trial")
+
+
+def check_crop_coverage(view, capture):
+    left, top, width, height = capture
+    x0, y0, x1, y1 = view["bounds"]
+    if (not 12 <= width <= 1200 or not 12 <= height <= 480
+            or not x0 <= left < left + width <= x1 or not y0 <= top < top + height <= y1
+            or (view["coveredPixelsBefore"], view["coveredPixelsAfter"]) != (width * height,) * 2):
+        raise ValueError("The screen crop lacks full coverage inside the identified native popup")
 
 
 def corroborates_labels(banner, popup):
@@ -142,6 +187,9 @@ def verify(directory, frames):
     root = PureWindowsPath(raw["windowsDirectory"])
     images = {root / "SystemApps" / package / "ShellExperienceHost.exe" for package in
               ("ShellExperienceHost_cw5n1h2txyewy", "Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewy")}
+    if captured.get("host") == "github-hosted" and ROOTS_SOURCE in native["observerInputs"]:
+        check_crop_coverage(popup["normalView"], popup["capture"])
+        images.update((root / "System32/ShellHost.exe", root / "SystemApps/MicrosoftWindows.Client.CBS_cw5n1h2txyewy/ShellHost.exe"))
     if (PureWindowsPath(popup["image"]) not in images or popup["session"] != native["desktop"]["session"]
             or popup["pid"] <= 0 or popup["hwnd"] <= 0 or popup["windowClass"] != "Windows.UI.Core.CoreWindow"
             or not popup["createdUtc"] or len(popup["labels"]) != 2):

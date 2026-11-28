@@ -44,6 +44,22 @@ $Kind = 'Shell'
 if ((Read-NoticeRoots @($history,$popup)).match.container -cne 'history') { throw 'The original Shell matcher changed' }
 Write-Output 'WinRT popup selection passed.'
 
+# Exercise modern discovery when classic enumeration omitted a real foreground CoreWindow.
+. (Join-Path $PSScriptRoot 'toast_roots.ps1')
+$foreground = @{hwnd=0x10204L; pid=7600; visible=$true; core=$true}
+$uia = @{hwnd=99L; pid=100; node='uia-shell-view'}
+$modern = @{foreground=$foreground; nodes=@($uia)}
+$candidates = @(Get-ToastCandidates ([IntPtr]::Zero) @() $modern)
+if ($candidates.Count -ne 2 -or $candidates[0].hwnd -ne 0x10204 -or $candidates[1].node -cne 'uia-shell-view') {
+    throw 'The retained foreground HWND or the independent UIA desktop child was lost'
+}
+$candidates = @(Get-ToastCandidates ([IntPtr]99) @([IntPtr]99,[IntPtr]0x10204) $modern)
+if ($candidates.Count -ne 3 -or $candidates[0].hwnd -ne 99 -or $candidates[1].hwnd -ne 0x10204 -or
+    $candidates[2].node -cne 'uia-shell-view') { throw 'Duplicate handles hid the independent UIA provider' }
+$foreground.visible = $false
+if (@(Get-ToastCandidates 0 @() $modern).Count -ne 1) { throw 'A hidden foreground window became a visible root' }
+Write-Output 'Foreground and UIA toast root selection passed.'
+
 # Run the same polling loop against a temporary sender and a title/body match that exists for only one sweep.
 $watch = $ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
     $node.Name -ceq 'Watch-Notice'},$true)

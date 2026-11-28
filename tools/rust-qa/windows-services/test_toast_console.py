@@ -124,6 +124,28 @@ class PhysicalVenueTests(unittest.TestCase):
             receipt = json.loads((frames / "observer.json").read_bytes())
             self.assertTrue(receipt["armedBeforeSender"] and receipt["profileRemoved"])
 
+    def test_desktop_corewindow_missing_from_classic_enumeration_is_counted(self):
+        foreground = dict(hwnd=0x10204, pid=7600, core=True, visible=True)
+        modern = dict(qpc=1000, foreground=foreground, classic=0, children=3, uiaCore=1, handlelessShell=0,
+                      unresolvedShell=0, errors=0, uiaQueried=True, uniqueCore=1)
+        diagnostics = dict(samples=1, firstQpc=1000, lastQpc=1000, visibleCoreWindowVisits=1)
+        receipt = dict(discovery=[modern], diagnostics=diagnostics)
+        toast_console.check_discovery(receipt)
+        for change in ({"uniqueCore": 0}, {"uniqueCore": 3}, {"classic": 2}, {"unresolvedShell": 3},
+                       {"uiaQueried": False}, {"children": 0}, {"foreground": {**foreground, "pid": 0}}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                toast_console.check_discovery({**receipt, "discovery": [{**modern, **change}]})
+        with self.assertRaises(ValueError):
+            toast_console.check_discovery({**receipt, "diagnostics": {**diagnostics, "visibleCoreWindowVisits": 0}})
+
+    def test_modern_popup_crop_requires_both_complete_native_coverage_checks(self):
+        view = dict(bounds=[-20, 0, 180, 120], coveredPixelsBefore=3000, coveredPixelsAfter=3000)
+        capture = [-10, 5, 100, 30]
+        toast_console.check_crop_coverage(view, capture)
+        for change in ({"bounds": [0, 0, 180, 120]}, {"coveredPixelsBefore": 2999}, {"coveredPixelsAfter": 2999}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                toast_console.check_crop_coverage({**view, **change}, capture)
+
     def test_original_local_observer_has_no_hosted_run(self):
         sender = {"host": "isolated-vm", "target": TARGET["X64"][0]}
         check_venue(sender, {})
