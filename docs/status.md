@@ -47,9 +47,11 @@ original Shell window. The console observer retained the screenshot and the
 original Do Not Disturb setting was restored. [Local Windows evidence](rust/rw02-windows-services.md).
 
 Local Windows trials share one guest slot. The Server 2025 test guest now
-runs with 4 GiB of RAM, down from 6 GiB. The three .NET test media images
-now reside on the SSD. Their original paths resolve to copies verified by
-SHA-256, freeing 2,944,704,512 bytes on the host's tmpfs. The standard user
+runs with 4 GiB of RAM, down from 6 GiB. The proxy launcher uses 3 GiB.
+The three .NET test images and nine other completed Windows test DVDs
+now reside on the SSD. The twelve original paths resolve to copies
+verified by SHA-256, freeing 3,901,890,560 bytes on the host's tmpfs.
+The standard user
 also completed Japanese IME composition in the filename field with the 4 GiB
 limit. [Native IME result](rust/rw02-windows-ime.md#standard-user-console-result-at-065ae57).
 
