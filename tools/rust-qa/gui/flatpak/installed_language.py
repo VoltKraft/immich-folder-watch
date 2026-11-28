@@ -21,6 +21,7 @@ CANDIDATE_RECEIPTS = {
 
 
 def compiler_input(binary, receipt, area, arch, *, candidate=False):
+    from ordinary_reader import STOCK_RECEIPT, archived_stock
     from run import sha
     binary, receipt = binary.resolve(strict=True), receipt.resolve(strict=True)
     if arch != 'x86_64' or not all(p.is_relative_to(area) for p in (binary, receipt)):
@@ -31,6 +32,8 @@ def compiler_input(binary, receipt, area, arch, *, candidate=False):
         if digest not in CANDIDATE_RECEIPTS:
             raise ValueError('Use a measured Fedora x64 candidate compiler receipt')
         return runpy.run_path(str(builder))['verify_candidate'](binary, receipt, digest)
+    if sha(receipt) == STOCK_RECEIPT:
+        return archived_stock(binary, receipt)
     if sha(receipt) != COMPILER_RECEIPT:
         raise ValueError('The native receipt differs from the reviewed startup compiler')
     evidence = receipt.parent

@@ -98,6 +98,8 @@ def main(args):
     if arch not in COMMITS:
         raise ValueError('A native x64 or ARM64 Linux host is required')
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    ordinary = args.screen_reader == 'ordinary'
+    languages = ordinary or bool(args.startup_pixels)
     if args.startup_pixels:
         from installed_language import reference_images
         references = reference_images(args.startup_pixels.resolve(strict=True), art)
@@ -124,7 +126,10 @@ def main(args):
             raise ValueError('The staged native executable and its exact compiled first-party sources must match')
         subprocess.run(['git', 'ls-files', '--error-unmatch', '--', *sources], cwd=root, check=True, stdout=subprocess.DEVNULL)
         subprocess.run(['git', 'diff', '--quiet', revision, '--', *sources], cwd=root, check=True)
-        if args.screen_reader:
+        if ordinary:
+            from ordinary_reader import corrected_build
+            compiler = corrected_build(subject.parent, gui, root)
+        elif args.screen_reader:
             original = runpy.run_path(str(qa / 'gui/flatpak-accessibility/build.py'))['original'](subject.parent)
             if original.receipt_sha != sha(receipt):
                 raise ValueError('The screen-reader control must use the ordinary compiler receipt')
@@ -141,12 +146,15 @@ def main(args):
         raise ValueError('Review the current shipping sandbox permissions')
     drivers = [HERE / n for n in ('run.py', 'observe.py', 'tray_menu.py', 'launch.sh')]
     drivers.append(qa / 'gui/compiler_inputs.py')
-    if args.startup_pixels:
+    if languages:
         drivers += [HERE / 'installed_language.py', HERE / 'accessibility-readback.sh',
-                    qa / 'gui/desktop_input.py', qa / 'gui/native.py']
+                    HERE / 'ordinary_reader.py', qa / 'gui/desktop_input.py', qa / 'gui/native.py']
     if args.screen_reader:
         drivers += [HERE / 'reader.py', qa / 'gui/screen_reader.py']
-    if args.screen_reader and (args.gui_build or args.screen_reader == 'candidate'):
+    if ordinary:
+        drivers += [HERE / 'verify_reader_pair.py', qa / 'gui/startup/vendor.py',
+                    *sorted((HERE / 'references').glob('*.bgra.xz'))]
+    elif args.screen_reader and (args.gui_build or args.screen_reader == 'candidate'):
         drivers += [qa / 'gui/source_profile.py', qa / 'gui/startup/vendor.py',
                     *(qa / 'gui/flatpak-accessibility' / name for name in
                       ('build.py', 'accesskit_source.py', 'source-review.json', 'application-bus.patch'))]
@@ -158,6 +166,9 @@ def main(args):
     dest.mkdir(exist_ok=True)
     out = Path(tempfile.mkdtemp(prefix='x11-', dir=dest))
     print(out, flush=True)
+    if ordinary and not args.startup_pixels:
+        from ordinary_reader import frames
+        references = frames(out, art)
     shutil.copyfile(receipt, out / 'gui-build.json')
     if args.screen_reader == 'candidate':
         shutil.copyfile(receipt.parent / 'adapter.json', out / 'adapter.json')
@@ -180,7 +191,7 @@ def main(args):
          'platform': {**platform_receipt, 'path': str(runtime)},
          'gl': {**graphics, 'path': str(gl), **mesa},
          'shipping': {'file': manifest.relative_to(root).as_posix(), 'sha256': sha(manifest), 'finishArgs': shipping},
-         'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu, 'savedLanguageCases': bool(args.startup_pixels),
+         'testFinishArgs': PERMISSIONS, 'trayMenu': args.tray_menu, 'savedLanguageCases': languages,
          'screenReader': args.screen_reader,
          'outerNamespaces': {n: os.readlink('/proc/self/ns/' + n) for n in NS}})
     cmd = namespace(out, qa / 'gui', None)
@@ -198,15 +209,26 @@ def main(args):
         '--setenv', 'FLATPAK_USER_DIR', '/tmp/home/.local/share/flatpak', '--dir', '/run/user/0',
         '--setenv', 'XDG_RUNTIME_DIR', '/run/user/0', '--chdir', '/qa', '--', '/usr/bin/python3', '-B',
         '/app/flatpak/run.py', '--inside']
-    if args.startup_pixels:
+    if languages:
         position = cmd.index('--chdir')
         cmd[position:position] = ['--dir', '/references', *(item for lang, path in references.items()
                                  for item in ('--ro-bind', str(path), '/references/' + lang + '.bgra'))]
     result = subprocess.run(cmd, timeout=180)
-    files = sorted(p for p in out.rglob('*') if p.is_file())
-    (out / 'evidence.sha256').write_text(''.join(f'{sha(p)}  {p.relative_to(out)}\n' for p in files))
-    if result.returncode or not json.loads((out / 'result.json').read_bytes()).get('passed'):
-        raise RuntimeError(f'Installed Flatpak observation failed in {out}')
+    try:
+        if result.returncode or not json.loads((out / 'result.json').read_bytes()).get('passed'):
+            raise RuntimeError(f'Installed Flatpak observation failed in {out}')
+        if ordinary:
+            from verify_reader_pair import capture
+            _, report, cases = capture(out, 'ordinary')
+            details = {'resultSha256': sha(out / 'result.json'), 'guiSha256': sha(binary), 'compiler': compiler,
+                       'installation': report['installation'], 'languages': cases}
+            if args.hosted_runtime:
+                packages = runpy.run_path(str(qa / 'ubuntu-reader/verify.py'))['packages']
+                details['ubuntuReaderPackages'] = packages(Path('/'), gui['target'])
+            save(out / 'ordinary-reader.json', details)
+    finally:
+        files = sorted(p for p in out.rglob('*') if p.is_file())
+        (out / 'evidence.sha256').write_text(''.join(f'{sha(p)}  {p.relative_to(out)}\n' for p in files))
 
 
 def inside():
@@ -285,14 +307,16 @@ if __name__ == '__main__':
         parser.add_argument('--startup-pixels', type=Path, metavar='PIXELS',
                             help='directory containing the reviewed German and English 640 by 400 headless GPU frames')
         parser.add_argument('--tray-menu', action='store_true')
-        parser.add_argument('--screen-reader', choices=['stock', 'candidate'],
-                            help='compare the installed stock or qualified candidate editor with native Orca')
+        parser.add_argument('--screen-reader', choices=['stock', 'candidate', 'ordinary'],
+                            help='use native Orca with a stock control, private candidate or ordinary corrected GUI')
         parser.add_argument('--hosted-runtime', type=Path, metavar='DEPLOYMENT',
                             help='verified native Platform deployment on a disposable hosted runner')
         args = parser.parse_args()
         if bool(args.startup_gui) != bool(args.startup_receipt) or (args.startup_gui and not args.startup_pixels):
             parser.error('the archived --startup-gui requires --startup-receipt and --startup-pixels')
-        if args.screen_reader and not (args.tray_menu and args.startup_pixels):
+        if args.screen_reader == 'ordinary' and not (args.gui_build and args.tray_menu):
+            parser.error('use --gui-build and --tray-menu for the ordinary native screen-reader comparison')
+        if args.screen_reader in ('stock', 'candidate') and not (args.tray_menu and args.startup_pixels):
             parser.error('--screen-reader requires the saved-language reference pixels and --tray-menu')
         if args.screen_reader == 'candidate' and not args.startup_gui:
             parser.error('use --startup-gui and --startup-receipt for the separate candidate compiler build')

@@ -19,11 +19,12 @@ def capture(folder, mode):
             or result['accessibilityControl']['observedButton'] != 'Private accessibility control'):
         raise ValueError(f'Incomplete {mode} control or installation in {folder}')
     absent, early = result['withoutBus'], result['beforeReader']
+    accessible = mode in ('candidate', 'ordinary')
     proxy = early['primary']['proxy']['pid']
     samples = early['registry']['samples']
     if (absent['registry'] != {'addresses': [], 'socketPresent': False} or absent['primaryExit'] or early['primaryExit']
             or len(samples) != 3 or any(s['listeners'] for s in samples)
-            or any([r['busPid'] for r in s['roots']] != ([proxy] if mode == 'candidate' else []) for s in samples)):
+            or any([r['busPid'] for r in s['roots']] != ([proxy] if accessible else []) for s in samples)):
         raise ValueError(f'Unexpected {mode} accessibility registration before Orca started')
     summaries = {}
     orca_log = (folder / 'orca-debug.log').read_text(encoding='utf-8', errors='replace')
@@ -42,8 +43,11 @@ def capture(folder, mode):
                 or tuple(row['label'] for row in visible['controls'] if row['expectedOverlap'] == 1) != expected):
             raise ValueError(f'The original {mode} {language} window, controls or process changed')
         summary = {'guiPid': gui, 'proxyPid': proxy, 'xid': reader['xid'], 'referenceSha256': visible['referenceSha256']}
-        if mode == 'candidate':
+        if accessible:
             focus = reader['focus']
+            if mode == 'ordinary' and (not reader['initialSpeech'].startswith(expected[-1])
+                                       or tuple(item['label'] for item in focus) != expected):
+                raise ValueError(f'The {language} ordinary traversal did not visit the expected tab order')
             with (folder / 'orca-audio.raw').open('rb') as raw:
                 raw.seek(reader['audioStart'])
                 pcm = raw.read(reader['audioBytes'])

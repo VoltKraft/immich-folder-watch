@@ -119,6 +119,21 @@ class InstalledReader:
 
         try:
             wait_for(complete, 8, 'The installed AT-SPI peer did not expose four typed editor controls')
+            if self.mode == 'ordinary':
+                # Orca 46 can discover the initial focus without announcing the first Tab.
+                # Start measuring after it has spoken the actual window's final button.
+                for _ in range(6):
+                    if any(row['focused'] and row['name'] == expected[-1] for row in read()):
+                        break
+                    tap(self.keyboard, 0xff09)
+                    time.sleep(.12)
+                else:
+                    raise ValueError('Could not position focus on the original installed Quit button')
+                report['initialSpeech'] = wait_for(lambda: next((s for s in self.orca.spoken()[offset:]
+                    if re.match(re.escape(expected[-1]) + r'(?:[.\s]|$)', s)), None), 8,
+                    'Orca did not announce the installed Quit button before traversal')
+                offset = len(self.orca.spoken())
+                audio_start = self.orca.audio.stat().st_size if self.orca.audio.exists() else 0
             visited = []
             for _ in range(5):
                 # Establish the speech offset before the physical focus change.

@@ -8,6 +8,8 @@ on:
       - 'tools/rust-qa/plasma/**'
       - 'tools/rust-qa/portal-noble/inputs.py'
       - 'tools/rust-qa/gui/**'
+      - 'tools/rust-qa/ubuntu-reader/packages.json'
+      - 'tools/rust-qa/ubuntu-reader/verify.py'
       - '!tools/rust-qa/gui/src/windows*.rs'
       - '!tools/rust-qa/gui/tests/windows*.rs'
       - 'tools/rust-qa/linux-services/gui_watcher.py'
@@ -123,12 +125,18 @@ jobs:
         if: ${{ !cancelled() && steps.pair.outcome == 'success' }}
         run: /usr/bin/python3 -B tools/rust-qa/portal-dialog/hosted_runtime.py
 
-      - name: Observe the tray menu and watcher replacement through the installed Flatpak proxy
+      - name: Obtain the signed native Flatpak GL extension
+        id: graphics
         if: ${{ !cancelled() && steps.platform.outcome == 'success' }}
         env:
           PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/launch/graphics.py "$PLATFORM_DEPLOYMENT"
+
+      - name: Observe the tray menu and watcher replacement through the installed Flatpak proxy
+        if: ${{ !cancelled() && steps.graphics.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
         run: |
-          /usr/bin/python3 -B tools/RustCompatibilityOracle/installed/launch/graphics.py "$PLATFORM_DEPLOYMENT"
           /usr/bin/python3 -B tools/rust-qa/gui/flatpak/run.py plasma-native --hosted-runtime "$PLATFORM_DEPLOYMENT" --tray-menu
 
       - name: Read the ordinary editor and tray startup languages on four private desktops
@@ -139,6 +147,21 @@ jobs:
             --compiler-receipt "artifacts/rust/gui-native/$NATIVE_TARGET/build.json" \
             --worker artifacts/rust/performance/subjects/plasma-native \
             --output artifacts/rust/gui-run/ordinary-startup
+
+      - name: Install the reviewed Ubuntu reader and the GTK and pixel observers
+        id: reader
+        if: ${{ !cancelled() && steps.graphics.outcome == 'success' }}
+        run: |
+          sudo apt-get install --yes --no-install-recommends gir1.2-gtk-3.0 python3-pil \
+            orca=46.1-1ubuntu1 speech-dispatcher-espeak-ng=0.12.0~rc2-2build3
+
+      - name: Read both saved languages through the installed ordinary editor's accessibility proxy
+        if: ${{ !cancelled() && steps.reader.outcome == 'success' }}
+        env:
+          PLATFORM_DEPLOYMENT: ${{ steps.platform.outputs.deployment }}
+        run: |
+          /usr/bin/python3 -B tools/rust-qa/gui/flatpak/run.py --gui-build artifacts/rust/gui-build \
+            --hosted-runtime "$PLATFORM_DEPLOYMENT" --tray-menu --screen-reader ordinary
 
       - name: Retain the original executables, compiler receipts and desktop observations
         if: ${{ !cancelled() }}

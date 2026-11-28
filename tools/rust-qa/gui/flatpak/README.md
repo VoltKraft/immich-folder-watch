@@ -230,3 +230,56 @@ stock first. The retained pair is under `artifacts/rust/flatpak-gui-launch-asses
 | Stock `x11-u36lrntk/result.json` | `f356af31e54ea699d8426580219e7f71c6d926055fdc9928701d6946a9f37693` |
 | Candidate `x11-_ign7mu3/result.json` | `42f41a232b135f4469ad10f01daa2ce62558eb74af0565f560bd222486e97a25` |
 | `reader-pair-b01ed1b-68d808a.json` | `5ca09398bf8875ebf58b5ca399255926b5ab86774680fdcdb1ebf6a4b0915fde` |
+
+## Installed reader from the ordinary compiler directory
+
+The ordinary comparison requires a normal compiler receipt, the reviewed
+target graph and a compiler stream for the selected native Linux host. Its
+registry receipt must identify the corrected AccessKit compiler tree. The
+unchanged fixture installs the executable with its existing permissions.
+The desktop starts once without an AT-SPI bus, again with a registry before
+any listeners subscribe, and then with the private GTK control and Orca.
+With the saved English and German language preferences, the observer starts
+from the spoken Quit button and tracks physical Tab, four accessible roles,
+the original XID, screen pixels, Orca speech requests and audio bytes.
+
+```sh
+python3 -B tools/rust-qa/gui/flatpak/run.py \
+  --gui-build artifacts/rust/gui-build --tray-menu --screen-reader ordinary
+```
+
+The two [compressed test references](references) retain the complete
+640 × 400 BGRA frames from the [ordinary six-frame render](../../windows-cpu-paint/headless/README.md#ordinary-linux-editor-with-the-settings-reader).
+Each expands to 1,024,000 bytes. The SHA-256 values below identify the exact
+files used on both architectures.
+
+| Reference | XZ SHA-256 | Original BGRA SHA-256 |
+| --- | --- | --- |
+| German initial frame | `418a5d3817c8da067e892252e8c90f2cab34d96d9f35865c07403bbb3c194a81` | `74cdd813becedc76765d9279c34a5544669a00ae720360a2fdec1c43bb0ab8d6` |
+| English edited frame | `53a24c99e62deddcc8e6ce3b190fb59002efd766b97b4bfae02367fc84dc19c9` | `26912314d09ed219f26a2ef27948dc703f343980e980a0a286b0a7d09a324626` |
+
+The [Ubuntu workflow](../../../../.github/workflows/rust-linux-plasma.yaml)
+uses the normal native executable and signed Platform and GL deployments
+already acquired on each runner. Its reader step checks the installed
+[Noble speech packages](../../ubuntu-reader/packages.json) and archives the
+original logs, PCM, screenshots, compiler evidence and `ordinary-reader.json`.
+
+The Fedora stock control from before the registry change was also preserved
+as `artifacts/rust/flatpak-accessibility/stock-b01ed1b`. This directory
+contains the original ELF, compiler inputs, original graph, registry receipt
+and a frozen copy of all 40 first-party inputs. To rerun that executable:
+
+```sh
+stock=artifacts/rust/flatpak-accessibility/stock-b01ed1b
+python3 -B tools/rust-qa/gui/flatpak/run.py \
+  --startup-gui "$stock/release/native-gui-assessment" \
+  --startup-receipt "$stock/release/native-gui-assessment.inputs.json" \
+  --startup-pixels artifacts/rust/egui-cpu-assessment/headless-e94nfyhl/pixels \
+  --tray-menu --screen-reader stock
+```
+
+This archived executable reproduced both visible languages, the GTK positive
+control, empty application roots before Orca and only Tab echoes during
+each traversal. Both primaries exited through Quit and the private
+installation was empty. The replay report `x11-tl5qsy5w/result.json` has
+SHA-256 `a4c44d142b8c2cb618ce180aa53a8a099c04b171a34fb616ec2629b7dc186117`.
