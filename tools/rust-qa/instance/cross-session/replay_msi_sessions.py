@@ -129,9 +129,16 @@ def replay(guest, endpoint, expected, order, prior):
         z = GuestArchive(original)
         build = read(native, 'build.json')
         info = read(z, 'endpoint-info.json')
-        observer = read(z, 'observer.json')
+        observer = read(z, 'handover-observer.json' if order == 'wpf-handover' else 'observer.json')
         required_sources = {'tools/rust-qa/instance/cross-session/msi_sessions.py', 'tools/rust-qa/instance/cross-session/fixture.py',
                             'tools/rust-qa/windows-msi-interop/upload/owners.py', 'tools/RustCompatibilityOracle/installed/interop/shipping_upload.py'}
+        if order == 'wpf-handover':
+            required_sources.update('tools/rust-qa/instance/cross-session/' + f for f in (
+                'handover_msi.py', 'handover_receipts.py', 'handover_quit.ps1', 'config_guard_msi.py',
+                'standard.py', 'existing.py'))
+            required_sources.update(('tools/rust-qa/windows-msi-interop/reverse/quit-source.ps1',
+                                     'tools/rust-qa/windows-msi-interop/reverse/evidence.py',
+                                     'tools/rust-qa/windows-performance/native.py', 'packaging/windows/Test-InstalledUpgrade.ps1'))
         if order == 'config-only':
             required_sources.add('tools/rust-qa/instance/cross-session/config_guard_msi.py')
         require(required_sources.issubset(observer['sources']) and all(digest(subprocess.check_output(
@@ -159,7 +166,7 @@ def replay(guest, endpoint, expected, order, prior):
                         read(first, 'peer-session.json')['identity']['sidSha256'] == other['identity']['sidSha256'],
                         'The original MSI, standard account or native image changed between the two local trials')
                 unmarked(first)
-        else:
+        elif order != 'wpf-handover':
             unmarked(z)
         observation, config_guard = None, None
         if order == 'config-only':
@@ -168,6 +175,32 @@ def replay(guest, endpoint, expected, order, prior):
             result = read(z, order + '/result.json')
             require(result['order'] == order, 'Wrong admission order')
             observation = case(z, result, controller['identity'], other['identity'])
+            if order == 'wpf-handover':
+                from handover_receipts import ordered, shutdown
+                from fixture import MARKER
+                area = order + '/'
+                owned = area + 'finished-profile/'
+                require(area + 'wpf-cleanup.json' not in z.files and area + 'abort' not in z.files
+                        and all(role + '-error.json' not in z.files for role in ('controller', 'peer'))
+                        and z.read(owned + '.ifw-instance-fixture') == MARKER and
+                        read(z, 'result.json') == {'completed': True, 'order': order, 'wpfPid': result['installedWpf']['pid']},
+                        'Expected the completed marked handover')
+                before = read(z, area + 'before-quit.json')
+                ended = read(z, area + 'wpf-ended.json')
+                require(ended == result['ended'] and result['heldSocket'] == read(z, area + 'wpf-socket.json')
+                        and result['installedWpf'] == read(z, area + 'wpf-process.json')
+                        and result['guard'] == read(z, area + 'started.json')['guard'], 'Original guest receipts differ')
+                check_identity(result['admitted']['endpoint'], controller['identity'], 'msi-session-endpoint.exe')
+                check_identity(result['admitted']['writer'], controller['identity'], 'instance.exe')
+                logs = {name: z.read(name) for name in z.files if name.startswith(owned + 'engine-logs/')
+                        and name.endswith('.log')}
+                drained = shutdown(before, ended, read(z, area + 'quit-menu.json'), z.read(area + 'before-quit.log'),
+                                   z.read(area + 'wpf.log'), logs)
+                require(drained == result['shutdown'], 'Detached worker shutdown result differs')
+                ordered(result, *(z.read(area + n + '.stdout').decode('ascii') for n in ('rust-refused', 'rust-admitted', 'writer')))
+                observation.update(installedExit=ended['exitCode'], orderlyQuit=drained,
+                                   admittedPid=result['admitted']['endpoint']['pid'], guardPid=result['admitted']['writer']['pid'])
+
         return {'guestSha256': digest(guest.read_bytes()), 'endpointSha256': expected, 'observerRevision': observer['revision'],
                 'observerSourceHashes': len(observer['sources']), 'nativeSourceHashes': len(build['sources']),
                 'controllerSession': controller['desktop']['sessionId'], 'peerSession': other['desktop']['sessionId'],
@@ -179,7 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('guest', type=Path)
     parser.add_argument('endpoint', type=Path)
     parser.add_argument('actions_sha256')
-    parser.add_argument('order', choices=(*ORDERS, 'config-only'))
+    parser.add_argument('order', choices=(*ORDERS, 'config-only', 'wpf-handover'))
     parser.add_argument('--prior-unmarked', type=Path, help='Original observation ZIP from before the same guest was marked')
     args = parser.parse_args()
     print(json.dumps(replay(args.guest, args.endpoint, args.actions_sha256, args.order, args.prior_unmarked), indent=2))

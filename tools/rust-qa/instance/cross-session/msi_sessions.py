@@ -72,19 +72,19 @@ def launch_wpf(work, session, sid, accounts, orders=ORDERS):
         write(area / 'wpf-ended.json', {'pid': proc.pid, 'exitCode': proc.returncode, 'cleanup': 'test-process termination'})
 
 
-def endpoint(stack, work, area, own, accounts, sid):
+def endpoint(stack, work, area, own, accounts, sid, *, observer=SuspendedEndpoint):
     exe = work / 'bin/msi-session-endpoint.exe'
-    native = stack.enter_context(SuspendedEndpoint(exe, area))
+    native = stack.enter_context(observer(exe, area))
     who = ordinary(accounts, native.proc.pid, sid, exe, own['sessionId'])
     native.resume()
     native.expect('SESSION_MUTEX session=' + str(own['sessionId']) + ' created=true')
     return native, who
 
 
-def begin_guard(stack, work, profile, own, sid, accounts):
+def begin_guard(stack, work, profile, own, sid, accounts, *, observer=instance.Child):
     exe = work / 'bin/instance.exe'
     require(instance.sha(exe) == WRITER_SHA, 'Unexpected retained writer image')
-    child = stack.enter_context(instance.Child([exe, 'writer', profile, sid, '0'], profile,
+    child = stack.enter_context(observer([exe, 'writer', profile, sid, '0'], profile,
                                                 {**os.environ, 'IFW_QA_EXISTING_SESSION': '1'}))
     child.expect('WRITER_HELD')
     return child, ordinary(accounts, child.proc.pid, sid, exe, own['sessionId'])
@@ -112,6 +112,8 @@ def measure(work, order, own, other, accounts, sid):
     media = area / 'media'
     media.mkdir()
     (media / peer.FILENAME).write_bytes(peer.IMAGE)
+    if order not in (*ORDERS, 'wpf-handover'):
+        raise ValueError('Unknown cross-session trial')
     result = {'order': order, 'guard': guard_id(profile)}
     write(area / 'started.json', result)
     with ExitStack() as stack:
@@ -125,6 +127,9 @@ def measure(work, order, own, other, accounts, sid):
         stack.callback(server.shutdown)
         stack.callback(server.release.set)
         (profile / 'config.yaml').write_text(configuration(media, f'http://127.0.0.1:{server.server_port}'), encoding='utf-8')
+        if order == 'wpf-handover':
+            from handover_msi import config_state, finish_handover, tracked
+            result['originalConfig'] = config_state(profile / 'config.yaml')
         if order == 'rust-first':
             native, result['rustProcess'] = endpoint(stack, work, area, own, accounts, sid)
             native.expect('RUST_PRIMARY')
@@ -138,8 +143,9 @@ def measure(work, order, own, other, accounts, sid):
         observed = server.uploads[0]
         write(area / 'socket.json', observed)
         result['heldSocket'] = wait(area, 'wpf-socket.json', timeout=12)
-        if order == 'wpf-first':
-            native, result['rustProcess'] = endpoint(stack, work, area, own, accounts, sid)
+        if order != 'rust-first':
+            observer = tracked(SuspendedEndpoint, area / 'rust-refused.stdout') if order == 'wpf-handover' else SuspendedEndpoint
+            native, result['rustProcess'] = endpoint(stack, work, area, own, accounts, sid, observer=observer)
             refusal = native.events.get(timeout=10)
             allowed = {'PIPE_REFUSED code=Some(5)': 5, 'PIPE_REFUSED code=Some(231)': 231}
             require(refusal in allowed, f'Expected refusal of the occupied first pipe instance, received {refusal!r}')
@@ -168,7 +174,9 @@ def measure(work, order, own, other, accounts, sid):
                     'Rust refusal must occur during the installed upload')
         result.update(posts=server.posts, upload=observed, configSha256=instance.sha(profile / 'config.yaml'))
         write(area / 'stop-wpf.json', True)
-        result['ended'] = wait(area, 'wpf-ended.json')
+        result['ended'] = wait(area, 'wpf-ended.json', timeout=100 if order == 'wpf-handover' else 45)
+        if order == 'wpf-handover':
+            finish_handover(work, profile, media, server, own, accounts, sid, result)
     # Preserve the full first profile instead of reusing its database for the second order.
     profile.rename(area / 'finished-profile')
     write(area / 'result.json', result)
