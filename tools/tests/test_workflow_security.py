@@ -95,6 +95,19 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.check_rust_workflow("rust-desktop-assessment.yaml",
                                  {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
 
+    def test_plasma_menu_and_watcher_have_both_native_linux_runners(self):
+        filename = "rust-linux-plasma.yaml"
+        self.check_rust_workflow(filename, {"actions/checkout", "actions/upload-artifact"})
+        source = (WORKFLOWS / filename).read_text()
+        self.assertEqual(set(re.findall(r"- runner: (\S+)\s+target: (\S+)", source)), {
+            ("ubuntu-24.04", "x86_64-unknown-linux-gnu"),
+            ("ubuntu-24.04-arm", "aarch64-unknown-linux-gnu"),
+        })
+        desktop = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
+        for observer in ("tools/rust-qa/linux-services/gui_watcher.py", "--restart-watcher"):
+            self.assertIn(observer, source)
+            self.assertNotIn(observer, desktop)
+
     def test_focused_windows_workflows_are_branch_bound_and_cannot_publish(self):
         for name in ("rust-windows-msi-interop.yaml", "rust-windows-installed-upload.yaml"):
             with self.subTest(workflow=name):

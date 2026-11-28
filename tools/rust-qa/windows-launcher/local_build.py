@@ -22,21 +22,9 @@ def sha(path):
 
 
 def inventory_sources(directory, target):
-    yaml = QA / "yaml"
-    inputs = json.loads((yaml / "inputs.json").read_bytes())
-    if sha(yaml / "Cargo.lock") != inputs["lock_sha256"]:
-        raise ValueError("The inventory acquisition lock differs from its review")
-    cache = ART / "assessment-cache"
-    subprocess.run(["cargo", "metadata", "--manifest-path", str(yaml / "Cargo.toml"), "--locked", "--format-version", "1"],
-                   cwd=ROOT, env=dict(os.environ, CARGO_HOME=str(cache)), stdout=subprocess.DEVNULL, check=True)
-    prepare = runpy.run_path(str(yaml / "prepare.py"))
-    vendor = directory / "vendor-inputs"
-    changes = prepare["prepare"](cache, vendor, inputs)
     archive = ART / "yaml-assessment/runs" / target / "filtered-sources.tar"
-    archive.parent.mkdir(parents=True, exist_ok=True)
-    prepare["bundle"](vendor, changes, archive)
-    if sha(archive) != inputs["filtered_bundle_sha256"]:
-        raise ValueError("The filtered worker sources differ from the audited archive")
+    subprocess.run([sys.executable, "-B", str(QA / "yaml/restore.py"),
+                    "--vendor", str(directory / "vendor-inputs"), "--archive", str(archive)], check=True)
 
 
 def hosted_revision():

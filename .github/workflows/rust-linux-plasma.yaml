@@ -1,0 +1,128 @@
+name: Rust native Linux Plasma tray
+
+on:
+  push:
+    branches: [rewrite/rust]
+    paths:
+      - '.github/workflows/rust-linux-plasma.yaml'
+      - 'tools/rust-qa/plasma/**'
+      - 'tools/rust-qa/portal-noble/inputs.py'
+      - 'tools/rust-qa/gui/**'
+      - '!tools/rust-qa/gui/src/windows*.rs'
+      - '!tools/rust-qa/gui/tests/windows*.rs'
+      - 'tools/rust-qa/linux-services/gui_watcher.py'
+      - 'tools/rust-qa/linux-services/watcher.py'
+      - 'tools/rust-qa/performance/worker/**'
+      - 'tools/rust-qa/performance/worker-inputs.json'
+      - 'tools/rust-qa/performance/build_worker.py'
+      - 'tools/rust-qa/performance/present.rs'
+      - 'tools/rust-qa/performance/linux.py'
+      - 'tools/rust-qa/performance/session.py'
+      - 'tools/rust-qa/performance/x11.py'
+      - 'tools/rust-qa/yaml/Cargo.*'
+      - 'tools/rust-qa/yaml/inputs.json'
+      - 'tools/rust-qa/yaml/prepare.py'
+      - 'tools/rust-qa/yaml/restore.py'
+      - 'tools/rust-qa/hosted-linux-namespace.*'
+      - 'tools/rust-qa/install-toolchain.sh'
+      - 'tools/rust-qa/check-toolchain.py'
+      - 'tools/rust-qa/build-gui-probe.py'
+      - 'tools/rust-qa/verify-gui-inputs.py'
+      - 'tools/rust-qa/audit-graph.py'
+      - 'tools/rust-qa/legacy/licenses/Unicode-LICENSE.txt'
+      - 'tools/rust-qa/storage/evidence.py'
+      - 'rust/Cargo.toml'
+      - 'rust/toolchain-inputs.json'
+      - 'rust/crates/desktop-lifecycle/**'
+      - 'rust/crates/safe-fs/**'
+      - 'rust/assets/fonts/**'
+      - 'rust/audit/gui*'
+      - 'rust/audit/notices/**'
+      - 'assets/branding/logo.svg'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plasma:
+    if: github.ref == 'refs/heads/rewrite/rust'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    env:
+      NATIVE_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned native Rust compiler
+        run: bash tools/rust-qa/install-toolchain.sh "$NATIVE_TARGET"
+
+      - name: Prepare the private D-Bus and native X11 test host
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends apparmor bubblewrap build-essential dbus \
+            libglib2.0-bin python3-gi gir1.2-glib-2.0 xvfb x11-utils libx11-6 libxtst6 \
+            libxdamage1 libxres1 libvulkan1 mesa-vulkan-drivers libxkbcommon-x11-0 pkg-config gpg gpgv
+          bash tools/rust-qa/hosted-linux-namespace.sh prepare
+
+      - name: Compile the source-bound GUI and inventory worker for this architecture
+        id: pair
+        run: |
+          export PATH="$PWD/artifacts/rust/toolchain/bin:$PATH"
+          /usr/bin/python3 -B tools/rust-qa/build-gui-probe.py "$NATIVE_TARGET"
+          area=artifacts/rust/plasma/worker-sources
+          /usr/bin/python3 -B tools/rust-qa/yaml/restore.py --vendor "$area/vendor" --archive "$area/filtered-sources.tar"
+          /usr/bin/python3 -B tools/rust-qa/performance/build_worker.py --name plasma-native --vendor "$area/vendor"
+
+      - name: Observe the hidden original GUI across five watcher owners
+        run: |
+          /usr/bin/python3 -B tools/rust-qa/linux-services/gui_watcher.py \
+            --gui artifacts/rust/performance/subjects/plasma-native/native-gui-assessment \
+            --output artifacts/rust/linux-services/tray-gui-handover
+
+      - name: Reconstruct the audited Noble Plasma desktop
+        if: ${{ !cancelled() && steps.pair.outcome == 'success' }}
+        id: desktop
+        run: /usr/bin/python3 -B tools/rust-qa/plasma/prepare.py --acquire
+
+      - name: Reopen the hidden GUI twice from the visible panel icon
+        if: ${{ !cancelled() && steps.desktop.outcome == 'success' }}
+        run: /usr/bin/python3 -B tools/rust-qa/plasma/run.py --binary artifacts/rust/performance/subjects/plasma-native/native-gui-assessment
+
+      - name: Select Open, Restart and Quit after reloading the private Plasma watcher
+        if: ${{ !cancelled() && steps.desktop.outcome == 'success' }}
+        run: |
+          subject=artifacts/rust/performance/subjects/plasma-native
+          /usr/bin/python3 -B tools/rust-qa/plasma/run.py --binary "$subject/native-gui-assessment" \
+            --worker "$subject/ifw-performance-worker" --restart-watcher
+
+      - name: Retain the original executables, compiler receipts and desktop observations
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-plasma-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            artifacts/rust/performance/subjects/plasma-native/native-gui-assessment*
+            artifacts/rust/performance/subjects/plasma-native/ifw-performance-worker
+            artifacts/rust/performance/subjects/plasma-native/worker.inputs.json
+            artifacts/rust/gui-native/${{ matrix.target }}/
+            artifacts/rust/linux-services/tray-gui-handover/
+            artifacts/rust/plasma/runs/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove the job-specific namespace launcher
+        if: always()
+        run: bash tools/rust-qa/hosted-linux-namespace.sh cleanup

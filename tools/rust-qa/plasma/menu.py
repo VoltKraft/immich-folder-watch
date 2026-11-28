@@ -238,8 +238,14 @@ def exercise(stack, x, bus, primary, shell, app, item, report, reload_watcher):
             actions["replacement"] = second
             if not original.poll(0) or second["pid"] == first["pid"]:
                 raise ValueError("The original worker was still running after replacement")
-            wait_for(lambda: check_alive(primary, log) or "INVENTORY_COMPLETE files=2 changed=2 pass=0" in log.read_text(),
-                     10, "The replacement failed to read the changed corpus")
+            def replacement_inventories():
+                check_alive(primary, log)
+                # The replacement can write before its parent announces the new PID.
+                _, _, events = log.read_text().partition(f"WORKER_EXIT pid={first['pid']} reason=restart success=true\n")
+                return [line for line in events.splitlines() if line.startswith("INVENTORY_COMPLETE ")][:2]
+            expected = ["INVENTORY_COMPLETE files=2 changed=2 pass=0", "INVENTORY_COMPLETE files=2 changed=0 pass=1"]
+            wait_for(lambda: replacement_inventories() == expected, 10, "The replacement did not finish both inventories")
+            actions["replacementInventories"] = expected
             if subject_window(x, primary.pid) != window:
                 raise ValueError("Restart replaced or closed the original GUI")
         else:

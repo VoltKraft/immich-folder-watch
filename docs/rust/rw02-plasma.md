@@ -231,6 +231,13 @@ The second menu bus trace has SHA-256
 `641ecc655075fb3a3849206026aedfbc91fa71bce19f09c72496341a538c990b`.
 The native ARM64 run of this three-command trial is pending.
 
+In a third x64 session the observer checked the first two inventory
+records after the original worker exited. New worker 300 reported two
+changed files on pass 0 and zero changes among the same two files on
+pass 1. It exited on Quit with the original GUI. The report in
+`artifacts/rust/plasma/runs/plasma-ghqmldfd/` has SHA-256
+`0d9a7bb71e9b863bd1bf1437cdc68c1d818362523dd32203b4ad863c887dfccc`.
+
 ### Panel activation and artwork
 
 In the desktop runs at `549066f` and `ba02f8b`, the public binary-pool
@@ -273,7 +280,7 @@ Qt Core, Qt Quick, XCB and watcher libraries mapped in the shell and KDED.
 Both the frozen x64 blank-icon control and a fresh x64 build from
 `725f1cd` passed the new observer on an isolated local display.
 The ARM64 run above also passed on Ubuntu's own kernel.
-[Native workflow](../../.github/workflows/rust-desktop-assessment.yaml).
+[Native Plasma workflow](../../.github/workflows/rust-linux-plasma.yaml).
 
 On an Ubuntu Linux x64 or ARM64 assessment runner with Python 3.11 or newer,
 Bubblewrap and tar, run the ordinary audited GUI build, then run these
@@ -292,3 +299,10 @@ inside Bubblewrap. Each assessment creates a fresh run directory. Retain
 `artifacts/rust/plasma/runs/**` for the JSON receipts, the target-limited
 bus trace, the GUI and desktop logs, and the panel and window images.
 [Guest preparation](../../tools/rust-qa/plasma/prepare.py) and [launcher](../../tools/rust-qa/plasma/run.py).
+
+The dedicated Plasma job builds the native GUI and its inventory worker
+on both Ubuntu architectures. Each runner records the five-owner D-Bus
+trial, the two ordinary panel clicks and the three menu selections after
+the watcher reload. Its artifact contains the original executables and
+their compiler receipts alongside the desktop observations.
+[Native jobs and source inputs](../../.github/workflows/rust-linux-plasma.yaml).

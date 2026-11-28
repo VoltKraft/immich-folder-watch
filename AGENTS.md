@@ -250,7 +250,8 @@ to reconcile project decisions, defaults, and recorded state.
   before changing the palette. With an unnamed original scheme, retain the
   read-only [Windows contrast baseline](docs/rust/rw02-appearance.md#windows-contrast-baseline-and-restoration-at-f155b65).
   The Plasma fixture uses separate audited Ubuntu package sets for x64 and
-  ARM64. Run its native GUI and panel on the matching architecture.
+  ARM64. The [native Plasma jobs](.github/workflows/rust-linux-plasma.yaml)
+  run the matching GUI, worker and panel on both architectures.
   For [Linux tray menu changes](docs/rust/rw02-plasma.md#open-restart-and-quit-from-the-plasma-menu),
   follow the original GUI and both inventory workers through the three
   Plasma menu selections after the private KDED watcher reloads.
