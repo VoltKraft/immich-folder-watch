@@ -30,9 +30,12 @@ Windows ARM64 application-mode trial confirmed the ordinary send and
 history cleanup. No visible Shell banner was verified. Two x64 console
 trials preserved the normal editor's backwards selection and focus
 across an ordinary second launch. On ARM64 both rebuilt variants showed
-the edited filename on private 96-DPI desktops. Their Default-desktop
-trials timed out waiting for the original field.
+the edited filename on private 96-DPI desktops. The archived ordinary GUI
+also restored the selection and accepted the next two keystrokes after an
+ordinary second launch. The separate Default-desktop trials timed out
+waiting for the original field.
 [Windows x64 second launch](rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch) ·
+[ARM64 second launch](rw02-windows-text.md#arm64-filename-selection-on-the-private-console) ·
 [ARM64 frames after the selection fix](rw02-windows-display.md#native-arm64-editor-frames-after-the-selection-fix).
 [Ubuntu budget repeat](rw02-performance.md#retained-worker-budget-on-ubuntu-x64-and-arm64-at-9487dbe) ·
 [Reopened editor](rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch) ·

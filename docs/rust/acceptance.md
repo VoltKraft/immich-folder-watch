@@ -62,7 +62,10 @@ The editor at `b71b573` also retained keyboard focus and its directional
 Unicode selection after an ordinary reopen on both backends.
 Two Windows x64 console runs also recovered the original selection in
 the replacement HWND, extended the left edge and replaced the selected
-text without refocusing the field. [Windows editor and native input](rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch).
+text without refocusing the field. The native ARM64 trial at `d8386a0`
+also preserved the selection on its private console and restored the
+original desktop. [Windows x64 editor and native input](rw02-windows-text.md#backward-filename-selection-across-an-ordinary-x64-second-launch) ·
+[ARM64 editor readback](rw02-windows-text.md#arm64-filename-selection-on-the-private-console).
 [Selected grants and revocation](rw02-portal-dialog.md#opening-and-revoking-a-directory-with-an-escaped-name) ·
 [Native editor measurements](rw02-native-gui.md#filename-selection-after-a-normal-close-and-second-launch).
 
