@@ -111,6 +111,22 @@ class WorkflowSecurityPolicyTests(unittest.TestCase):
         self.assertIn('tools/RustCompatibilityOracle/installed/launch/graphics.py "$PLATFORM_DEPLOYMENT"', source)
         self.assertIn("artifacts/rust/flatpak-gui-launch-assessment/", source)
 
+    def test_native_linux_worker_budget_reuses_the_two_desktop_measurements(self):
+        name = "rust-linux-worker-budget.yaml"
+        self.check_rust_workflow(name, {"actions/checkout", "actions/setup-dotnet", "actions/upload-artifact"})
+        source = (WORKFLOWS / name).read_text()
+        self.assertEqual(re.findall(r"^      - '(.*)'$", source.split("permissions:", 1)[0], re.M), [".github/workflows/" + name])
+        self.assertIn("  workflow_dispatch:", source)
+        self.assertNotIn("pull_request", source)
+        self.assertEqual(set(re.findall(r"- runner: (\S+)\s+target: (\S+)", source)), {
+            ("ubuntu-24.04", "x86_64-unknown-linux-gnu"), ("ubuntu-24.04-arm", "aarch64-unknown-linux-gnu")})
+        self.assertIn("  actions: read", source)
+        broad = (WORKFLOWS / "rust-desktop-assessment.yaml").read_text()
+        for phase in ("reference", "candidate"):
+            command = "bash tools/rust-qa/performance/hosted_budget.sh " + phase
+            self.assertIn(command, source)
+            self.assertIn(command, broad)
+
     def test_focused_windows_workflows_are_branch_bound_and_cannot_publish(self):
         for name in ("rust-windows-msi-interop.yaml", "rust-windows-installed-upload.yaml"):
             with self.subTest(workflow=name):

@@ -723,24 +723,11 @@ jobs:
         if: ${{ !cancelled() && steps.worker.outcome == 'success' }}
         env:
           NUGET_PACKAGES: ${{ github.workspace }}/artifacts/rust/assessment-nuget
-        run: |
-          reference=19dcbaf63be583c4cf9071302abeb9ccdc2bd3dc
-          git diff --exit-code "$reference" HEAD -- src ':!src/ImmichFolderWatch.Tests.*' Directory.Build.props Directory.Build.targets global.json NuGet.Config assets/branding tools/BrandAssetGen packaging/avalonia-reduced
-          python3 tools/prepare_reduced_avalonia.py
-          dotnet build src/ImmichFolderWatch.App.Linux/ImmichFolderWatch.App.Linux.csproj -c Release --artifacts-path artifacts/rust/linux-reference
-          python3 tools/rust-qa/performance/linux.py measure --name "hosted-dotnet-$NATIVE_TARGET" \
-            --entry artifacts/rust/linux-reference/bin/ImmichFolderWatch.App.Linux/release/immich-folder-watch.dll \
-            --runtime-root "$DOTNET_ROOT" --revision "$reference" --input-interval-ms 25
+        run: bash tools/rust-qa/performance/hosted_budget.sh reference
 
       - name: Compare Rust startup, memory, CPU, idle rendering and response during the native scan
         if: ${{ !cancelled() && steps.budget.outcome == 'success' }}
-        run: |
-          python3 tools/rust-qa/performance/linux.py measure --name "hosted-rust-$NATIVE_TARGET" \
-            --entry artifacts/rust/performance/subjects/graphics-ci/native-gui-assessment \
-            --revision "$GITHUB_SHA" --desktop-spike --frame-counter --input-interval-ms 25 \
-            --start-marker INVENTORY_STARTED --finish-marker INVENTORY_COMPLETE
-          python3 tools/rust-qa/performance/linux.py compare \
-            "artifacts/rust/performance/hosted-dotnet-$NATIVE_TARGET.json" "artifacts/rust/performance/hosted-rust-$NATIVE_TARGET.json"
+        run: bash tools/rust-qa/performance/hosted_budget.sh candidate artifacts/rust/performance/subjects/graphics-ci "$GITHUB_SHA"
 
       - name: Observe Windows input-method composition with native Japanese Basic Typing
         if: ${{ !cancelled() && runner.os == 'Windows' && steps.gui.outcome == 'success' }}
